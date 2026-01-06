@@ -1,0 +1,12 @@
+workflow_status:
+  product-brief: "c:/Users/aheedtahir/Bmad-Experiment/_bmad-output/planning-artifacts/product-brief-ClearDues-2026-01-05.md"
+  prd: "c:/Users/aheedtahir/Bmad-Experiment/_bmad-output/planning-artifacts/prd.md"
+  architecture: "c:/Users/aheedtahir/Bmad-Experiment/_bmad-output/planning-artifacts/architecture.md"
+  epics: "c:/Users/aheedtahir/Bmad-Experiment/_bmad-output/planning-artifacts/epics.md"
+metadata:
+  last_updated: "2026-01-06T11:53:00+05:00"
+  completed_workflows:
+    - "product-brief"
+    - "prd"
+    - "create-architecture"
+    - "create-epics-and-stories"

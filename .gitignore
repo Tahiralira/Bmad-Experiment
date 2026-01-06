@@ -1,0 +1,84 @@
+# AI Agent Folders (Useless for source code)
+.agent/
+.agentvibes/
+.augment/
+.claude/
+.clinerules/
+.codex/
+.crush/
+.cursor/
+.gemini/
+.iflow/
+.kiro/
+.opencode/
+.qwen/
+.roo/
+.rovodev/
+.trae/
+.windsurf/
+.codex/
+.trae/
+
+# Python / General
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.next/
+out/
+.nuxt/
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# BMM Engine
+# We ignore the heavy workflow engine files, but KEEP the output and config
+/_bmad/bmm/workflows/
+/_bmad/core/
+/_bmad/gui/
+# Ensure we keep the output
+!/_bmad-output/
+!/_bmad/bmm/config.yaml
+
+# Local/Secrets
+.env
+.env.*
+!.env.example
+
+# Temporary
+temp.py
