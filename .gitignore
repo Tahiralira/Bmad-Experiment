@@ -16,8 +16,6 @@
 .rovodev/
 .trae/
 .windsurf/
-.codex/
-.trae/
 
 # Python / General
 .venv/
@@ -66,19 +64,22 @@ out/
 ehthumbs.db
 Thumbs.db
 
-# BMM Engine
-# We ignore the heavy workflow engine files, but KEEP the output and config
-/_bmad/bmm/workflows/
-/_bmad/core/
-/_bmad/gui/
-# Ensure we keep the output
+# BMAD Framework - Ignore ALL except output and project config
+/_bmad/
 !/_bmad-output/
-!/_bmad/bmm/config.yaml
+
+# Backup and old folders
+/_bmad-backup/
+/cleardues-old-prd/
 
 # Local/Secrets
 .env
 .env.*
 !.env.example
 
+# Windows artifacts
+nul
+
 # Temporary
 temp.py
+package.json

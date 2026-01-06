@@ -1,0 +1,38 @@
+// Shared components - re-exports from ui and common
+// These re-exports allow new code to import from @/shared/components
+// while maintaining backward compatibility with existing @/components imports
+
+// UI components (shadcn/ui)
+export * from "@/components/ui/alert"
+export * from "@/components/ui/avatar"
+export * from "@/components/ui/badge"
+export { Button, buttonVariants } from "@/components/ui/button"
+export * from "@/components/ui/button-group"
+export * from "@/components/ui/card"
+export * from "@/components/ui/checkbox"
+export * from "@/components/ui/dialog"
+export * from "@/components/ui/dropdown-menu"
+export * from "@/components/ui/form"
+export * from "@/components/ui/input"
+export * from "@/components/ui/label"
+export * from "@/components/ui/loading-button"
+export * from "@/components/ui/pagination"
+export * from "@/components/ui/password-input"
+export * from "@/components/ui/select"
+export * from "@/components/ui/separator"
+export * from "@/components/ui/sheet"
+export * from "@/components/ui/sidebar"
+export * from "@/components/ui/skeleton"
+export * from "@/components/ui/sonner"
+export * from "@/components/ui/table"
+export * from "@/components/ui/tabs"
+export * from "@/components/ui/tooltip"
+
+// Common components (named exports)
+export { Appearance, SidebarAppearance } from "@/components/Common/Appearance"
+export { AuthLayout } from "@/components/Common/AuthLayout"
+export { DataTable } from "@/components/Common/DataTable"
+export { default as ErrorComponent } from "@/components/Common/ErrorComponent"
+export { Footer } from "@/components/Common/Footer"
+export { Logo } from "@/components/Common/Logo"
+export { default as NotFound } from "@/components/Common/NotFound"
