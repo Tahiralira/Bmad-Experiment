@@ -1,4 +1,5 @@
 # Auth feature models - User and authentication-related schemas
+import secrets
 import uuid
 from datetime import datetime, timezone
 
@@ -46,15 +47,49 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# Authentication methods
+AUTH_METHOD_PASSWORD = "password"
+AUTH_METHOD_MAGIC_LINK = "magic_link"
+AUTH_METHOD_OAUTH = "oauth"
+
+
 # Database model, database table inferred from class name
 class User(UserBase, table=True):
     __tablename__ = "user"  # Explicit table name (singular, not plural per architecture.md)
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    hashed_password: str
+    hashed_password: str  # For magic_link users, this is a random placeholder
+    auth_method: str = Field(default=AUTH_METHOD_PASSWORD, max_length=20)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now})
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
+
+
+# Magic link token for passwordless authentication
+class MagicLinkToken(SQLModel, table=True):
+    """
+    Stores one-time use magic link tokens for passwordless registration/login.
+    Tokens are stored in database (not JWT) to allow immediate invalidation.
+    """
+    __tablename__ = "magic_link_token"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    email: str = Field(index=True, max_length=255)
+    token: str = Field(unique=True, index=True, max_length=64)
+    expires_at: datetime
+    used_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    @classmethod
+    def generate_token(cls) -> str:
+        """Generate a cryptographically secure token."""
+        return secrets.token_urlsafe(32)
+
+
+# Schema for magic link registration request
+class MagicLinkRequest(SQLModel):
+    """Request schema for magic link registration."""
+    email: EmailStr = Field(max_length=255)
 
 
 # Properties to return via API, id is always required
@@ -76,6 +111,12 @@ class Message(SQLModel):
 class Token(SQLModel):
     access_token: str
     token_type: str = "bearer"
+
+
+# Token response with user info for magic link verification
+class TokenWithUser(Token):
+    """Token response that includes user information after magic link verification."""
+    user: "UserPublic"
 
 
 # Contents of JWT token

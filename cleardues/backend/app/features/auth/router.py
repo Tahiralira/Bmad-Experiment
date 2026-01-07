@@ -23,6 +23,7 @@ from app.features.auth.models import (
     Message,
     NewPassword,
     Token,
+    TokenWithUser,
     UpdatePassword,
     User,
     UserCreate,
@@ -31,10 +32,13 @@ from app.features.auth.models import (
     UsersPublic,
     UserUpdate,
     UserUpdateMe,
+    MagicLinkRequest,
+    AUTH_METHOD_MAGIC_LINK,
 )
 from app.features.auth import service as auth_service
 from app.utils import (
     generate_new_account_email,
+    generate_magic_link_email,
     generate_password_reset_token,
     generate_reset_password_email,
     send_email,
@@ -49,6 +53,9 @@ login_router = APIRouter(tags=["login"])
 
 # Users router
 users_router = APIRouter(prefix="/users", tags=["users"])
+
+# Auth router for magic link registration/verification
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 # ============================================================================
@@ -356,6 +363,120 @@ def delete_user(
     return Message(message="User deleted successfully")
 
 
+# ============================================================================
+# MAGIC LINK AUTH ROUTES
+# ============================================================================
+
+
+@auth_router.post("/register", response_model=Message)
+def request_magic_link(session: SessionDep, body: MagicLinkRequest) -> Message:
+    """
+    Request a magic link for passwordless registration.
+
+    Generates a magic link token and sends it to the user's email.
+    Returns a generic success message regardless of whether the email exists
+    (to prevent email enumeration attacks).
+
+    Rate limited to 3 requests per email per hour.
+    """
+    # Check if user already exists
+    existing_user = auth_service.get_user_by_email(session=session, email=body.email)
+    if existing_user:
+        # User already exists - still return success message for security
+        # (prevents email enumeration)
+        return Message(
+            message="If an account exists or can be created, we've sent a magic link"
+        )
+
+    # Check rate limiting
+    if auth_service.is_rate_limited(session=session, email=body.email):
+        # Return same message to prevent enumeration, but don't create token
+        return Message(
+            message="If an account exists or can be created, we've sent a magic link"
+        )
+
+    # Generate magic link token (returns tuple of token object and raw token)
+    _, raw_token = auth_service.generate_magic_link_token(session=session, email=body.email)
+
+    # Send email with magic link (use raw_token for the URL, not hashed)
+    if settings.emails_enabled:
+        email_data = generate_magic_link_email(
+            email_to=body.email,
+            token=raw_token,
+            valid_minutes=auth_service.MAGIC_LINK_EXPIRE_MINUTES,
+        )
+        send_email(
+            email_to=body.email,
+            subject=email_data.subject,
+            html_content=email_data.html_content,
+        )
+
+    return Message(
+        message="If an account exists or can be created, we've sent a magic link"
+    )
+
+
+@auth_router.get("/verify/{token}", response_model=TokenWithUser)
+def verify_magic_link(session: SessionDep, token: str) -> TokenWithUser:
+    """
+    Verify a magic link token and create the user account.
+
+    If the token is valid:
+    - Creates a new user account (passwordless)
+    - Marks the token as used
+    - Returns a JWT access token for the user
+    """
+    import secrets
+
+    # Verify token
+    magic_token = auth_service.verify_magic_link_token(session=session, token_str=token)
+
+    if not magic_token:
+        # Token doesn't exist or is expired
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired token. Please request a new magic link."
+        )
+
+    # Check if user already exists (shouldn't happen normally, but handle edge case)
+    existing_user = auth_service.get_user_by_email(session=session, email=magic_token.email)
+    if existing_user:
+        # Mark token as used
+        auth_service.mark_token_as_used(session=session, token=magic_token)
+        raise HTTPException(
+            status_code=400,
+            detail="An account with this email already exists. Please log in."
+        )
+
+    # Create passwordless user with random placeholder password
+    placeholder_password = secrets.token_urlsafe(32)
+    user = User(
+        email=magic_token.email,
+        hashed_password=get_password_hash(placeholder_password),
+        auth_method=AUTH_METHOD_MAGIC_LINK,
+        is_active=True,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    # Mark token as used
+    auth_service.mark_token_as_used(session=session, token=magic_token)
+
+    # Generate JWT access token
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = security.create_access_token(
+        user.id, expires_delta=access_token_expires
+    )
+
+    return TokenWithUser(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserPublic.model_validate(user),
+    )
+
+
 # Include sub-routers into main auth router
 router.include_router(login_router)
 router.include_router(users_router)
+router.include_router(auth_router)

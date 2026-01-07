@@ -432,6 +432,50 @@ export class UsersService {
     }
 }
 
+export class AuthService {
+    /**
+     * Request Magic Link
+     * Request a magic link for passwordless registration.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static requestMagicLink(data: { requestBody: { email: string } }): CancelablePromise<{ message: string }> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/auth/register',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+
+    /**
+     * Verify Magic Link
+     * Verify a magic link token and create the user account.
+     * @param data The data for the request.
+     * @param data.token
+     * @returns TokenWithUser Successful Response
+     * @throws ApiError
+     */
+    public static verifyMagicLink(data: { token: string }): CancelablePromise<{ access_token: string; token_type: string; user: { id: string; email: string; full_name: string | null; is_active: boolean; is_superuser: boolean } }> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/auth/verify/{token}',
+            path: {
+                token: data.token
+            },
+            errors: {
+                400: 'Bad Request',
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
 export class UtilsService {
     /**
      * Test Email

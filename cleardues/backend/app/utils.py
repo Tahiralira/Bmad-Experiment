@@ -100,6 +100,33 @@ def generate_new_account_email(
     return EmailData(html_content=html_content, subject=subject)
 
 
+def generate_magic_link_email(email_to: str, token: str, valid_minutes: int = 15) -> EmailData:
+    """
+    Generate a magic link email for passwordless registration/login.
+
+    Args:
+        email_to: The recipient email address
+        token: The magic link token
+        valid_minutes: Number of minutes until the link expires (default 15)
+
+    Returns:
+        EmailData with the rendered email content and subject
+    """
+    project_name = settings.PROJECT_NAME
+    subject = f"{project_name} - Complete your registration"
+    link = f"{settings.FRONTEND_HOST}/verify/{token}"
+    html_content = render_email_template(
+        template_name="magic_link.html",
+        context={
+            "project_name": settings.PROJECT_NAME,
+            "email": email_to,
+            "valid_minutes": valid_minutes,
+            "link": link,
+        },
+    )
+    return EmailData(html_content=html_content, subject=subject)
+
+
 def generate_password_reset_token(email: str) -> str:
     delta = timedelta(hours=settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS)
     now = datetime.now(timezone.utc)

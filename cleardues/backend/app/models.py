@@ -17,9 +17,17 @@ from app.features.auth.models import (
     UpdatePassword,
     # Auth models
     Token,
+    TokenWithUser,
     TokenPayload,
     NewPassword,
     Message,
+    # Magic link models
+    MagicLinkToken,
+    MagicLinkRequest,
+    # Auth method constants
+    AUTH_METHOD_PASSWORD,
+    AUTH_METHOD_MAGIC_LINK,
+    AUTH_METHOD_OAUTH,
     # Item models (temporary - will be moved to expenses feature)
     Item,
     ItemBase,
@@ -44,9 +52,17 @@ __all__ = [
     "UpdatePassword",
     # Auth models
     "Token",
+    "TokenWithUser",
     "TokenPayload",
     "NewPassword",
     "Message",
+    # Magic link models
+    "MagicLinkToken",
+    "MagicLinkRequest",
+    # Auth method constants
+    "AUTH_METHOD_PASSWORD",
+    "AUTH_METHOD_MAGIC_LINK",
+    "AUTH_METHOD_OAUTH",
     # Item models
     "Item",
     "ItemBase",
