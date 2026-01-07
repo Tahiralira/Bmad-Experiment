@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { OAuthButtons } from "@/features/auth/components"
 import { isLoggedIn } from "@/hooks/useAuth"
 import { AuthService } from "@/client"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
@@ -172,6 +173,8 @@ function Register() {
             >
               Send Magic Link
             </LoadingButton>
+
+            <OAuthButtons disabled={registerMutation.isPending} />
           </div>
 
           <div className="text-center text-sm">

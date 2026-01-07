@@ -1,14 +1,16 @@
 # Auth feature router - API routes for authentication and user management
 # Consolidates login and user routes from the original api/routes/ directory
 
+import secrets
 import uuid
 from datetime import timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import col, delete, func, select
+from starlette.requests import Request
 
 from app.api.deps import (
     CurrentUser,
@@ -36,6 +38,7 @@ from app.features.auth.models import (
     AUTH_METHOD_MAGIC_LINK,
 )
 from app.features.auth import service as auth_service
+from app.core.oauth import oauth, SUPPORTED_PROVIDERS, is_provider_configured
 from app.utils import (
     generate_new_account_email,
     generate_magic_link_email,
@@ -426,8 +429,6 @@ def verify_magic_link(session: SessionDep, token: str) -> TokenWithUser:
     - Marks the token as used
     - Returns a JWT access token for the user
     """
-    import secrets
-
     # Verify token
     magic_token = auth_service.verify_magic_link_token(session=session, token_str=token)
 
@@ -579,6 +580,136 @@ def verify_login_magic_link(session: SessionDep, token: str) -> TokenWithUser:
         token_type="bearer",
         user=UserPublic.model_validate(user),
     )
+
+
+# ============================================================================
+# OAUTH ROUTES (Story 1.6)
+# ============================================================================
+
+
+@auth_router.get("/oauth/{provider}/login")
+async def oauth_login(request: Request, provider: str) -> RedirectResponse:
+    """
+    Initiate OAuth login flow for the specified provider.
+    Redirects user to provider's consent screen.
+
+    Supported providers: google, github
+    """
+    if provider not in SUPPORTED_PROVIDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported OAuth provider: {provider}. Supported: {', '.join(SUPPORTED_PROVIDERS)}"
+        )
+
+    if not is_provider_configured(provider):
+        raise HTTPException(
+            status_code=503,
+            detail=f"OAuth provider '{provider}' is not configured. Please set the required environment variables."
+        )
+
+    # Build callback URL
+    redirect_uri = f"{settings.OAUTH_REDIRECT_BASE_URL}/api/v1/auth/oauth/{provider}/callback"
+
+    client = oauth.create_client(provider)
+    return await client.authorize_redirect(request, redirect_uri)
+
+
+@auth_router.get("/oauth/{provider}/callback")
+async def oauth_callback(
+    request: Request,
+    provider: str,
+    session: SessionDep,
+) -> RedirectResponse:
+    """
+    Handle OAuth callback from provider.
+    Exchanges authorization code for token, creates/links user, returns JWT.
+    Redirects to frontend with token in query parameter.
+    """
+    if provider not in SUPPORTED_PROVIDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported OAuth provider: {provider}"
+        )
+
+    if not is_provider_configured(provider):
+        raise HTTPException(
+            status_code=503,
+            detail=f"OAuth provider '{provider}' is not configured"
+        )
+
+    client = oauth.create_client(provider)
+
+    try:
+        token = await client.authorize_access_token(request)
+    except Exception as e:
+        # Redirect to frontend with error
+        error_url = f"{settings.FRONTEND_HOST}/auth/callback?error=oauth_failed&message={str(e)}"
+        return RedirectResponse(url=error_url)
+
+    # Extract user info based on provider
+    email: str | None = None
+    full_name: str | None = None
+    provider_id: str | None = None
+
+    if provider == "google":
+        # Google returns userinfo in the token for OpenID Connect
+        user_info = token.get("userinfo")
+        if not user_info:
+            # Fallback to fetching userinfo separately
+            resp = await client.get("userinfo")
+            user_info = resp.json()
+        email = user_info.get("email")
+        full_name = user_info.get("name")
+        provider_id = user_info.get("sub")  # Google's unique user ID
+
+    elif provider == "github":
+        # GitHub requires separate API calls
+        resp = await client.get("user")
+        user_info = resp.json()
+        provider_id = str(user_info.get("id"))
+        full_name = user_info.get("name") or user_info.get("login")
+
+        # GitHub may not include email in profile - need separate call
+        email = user_info.get("email")
+        if not email:
+            emails_resp = await client.get("user/emails")
+            emails = emails_resp.json()
+            # Find primary verified email
+            for e in emails:
+                if e.get("primary") and e.get("verified"):
+                    email = e.get("email")
+                    break
+
+    if not email:
+        error_url = f"{settings.FRONTEND_HOST}/auth/callback?error=no_email&message=Could not retrieve email from OAuth provider"
+        return RedirectResponse(url=error_url)
+
+    if not provider_id:
+        error_url = f"{settings.FRONTEND_HOST}/auth/callback?error=no_provider_id&message=Could not retrieve user ID from OAuth provider"
+        return RedirectResponse(url=error_url)
+
+    # Find or create user (handles account linking)
+    user = auth_service.find_or_create_oauth_user(
+        session=session,
+        email=email,
+        full_name=full_name,
+        provider=provider,
+        provider_id=provider_id
+    )
+
+    if not user.is_active:
+        error_url = f"{settings.FRONTEND_HOST}/auth/callback?error=inactive&message=Account is deactivated"
+        return RedirectResponse(url=error_url)
+
+    # Generate JWT with 30-day expiration (PRD "Walled Garden")
+    access_token_expires = timedelta(days=settings.LOGIN_TOKEN_EXPIRE_DAYS)
+    access_token = security.create_access_token(
+        user.id, expires_delta=access_token_expires
+    )
+
+    # Redirect to frontend with token
+    frontend_callback_url = f"{settings.FRONTEND_HOST}/auth/callback?token={access_token}"
+    return RedirectResponse(url=frontend_callback_url)
 
 
 # Include sub-routers into main auth router

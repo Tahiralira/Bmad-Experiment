@@ -14,6 +14,7 @@ from app.features.auth.models import (
     Item,
     ItemCreate,
     MagicLinkToken,
+    AUTH_METHOD_OAUTH,
 )
 
 
@@ -165,3 +166,78 @@ def cleanup_expired_tokens(*, session: Session) -> int:
         session.delete(token)
     session.commit()
     return count
+
+
+# ============================================================================
+# OAUTH USER OPERATIONS
+# ============================================================================
+
+
+def get_user_by_oauth(
+    *, session: Session, provider: str, provider_id: str
+) -> User | None:
+    """
+    Find a user by OAuth provider and provider ID.
+    """
+    statement = select(User).where(
+        User.oauth_provider == provider,
+        User.oauth_provider_id == provider_id
+    )
+    return session.exec(statement).first()
+
+
+def find_or_create_oauth_user(
+    *,
+    session: Session,
+    email: str,
+    full_name: str | None,
+    provider: str,
+    provider_id: str
+) -> User:
+    """
+    Find existing user or create new one for OAuth login.
+
+    Logic:
+    1. First try to find by oauth_provider + oauth_provider_id (exact match)
+    2. Then try to find by email (account linking)
+    3. If not found, create new user
+
+    Returns the user (existing or newly created).
+    """
+    import secrets
+
+    # Try to find by OAuth provider ID first (existing OAuth user)
+    user = get_user_by_oauth(
+        session=session, provider=provider, provider_id=provider_id
+    )
+    if user:
+        return user
+
+    # Try to find by email (potential account linking)
+    user = get_user_by_email(session=session, email=email)
+    if user:
+        # Link OAuth to existing account
+        user.oauth_provider = provider
+        user.oauth_provider_id = provider_id
+        # Keep original auth_method if it was password or magic_link
+        # User can still use those methods
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+
+    # Create new OAuth user with placeholder password
+    placeholder_password = secrets.token_urlsafe(32)
+    user = User(
+        email=email,
+        full_name=full_name,
+        hashed_password=get_password_hash(placeholder_password),
+        auth_method=AUTH_METHOD_OAUTH,
+        oauth_provider=provider,
+        oauth_provider_id=provider_id,
+        is_active=True,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user

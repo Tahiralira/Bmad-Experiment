@@ -2,9 +2,11 @@ import sentry_sdk
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.main import api_router
 from app.core.config import settings
+from app.core.oauth import configure_oauth
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -29,5 +31,16 @@ if settings.all_cors_origins:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+# Session middleware for OAuth state management
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    same_site="lax",  # Allow OAuth redirects
+    https_only=settings.ENVIRONMENT != "local",  # HTTPS only in staging/production
+)
+
+# Configure OAuth providers
+configure_oauth()
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

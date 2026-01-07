@@ -228,6 +228,59 @@ This includes using Docker Compose, custom local domains, `.env` configurations,
 
 Check the file [release-notes.md](./release-notes.md).
 
+## OAuth / Social Authentication Setup
+
+ClearDues supports social login with **Google** and **GitHub**. Follow these steps to configure OAuth providers:
+
+### Google OAuth Setup
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new project or select an existing one
+3. Navigate to **APIs & Services** > **Credentials**
+4. Click **Create Credentials** > **OAuth 2.0 Client IDs**
+5. Configure the OAuth consent screen:
+   - User Type: External (for public apps)
+   - Add your app name and support email
+6. Create OAuth 2.0 Client ID:
+   - Application type: **Web application**
+   - Authorized redirect URIs: `http://localhost:8000/api/v1/auth/oauth/google/callback`
+7. Copy the **Client ID** and **Client Secret** to your `.env` file:
+   ```
+   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   ```
+
+### GitHub OAuth Setup
+
+1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
+2. Click **New OAuth App**
+3. Fill in the application details:
+   - Application name: ClearDues (or your app name)
+   - Homepage URL: `http://localhost:5173`
+   - Authorization callback URL: `http://localhost:8000/api/v1/auth/oauth/github/callback`
+4. Click **Register application**
+5. Copy the **Client ID** and generate a new **Client Secret**
+6. Add to your `.env` file:
+   ```
+   GITHUB_CLIENT_ID=your-github-client-id
+   GITHUB_CLIENT_SECRET=your-github-client-secret
+   ```
+
+### Environment Variables
+
+Add these OAuth-related variables to your `.env` file:
+
+```bash
+# OAuth Settings (Social Authentication)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+OAUTH_REDIRECT_BASE_URL=http://localhost:8000
+```
+
+For production, update `OAUTH_REDIRECT_BASE_URL` to your production backend URL and update the redirect URIs in Google/GitHub console accordingly.
+
 ## License
 
 The Full Stack FastAPI Template is licensed under the terms of the MIT license.

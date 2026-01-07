@@ -60,6 +60,9 @@ class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str  # For magic_link users, this is a random placeholder
     auth_method: str = Field(default=AUTH_METHOD_PASSWORD, max_length=20)
+    # OAuth fields
+    oauth_provider: str | None = Field(default=None, max_length=50)
+    oauth_provider_id: str | None = Field(default=None, max_length=255)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now})
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)

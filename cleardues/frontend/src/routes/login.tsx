@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { OAuthButtons } from "@/features/auth/components"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
 
@@ -165,6 +166,8 @@ function Login() {
             >
               Send Login Link
             </LoadingButton>
+
+            <OAuthButtons disabled={requestLoginMagicLinkMutation.isPending} />
           </div>
 
           <div className="text-center text-sm">

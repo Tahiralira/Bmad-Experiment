@@ -14,3 +14,6 @@ export { default as EditUser } from "@/components/Admin/EditUser"
 export { default as DeleteUser } from "@/components/Admin/DeleteUser"
 export { UserActionsMenu } from "@/components/Admin/UserActionsMenu"
 export { columns as userColumns } from "@/components/Admin/columns"
+
+// OAuth components
+export { OAuthButtons } from "./OAuthButtons"
