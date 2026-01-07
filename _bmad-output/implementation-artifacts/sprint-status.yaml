@@ -44,7 +44,7 @@ development_status:
   epic-1: in-progress
   1-1-initialize-project-from-starter-template: done
   1-2-reorganize-to-feature-based-architecture: done
-  1-3-configure-database-models-for-users: backlog
+  1-3-configure-database-models-for-users: done
   1-4-user-registration-with-magic-link: backlog
   1-5-user-login-with-jwt-authentication: backlog
   1-6-social-authentication-oauth: backlog

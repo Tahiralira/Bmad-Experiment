@@ -2,6 +2,8 @@
 # This file allows existing imports to continue working during migration
 # New code should import directly from app.features.auth.models
 
+from sqlmodel import SQLModel
+
 from app.features.auth.models import (
     # User models
     User,
@@ -28,6 +30,8 @@ from app.features.auth.models import (
 )
 
 __all__ = [
+    # SQLModel for alembic
+    "SQLModel",
     # User models
     "User",
     "UserBase",
