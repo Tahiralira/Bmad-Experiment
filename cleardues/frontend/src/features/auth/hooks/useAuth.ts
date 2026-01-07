@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router"
 
 import {
   type Body_login_login_access_token as AccessToken,
+  AuthService,
   LoginService,
   type UserPublic,
   type UserRegister,
@@ -58,11 +59,34 @@ const useAuth = () => {
     navigate({ to: "/login" })
   }
 
+  // Magic link login - request login link for existing users
+  const requestLoginMagicLinkMutation = useMutation({
+    mutationFn: (email: string) =>
+      AuthService.requestLoginMagicLink({ requestBody: { email } }),
+    onError: handleError.bind(showErrorToast),
+  })
+
+  // Magic link login - verify token and store JWT
+  const verifyLoginMagicLinkMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const response = await AuthService.verifyLoginMagicLink({ token })
+      localStorage.setItem("access_token", response.access_token)
+      return response
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] })
+      navigate({ to: "/" })
+    },
+    onError: handleError.bind(showErrorToast),
+  })
+
   return {
     signUpMutation,
     loginMutation,
     logout,
     user,
+    requestLoginMagicLinkMutation,
+    verifyLoginMagicLinkMutation,
   }
 }
 

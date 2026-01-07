@@ -20,6 +20,7 @@ import { Route as VerifyTokenRouteImport } from './routes/verify.$token'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
+import { Route as LoginVerifyTokenRouteImport } from './routes/login.verify.$token'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -75,9 +76,14 @@ const LayoutAdminRoute = LayoutAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LoginVerifyTokenRoute = LoginVerifyTokenRouteImport.update({
+  id: '/verify/$token',
+  path: '/verify/$token',
+  getParentRoute: () => LoginRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/login': typeof LoginRoute
+  '/login': typeof LoginRouteWithChildren
   '/recover-password': typeof RecoverPasswordRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -87,9 +93,10 @@ export interface FileRoutesByFullPath {
   '/settings': typeof LayoutSettingsRoute
   '/verify/$token': typeof VerifyTokenRoute
   '/': typeof LayoutIndexRoute
+  '/login/verify/$token': typeof LoginVerifyTokenRoute
 }
 export interface FileRoutesByTo {
-  '/login': typeof LoginRoute
+  '/login': typeof LoginRouteWithChildren
   '/recover-password': typeof RecoverPasswordRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -99,11 +106,12 @@ export interface FileRoutesByTo {
   '/settings': typeof LayoutSettingsRoute
   '/verify/$token': typeof VerifyTokenRoute
   '/': typeof LayoutIndexRoute
+  '/login/verify/$token': typeof LoginVerifyTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteWithChildren
-  '/login': typeof LoginRoute
+  '/login': typeof LoginRouteWithChildren
   '/recover-password': typeof RecoverPasswordRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/_layout/settings': typeof LayoutSettingsRoute
   '/verify/$token': typeof VerifyTokenRoute
   '/_layout/': typeof LayoutIndexRoute
+  '/login/verify/$token': typeof LoginVerifyTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/verify/$token'
     | '/'
+    | '/login/verify/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/verify/$token'
     | '/'
+    | '/login/verify/$token'
   id:
     | '__root__'
     | '/_layout'
@@ -152,11 +163,12 @@ export interface FileRouteTypes {
     | '/_layout/settings'
     | '/verify/$token'
     | '/_layout/'
+    | '/login/verify/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   LayoutRoute: typeof LayoutRouteWithChildren
-  LoginRoute: typeof LoginRoute
+  LoginRoute: typeof LoginRouteWithChildren
   RecoverPasswordRoute: typeof RecoverPasswordRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -243,6 +255,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/login/verify/$token': {
+      id: '/login/verify/$token'
+      path: '/verify/$token'
+      fullPath: '/login/verify/$token'
+      preLoaderRoute: typeof LoginVerifyTokenRouteImport
+      parentRoute: typeof LoginRoute
+    }
   }
 }
 
@@ -263,9 +282,19 @@ const LayoutRouteChildren: LayoutRouteChildren = {
 const LayoutRouteWithChildren =
   LayoutRoute._addFileChildren(LayoutRouteChildren)
 
+interface LoginRouteChildren {
+  LoginVerifyTokenRoute: typeof LoginVerifyTokenRoute
+}
+
+const LoginRouteChildren: LoginRouteChildren = {
+  LoginVerifyTokenRoute: LoginVerifyTokenRoute,
+}
+
+const LoginRouteWithChildren = LoginRoute._addFileChildren(LoginRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   LayoutRoute: LayoutRouteWithChildren,
-  LoginRoute: LoginRoute,
+  LoginRoute: LoginRouteWithChildren,
   RecoverPasswordRoute: RecoverPasswordRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,

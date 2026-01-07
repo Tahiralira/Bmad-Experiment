@@ -474,6 +474,49 @@ export class AuthService {
             }
         });
     }
+
+    /**
+     * Request Login Magic Link
+     * Request a magic link for passwordless login (existing users only).
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static requestLoginMagicLink(data: { requestBody: { email: string } }): CancelablePromise<{ message: string }> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/auth/login',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+
+    /**
+     * Verify Login Magic Link
+     * Verify a login magic link token and return JWT (user must exist).
+     * @param data The data for the request.
+     * @param data.token
+     * @returns TokenWithUser Successful Response
+     * @throws ApiError
+     */
+    public static verifyLoginMagicLink(data: { token: string }): CancelablePromise<{ access_token: string; token_type: string; user: { id: string; email: string; full_name: string | null; is_active: boolean; is_superuser: boolean } }> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/auth/login/verify/{token}',
+            path: {
+                token: data.token
+            },
+            errors: {
+                400: 'Bad Request',
+                404: 'Not Found',
+                422: 'Validation Error'
+            }
+        });
+    }
 }
 
 export class UtilsService {

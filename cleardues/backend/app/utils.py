@@ -100,7 +100,9 @@ def generate_new_account_email(
     return EmailData(html_content=html_content, subject=subject)
 
 
-def generate_magic_link_email(email_to: str, token: str, valid_minutes: int = 15) -> EmailData:
+def generate_magic_link_email(
+    email_to: str, token: str, valid_minutes: int = 15, is_login: bool = False
+) -> EmailData:
     """
     Generate a magic link email for passwordless registration/login.
 
@@ -108,13 +110,20 @@ def generate_magic_link_email(email_to: str, token: str, valid_minutes: int = 15
         email_to: The recipient email address
         token: The magic link token
         valid_minutes: Number of minutes until the link expires (default 15)
+        is_login: If True, generates login link; if False, generates registration link
 
     Returns:
         EmailData with the rendered email content and subject
     """
     project_name = settings.PROJECT_NAME
-    subject = f"{project_name} - Complete your registration"
-    link = f"{settings.FRONTEND_HOST}/verify/{token}"
+
+    if is_login:
+        subject = f"{project_name} - Log in to your account"
+        link = f"{settings.FRONTEND_HOST}/login/verify/{token}"
+    else:
+        subject = f"{project_name} - Complete your registration"
+        link = f"{settings.FRONTEND_HOST}/verify/{token}"
+
     html_content = render_email_template(
         template_name="magic_link.html",
         context={

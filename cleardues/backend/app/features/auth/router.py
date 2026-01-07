@@ -476,6 +476,111 @@ def verify_magic_link(session: SessionDep, token: str) -> TokenWithUser:
     )
 
 
+# ============================================================================
+# LOGIN MAGIC LINK ROUTES (Story 1.5)
+# ============================================================================
+
+
+@auth_router.post("/login", response_model=Message)
+def request_login_magic_link(session: SessionDep, body: MagicLinkRequest) -> Message:
+    """
+    Request a magic link for passwordless login.
+
+    Only works for registered users. Returns generic message
+    regardless of whether email exists (prevents enumeration).
+
+    Rate limited to 3 requests per email per hour.
+    """
+    # Check if user exists
+    existing_user = auth_service.get_user_by_email(session=session, email=body.email)
+
+    if not existing_user:
+        # User doesn't exist - return same message for security
+        return Message(
+            message="If an account exists, we've sent a magic login link"
+        )
+
+    # Check if user is active
+    if not existing_user.is_active:
+        return Message(
+            message="If an account exists, we've sent a magic login link"
+        )
+
+    # Check rate limiting
+    if auth_service.is_rate_limited(session=session, email=body.email):
+        return Message(
+            message="If an account exists, we've sent a magic login link"
+        )
+
+    # Generate magic link token
+    _, raw_token = auth_service.generate_magic_link_token(session=session, email=body.email)
+
+    # Send email with magic link (is_login=True for login flow)
+    if settings.emails_enabled:
+        email_data = generate_magic_link_email(
+            email_to=body.email,
+            token=raw_token,
+            valid_minutes=auth_service.MAGIC_LINK_EXPIRE_MINUTES,
+            is_login=True,
+        )
+        send_email(
+            email_to=body.email,
+            subject=email_data.subject,
+            html_content=email_data.html_content,
+        )
+
+    return Message(message="If an account exists, we've sent a magic login link")
+
+
+@auth_router.get("/login/verify/{token}", response_model=TokenWithUser)
+def verify_login_magic_link(session: SessionDep, token: str) -> TokenWithUser:
+    """
+    Verify a login magic link token.
+
+    Unlike registration verification, this does NOT create a user.
+    User must already exist. Returns JWT with 30-day expiration per PRD.
+    """
+    # Verify token
+    magic_token = auth_service.verify_magic_link_token(session=session, token_str=token)
+
+    if not magic_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired token. Please request a new login link."
+        )
+
+    # Get existing user (MUST exist for login)
+    user = auth_service.get_user_by_email(session=session, email=magic_token.email)
+    if not user:
+        auth_service.mark_token_as_used(session=session, token=magic_token)
+        raise HTTPException(
+            status_code=404,
+            detail="Account not found. Please register first."
+        )
+
+    if not user.is_active:
+        auth_service.mark_token_as_used(session=session, token=magic_token)
+        raise HTTPException(
+            status_code=400,
+            detail="Account is deactivated."
+        )
+
+    # Mark token as used
+    auth_service.mark_token_as_used(session=session, token=magic_token)
+
+    # Generate JWT with 30-day expiration (PRD "Walled Garden")
+    access_token_expires = timedelta(days=settings.LOGIN_TOKEN_EXPIRE_DAYS)
+    access_token = security.create_access_token(
+        user.id, expires_delta=access_token_expires
+    )
+
+    return TokenWithUser(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserPublic.model_validate(user),
+    )
+
+
 # Include sub-routers into main auth router
 router.include_router(login_router)
 router.include_router(users_router)

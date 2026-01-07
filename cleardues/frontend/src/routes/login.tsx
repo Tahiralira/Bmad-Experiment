@@ -4,10 +4,10 @@ import {
   Link as RouterLink,
   redirect,
 } from "@tanstack/react-router"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
-import type { Body_login_login_access_token as AccessToken } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import {
   Form,
@@ -19,16 +19,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
-import { PasswordInput } from "@/components/ui/password-input"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
+import { useCustomToast } from "@/shared/hooks/useCustomToast"
 
 const formSchema = z.object({
-  username: z.email(),
-  password: z
-    .string()
-    .min(1, { message: "Password is required" })
-    .min(8, { message: "Password must be at least 8 characters" }),
-}) satisfies z.ZodType<AccessToken>
+  email: z.string().email("Please enter a valid email address"),
+})
 
 type FormData = z.infer<typeof formSchema>
 
@@ -44,29 +40,89 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       {
-        title: "Log In - FastAPI Cloud",
+        title: "Log In - ClearDues",
       },
     ],
   }),
 })
 
 function Login() {
-  const { loginMutation } = useAuth()
+  const [submitted, setSubmitted] = useState(false)
+  const { requestLoginMagicLinkMutation } = useAuth()
+  const { showSuccessToast } = useCustomToast()
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
-      username: "",
-      password: "",
+      email: "",
     },
   })
 
   const onSubmit = (data: FormData) => {
-    if (loginMutation.isPending) return
-    loginMutation.mutate(data)
+    if (requestLoginMagicLinkMutation.isPending) return
+    requestLoginMagicLinkMutation.mutate(data.email, {
+      onSuccess: () => {
+        setSubmitted(true)
+        showSuccessToast("Check your email for the login link!")
+      },
+    })
   }
 
+  if (submitted) {
+    return (
+      <AuthLayout>
+        <div className="flex flex-col items-center gap-6 text-center">
+          <div className="rounded-full bg-green-100 p-4">
+            <svg
+              className="h-12 w-12 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76"
+              />
+            </svg>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold">Check your email</h1>
+            <p className="text-muted-foreground">
+              We've sent a login link to <strong>{form.getValues("email")}</strong>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Click the link in the email to log in.
+              The link expires in 15 minutes.
+            </p>
+          </div>
+
+          <div className="space-y-2 text-sm">
+            <p className="text-muted-foreground">
+              Didn't receive the email?{" "}
+              <button
+                onClick={() => setSubmitted(false)}
+                className="text-primary underline underline-offset-4"
+              >
+                Try again
+              </button>
+            </p>
+          </div>
+
+          <div className="text-center text-sm">
+            Don't have an account?{" "}
+            <RouterLink to="/register" className="underline underline-offset-4">
+              Register
+            </RouterLink>
+          </div>
+        </div>
+      </AuthLayout>
+    )
+  }
 
   return (
     <AuthLayout>
@@ -77,12 +133,15 @@ function Login() {
         >
           <div className="flex flex-col items-center gap-2 text-center">
             <h1 className="text-2xl font-bold">Login to your account</h1>
+            <p className="text-muted-foreground">
+              Enter your email to receive a login link
+            </p>
           </div>
 
           <div className="grid gap-4">
             <FormField
               control={form.control}
-              name="username"
+              name="email"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
@@ -99,41 +158,19 @@ function Login() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center">
-                    <FormLabel>Password</FormLabel>
-                    <RouterLink
-                      to="/recover-password"
-                      className="ml-auto text-sm underline-offset-4 hover:underline"
-                    >
-                      Forgot your password?
-                    </RouterLink>
-                  </div>
-                  <FormControl>
-                    <PasswordInput
-                      data-testid="password-input"
-                      placeholder="Password"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs" />
-                </FormItem>
-              )}
-            />
-
-            <LoadingButton type="submit" loading={loginMutation.isPending}>
-              Log In
+            <LoadingButton
+              type="submit"
+              className="w-full"
+              loading={requestLoginMagicLinkMutation.isPending}
+            >
+              Send Login Link
             </LoadingButton>
           </div>
 
           <div className="text-center text-sm">
-            Don't have an account yet?{" "}
-            <RouterLink to="/signup" className="underline underline-offset-4">
-              Sign up
+            Don't have an account?{" "}
+            <RouterLink to="/register" className="underline underline-offset-4">
+              Register
             </RouterLink>
           </div>
         </form>
