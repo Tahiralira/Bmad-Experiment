@@ -519,6 +519,45 @@ export class AuthService {
     }
 }
 
+export class GroupsService {
+    /**
+     * Create Group
+     * Create a new expense group.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns ExpenseGroupPublic Successful Response
+     * @throws ApiError
+     */
+    public static createGroup(data: { requestBody: { name: string } }): CancelablePromise<{ id: string; name: string; created_by: string; created_at: string; updated_at: string }> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expense-groups/',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized',
+                422: 'Validation Error'
+            }
+        });
+    }
+
+    /**
+     * List User Groups
+     * List all expense groups the current user is a member of.
+     * @returns ExpenseGroupWithMembers[] Successful Response
+     * @throws ApiError
+     */
+    public static listUserGroups(): CancelablePromise<Array<{ id: string; name: string; created_by: string; created_at: string; updated_at: string; member_count: number }>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+}
+
 export class UtilsService {
     /**
      * Test Email

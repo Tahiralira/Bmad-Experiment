@@ -3,6 +3,7 @@ from fastapi import APIRouter
 # Import from feature routers (new feature-based architecture)
 from app.features.auth.router import router as auth_router
 from app.features.expenses.router import router as expenses_router
+from app.features.groups.router import router as groups_router
 
 # Utils and private routes remain in api/routes as they are infrastructure routes
 from app.api.routes import private, utils
@@ -13,6 +14,7 @@ api_router = APIRouter()
 # Feature routers - organized by domain
 api_router.include_router(auth_router)  # login + users routes
 api_router.include_router(expenses_router)  # items routes (temporary)
+api_router.include_router(groups_router)  # expense groups routes
 
 # Infrastructure routes
 api_router.include_router(utils.router)
