@@ -4,11 +4,14 @@ import uuid
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from app.features.auth.models import utc_now
 from app.features.groups.models import (
     ExpenseGroup,
     ExpenseGroupCreate,
     ExpenseGroupWithMembers,
+    GroupInvite,
     GroupMember,
+    GROUP_ROLE_MEMBER,
     GROUP_ROLE_OWNER,
 )
 
@@ -131,3 +134,107 @@ def get_user_groups_with_member_count(
         )
         for row in results
     ]
+
+
+# === Invite Functions ===
+
+
+def create_group_invite(
+    session: Session,
+    group_id: uuid.UUID,
+    creator_id: uuid.UUID,
+) -> GroupInvite:
+    """
+    Create a new invite token for a group.
+
+    Args:
+        session: Database session
+        group_id: UUID of the group to create invite for
+        creator_id: UUID of the user creating the invite (must be owner)
+
+    Returns:
+        Created GroupInvite with token
+    """
+    invite = GroupInvite(
+        group_id=group_id,
+        token=GroupInvite.generate_token(),
+        expires_at=GroupInvite.default_expiration(),
+        created_by=creator_id,
+    )
+    session.add(invite)
+    session.flush()
+    session.refresh(invite)
+    return invite
+
+
+def get_invite_by_token(session: Session, token: str) -> GroupInvite | None:
+    """Get an invite by its token."""
+    statement = select(GroupInvite).where(GroupInvite.token == token)
+    return session.exec(statement).first()
+
+
+def is_invite_valid(invite: GroupInvite) -> tuple[bool, str]:
+    """
+    Check if an invite is valid.
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if invite.is_expired():
+        return False, "This invite link has expired"
+    return True, ""
+
+
+def accept_invite(
+    session: Session,
+    invite: GroupInvite,
+    user_id: uuid.UUID,
+) -> tuple[bool, str]:
+    """
+    Accept an invite and add user to the group.
+
+    Args:
+        session: Database session
+        invite: The invite to accept
+        user_id: UUID of the user accepting the invite
+
+    Returns:
+        Tuple of (success, message)
+    """
+    # Check if already a member
+    if is_group_member(session, invite.group_id, user_id):
+        return True, "You are already a member of this group"
+
+    # Add as member
+    member = GroupMember(
+        group_id=invite.group_id,
+        user_id=user_id,
+        role=GROUP_ROLE_MEMBER,
+    )
+    session.add(member)
+    session.flush()
+
+    return True, "Successfully joined the group"
+
+
+def is_group_owner(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    """Check if user is the owner of the group."""
+    statement = select(GroupMember).where(
+        GroupMember.group_id == group_id,
+        GroupMember.user_id == user_id,
+        GroupMember.role == GROUP_ROLE_OWNER,
+    )
+    return session.exec(statement).first() is not None
+
+
+def get_group_invites(session: Session, group_id: uuid.UUID) -> list[GroupInvite]:
+    """Get all active (non-expired) invites for a group."""
+    statement = (
+        select(GroupInvite)
+        .where(
+            GroupInvite.group_id == group_id,
+            GroupInvite.expires_at > utc_now(),
+        )
+        .order_by(GroupInvite.created_at.desc())
+    )
+    return list(session.exec(statement).all())

@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import { AuthService } from "@/client"
 import { isLoggedIn } from "@/hooks/useAuth"
+import { processPendingInvite } from "./invite.$token"
 
 export const Route = createFileRoute("/login/verify/$token")({
   component: VerifyLoginMagicLink,
@@ -38,8 +39,15 @@ function VerifyLoginMagicLink() {
       localStorage.setItem("access_token", data.access_token)
       // Invalidate user query to refresh
       queryClient.invalidateQueries({ queryKey: ["currentUser"] })
-      // Redirect to dashboard
-      navigate({ to: "/" })
+      // Check for pending invite token from before login
+      const pendingInviteToken = processPendingInvite()
+      if (pendingInviteToken) {
+        // Redirect to accept the pending invite
+        navigate({ to: "/invite/$token", params: { token: pendingInviteToken } })
+      } else {
+        // Redirect to dashboard
+        navigate({ to: "/" })
+      }
     },
     onError: (error: Error & { body?: { detail?: string } }) => {
       const message = error.body?.detail || error.message || "Login verification failed"

@@ -17,6 +17,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as VerifyTokenRouteImport } from './routes/verify.$token'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
@@ -62,6 +63,11 @@ const VerifyTokenRoute = VerifyTokenRouteImport.update({
   path: '/verify/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/verify/$token': typeof VerifyTokenRoute
   '/': typeof LayoutIndexRoute
   '/login/verify/$token': typeof LoginVerifyTokenRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/verify/$token': typeof VerifyTokenRoute
   '/': typeof LayoutIndexRoute
   '/login/verify/$token': typeof LoginVerifyTokenRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/_layout/items': typeof LayoutItemsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/verify/$token': typeof VerifyTokenRoute
   '/_layout/': typeof LayoutIndexRoute
   '/login/verify/$token': typeof LoginVerifyTokenRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/items'
     | '/settings'
     | '/auth/callback'
+    | '/invite/$token'
     | '/verify/$token'
     | '/'
     | '/login/verify/$token'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/items'
     | '/settings'
     | '/auth/callback'
+    | '/invite/$token'
     | '/verify/$token'
     | '/'
     | '/login/verify/$token'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/_layout/items'
     | '/_layout/settings'
     | '/auth/callback'
+    | '/invite/$token'
     | '/verify/$token'
     | '/_layout/'
     | '/login/verify/$token'
@@ -186,6 +198,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   VerifyTokenRoute: typeof VerifyTokenRoute
 }
 
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       path: '/verify/$token'
       fullPath: '/verify/$token'
       preLoaderRoute: typeof VerifyTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/callback': {
@@ -320,6 +340,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  InviteTokenRoute: InviteTokenRoute,
   VerifyTokenRoute: VerifyTokenRoute,
 }
 export const routeTree = rootRouteImport

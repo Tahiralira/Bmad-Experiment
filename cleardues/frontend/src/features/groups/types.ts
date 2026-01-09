@@ -18,3 +18,20 @@ export interface GroupMember {
   role: "owner" | "member"
   joined_at: string
 }
+
+// === Invite Types ===
+
+export interface GroupInvite {
+  id: string
+  group_id: string
+  token: string
+  expires_at: string
+  created_at: string
+  invite_url?: string
+}
+
+export interface GroupInviteResponse {
+  invite?: GroupInvite
+  group?: ExpenseGroup
+  message: string
+}

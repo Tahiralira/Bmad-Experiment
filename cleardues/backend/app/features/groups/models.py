@@ -1,6 +1,7 @@
-# Groups feature models - ExpenseGroup, GroupMember, and related schemas
+# Groups feature models - ExpenseGroup, GroupMember, GroupInvite, and related schemas
+import secrets
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
 
@@ -30,6 +31,28 @@ class ExpenseGroupWithMembers(ExpenseGroupPublic):
     """Response schema for a group with member count."""
 
     member_count: int = 0
+
+
+# === Invite Schemas ===
+
+
+class GroupInvitePublic(SQLModel):
+    """Response schema for a group invite."""
+
+    id: uuid.UUID
+    group_id: uuid.UUID
+    token: str
+    expires_at: datetime
+    created_at: datetime
+    invite_url: str | None = None  # Computed field
+
+
+class GroupInviteResponse(SQLModel):
+    """Response after creating or accepting an invite."""
+
+    invite: GroupInvitePublic | None = None
+    group: ExpenseGroupPublic | None = None
+    message: str
 
 
 # === Database Models ===
@@ -83,3 +106,42 @@ class GroupMember(SQLModel, table=True):
     # Relationships
     group: ExpenseGroup = Relationship(back_populates="members")
     user: User = Relationship()
+
+
+# Invite expiration constant (30 days)
+INVITE_EXPIRATION_DAYS = 30
+
+
+class GroupInvite(SQLModel, table=True):
+    """
+    Invite tokens for joining expense groups via shareable links.
+    Unlike magic link tokens, these can be used multiple times until expiration.
+    """
+
+    __tablename__ = "group_invite"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    group_id: uuid.UUID = Field(
+        foreign_key="expense_group.id", nullable=False, index=True
+    )
+    token: str = Field(unique=True, index=True, max_length=64)
+    expires_at: datetime
+    created_by: uuid.UUID = Field(foreign_key="user.id", nullable=False)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    # Relationships
+    group: ExpenseGroup = Relationship()
+
+    @classmethod
+    def generate_token(cls) -> str:
+        """Generate a cryptographically secure token."""
+        return secrets.token_urlsafe(32)
+
+    @classmethod
+    def default_expiration(cls) -> datetime:
+        """Get default expiration datetime (30 days from now)."""
+        return utc_now() + timedelta(days=INVITE_EXPIRATION_DAYS)
+
+    def is_expired(self) -> bool:
+        """Check if this invite has expired."""
+        return utc_now() > self.expires_at
