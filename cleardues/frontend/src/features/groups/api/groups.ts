@@ -6,6 +6,7 @@ import type {
   ExpenseGroup,
   ExpenseGroupCreate,
   GroupInviteResponse,
+  GroupMembersListResponse,
 } from "../types"
 
 export function useCreateGroup() {
@@ -69,5 +70,29 @@ export function useAcceptInvite() {
       // Invalidate groups list to show new membership
       queryClient.invalidateQueries({ queryKey: ["groups"] })
     },
+  })
+}
+
+// === Members API ===
+
+async function getGroupMembers(
+  groupId: string
+): Promise<GroupMembersListResponse> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expense-groups/${groupId}/members`,
+    errors: {
+      401: "Unauthorized",
+      403: "You are not a member of this group",
+      404: "Group not found",
+    },
+  })
+}
+
+export function useGroupMembers(groupId: string) {
+  return useQuery<GroupMembersListResponse, Error>({
+    queryKey: ["groups", groupId, "members"],
+    queryFn: () => getGroupMembers(groupId),
+    enabled: !!groupId,
   })
 }

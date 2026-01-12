@@ -13,6 +13,7 @@ from app.features.groups.models import (
     ExpenseGroupWithMembers,
     GroupInvitePublic,
     GroupInviteResponse,
+    GroupMembersListResponse,
 )
 
 router = APIRouter(prefix="/expense-groups", tags=["groups"])
@@ -50,6 +51,44 @@ def list_user_groups(
     Uses optimized single-query to fetch groups with member counts.
     """
     return service.get_user_groups_with_member_count(session, current_user.id)
+
+
+# === Member Endpoints ===
+
+
+@router.get("/{group_id}/members", response_model=GroupMembersListResponse)
+def list_group_members(
+    group_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> GroupMembersListResponse:
+    """
+    List all members of a group with their details.
+
+    Only group members can view the member list.
+    Returns members ordered by role (owner first), then by join date.
+    """
+    # Verify group exists
+    group = service.get_group_by_id(session, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    # Verify user is a member
+    if not service.is_group_member(session, group_id, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this group",
+        )
+
+    members = service.get_group_members_with_user_data(session, group_id)
+
+    return GroupMembersListResponse(
+        members=members,
+        count=len(members),
+    )
 
 
 # === Invite Endpoints ===

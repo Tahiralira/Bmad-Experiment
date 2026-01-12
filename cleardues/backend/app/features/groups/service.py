@@ -5,12 +5,14 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.features.auth.models import utc_now
+from app.features.auth.models import User
 from app.features.groups.models import (
     ExpenseGroup,
     ExpenseGroupCreate,
     ExpenseGroupWithMembers,
     GroupInvite,
     GroupMember,
+    GroupMemberPublic,
     GROUP_ROLE_MEMBER,
     GROUP_ROLE_OWNER,
 )
@@ -238,3 +240,54 @@ def get_group_invites(session: Session, group_id: uuid.UUID) -> list[GroupInvite
         .order_by(GroupInvite.created_at.desc())
     )
     return list(session.exec(statement).all())
+
+
+def get_group_members_with_user_data(
+    session: Session,
+    group_id: uuid.UUID,
+) -> list[GroupMemberPublic]:
+    """
+    Get all members of a group with their user details.
+
+    Joins GroupMember with User to get full_name and email.
+    Orders by role (owner first), then by joined_at.
+
+    Args:
+        session: Database session
+        group_id: UUID of the group
+
+    Returns:
+        List of GroupMemberPublic with user details
+    """
+    # Join GroupMember with User to get user details
+    statement = (
+        select(
+            GroupMember.id,
+            GroupMember.user_id,
+            GroupMember.role,
+            GroupMember.joined_at,
+            User.full_name,
+            User.email,
+        )
+        .join(User, GroupMember.user_id == User.id)
+        .where(GroupMember.group_id == group_id)
+        .order_by(
+            # Owner first (descending sort: 'owner' > 'member' alphabetically)
+            GroupMember.role.desc(),
+            GroupMember.joined_at.asc(),
+        )
+    )
+
+    results = session.exec(statement).all()
+
+    return [
+        GroupMemberPublic(
+            id=row.id,
+            user_id=row.user_id,
+            role=row.role,
+            joined_at=row.joined_at,
+            full_name=row.full_name,
+            email=row.email,
+        )
+        for row in results
+    ]

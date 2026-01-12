@@ -8,7 +8,11 @@ import { useCustomToast } from "@/shared/hooks/useCustomToast"
 
 import { useCreateGroup } from "../api/groups"
 
-export function CreateGroupForm() {
+interface Props {
+  onSuccess?: () => void
+}
+
+export function CreateGroupForm({ onSuccess }: Props) {
   const [name, setName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -33,8 +37,12 @@ export function CreateGroupForm() {
     try {
       await createGroup.mutateAsync({ name: trimmedName })
       showSuccessToast("Group created successfully!")
-      // Redirect to dashboard or group list
-      navigate({ to: "/" })
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        // Redirect to groups page
+        navigate({ to: "/groups" })
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to create group"

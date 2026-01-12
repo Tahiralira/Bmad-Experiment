@@ -395,3 +395,208 @@ def test_invite_can_be_used_multiple_times(
     )
     members = db.exec(statement).all()
     assert len(members) == 3  # Owner + 2 new members
+
+
+# === Member List Tests ===
+
+
+def test_list_group_members_as_member(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """Test listing group members as a group member."""
+    # Create a group
+    group_data = {"name": "Members List Test Group"}
+    create_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/",
+        headers=normal_user_token_headers,
+        json=group_data,
+    )
+    assert create_response.status_code == 201
+    group = create_response.json()
+
+    # List members
+    response = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/members",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 200
+    content = response.json()
+    assert "members" in content
+    assert "count" in content
+    assert content["count"] == 1
+    assert len(content["members"]) == 1
+
+
+def test_list_group_members_as_non_member(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+) -> None:
+    """Test listing group members as non-member returns 403."""
+    # Create a group as normal user
+    group_data = {"name": "Non-Member List Test Group"}
+    create_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/",
+        headers=normal_user_token_headers,
+        json=group_data,
+    )
+    assert create_response.status_code == 201
+    group = create_response.json()
+
+    # Try to list members as second user (not a member)
+    response = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/members",
+        headers=second_user_token_headers,
+    )
+    assert response.status_code == 403
+    content = response.json()
+    assert "You are not a member of this group" in content["detail"]
+
+
+def test_list_group_members_nonexistent_group(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """Test listing members of nonexistent group returns 404."""
+    fake_group_id = "00000000-0000-0000-0000-000000000000"
+    response = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{fake_group_id}/members",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 404
+
+
+def test_list_group_members_owner_has_owner_role(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """Test that owner is returned with role='owner'."""
+    # Create a group
+    group_data = {"name": "Owner Role Test Group"}
+    create_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/",
+        headers=normal_user_token_headers,
+        json=group_data,
+    )
+    assert create_response.status_code == 201
+    group = create_response.json()
+
+    # List members
+    response = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/members",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 200
+    content = response.json()
+    members = content["members"]
+    assert len(members) == 1
+    assert members[0]["role"] == GROUP_ROLE_OWNER
+
+
+def test_list_group_members_includes_user_details(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """Test that member response includes full_name and email."""
+    # Create a group
+    group_data = {"name": "User Details Test Group"}
+    create_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/",
+        headers=normal_user_token_headers,
+        json=group_data,
+    )
+    assert create_response.status_code == 201
+    group = create_response.json()
+
+    # List members
+    response = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/members",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 200
+    content = response.json()
+    members = content["members"]
+    assert len(members) == 1
+
+    # Check user details are present
+    member = members[0]
+    assert "full_name" in member
+    assert "email" in member
+    assert "id" in member
+    assert "user_id" in member
+    assert "role" in member
+    assert "joined_at" in member
+
+
+def test_list_group_members_handles_null_full_name(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """Test that members with null full_name are handled properly."""
+    # Create a group (test user has no full_name set by default)
+    group_data = {"name": "Null Name Test Group"}
+    create_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/",
+        headers=normal_user_token_headers,
+        json=group_data,
+    )
+    assert create_response.status_code == 201
+    group = create_response.json()
+
+    # List members
+    response = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/members",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 200
+    content = response.json()
+    members = content["members"]
+    assert len(members) == 1
+
+    # Verify full_name field exists and can be null (no crash)
+    member = members[0]
+    assert "full_name" in member
+    # full_name can be null or a string - either is valid
+    assert member["full_name"] is None or isinstance(member["full_name"], str)
+
+
+def test_list_group_members_owner_first(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test that owner appears first in the members list."""
+    # Create a group
+    group_data = {"name": "Owner First Test Group"}
+    create_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/",
+        headers=normal_user_token_headers,
+        json=group_data,
+    )
+    assert create_response.status_code == 201
+    group = create_response.json()
+
+    # Create and accept invite for second user
+    invite_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/invites",
+        headers=normal_user_token_headers,
+    )
+    assert invite_response.status_code == 201
+    invite = invite_response.json()["invite"]
+
+    accept_response = client.get(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}",
+        headers=second_user_token_headers,
+    )
+    assert accept_response.status_code == 200
+
+    # List members
+    response = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/members",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 200
+    content = response.json()
+    assert content["count"] == 2
+
+    members = content["members"]
+    # Owner should be first (descending sort: owner > member)
+    assert members[0]["role"] == GROUP_ROLE_OWNER
+    assert members[1]["role"] == GROUP_ROLE_MEMBER

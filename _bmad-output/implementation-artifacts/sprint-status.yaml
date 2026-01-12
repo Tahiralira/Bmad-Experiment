@@ -54,7 +54,7 @@ development_status:
   epic-2: in-progress
   2-1-create-expense-group: done
   2-2-invite-members-via-deep-link: done
-  2-3-view-group-members-list: backlog
+  2-3-view-group-members-list: done
   2-4-dashboard-with-net-balances: backlog
   epic-2-retrospective: optional
 

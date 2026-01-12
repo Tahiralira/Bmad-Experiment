@@ -35,3 +35,19 @@ export interface GroupInviteResponse {
   group?: ExpenseGroup
   message: string
 }
+
+// === Member Types ===
+
+export interface GroupMemberPublic {
+  id: string
+  user_id: string
+  role: "owner" | "member"
+  joined_at: string
+  full_name: string | null
+  email: string
+}
+
+export interface GroupMembersListResponse {
+  members: GroupMemberPublic[]
+  count: number
+}

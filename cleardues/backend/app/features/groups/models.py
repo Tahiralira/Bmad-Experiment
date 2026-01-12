@@ -33,6 +33,27 @@ class ExpenseGroupWithMembers(ExpenseGroupPublic):
     member_count: int = 0
 
 
+# === Member Schemas ===
+
+
+class GroupMemberPublic(SQLModel):
+    """Response schema for a group member with user details."""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    role: str
+    joined_at: datetime
+    full_name: str | None
+    email: str
+
+
+class GroupMembersListResponse(SQLModel):
+    """Response schema for list of group members."""
+
+    members: list[GroupMemberPublic]
+    count: int
+
+
 # === Invite Schemas ===
 
 
