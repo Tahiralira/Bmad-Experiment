@@ -1,125 +1,50 @@
 # Expenses feature router - API routes for expense management
-# Items routes are temporarily here (will be replaced with actual expenses in Epic 3)
-
-import uuid
-from typing import Any
-
 from fastapi import APIRouter, HTTPException
-from sqlmodel import func, select
 
 from app.api.deps import CurrentUser, SessionDep
-from app.features.auth.models import (
-    Item,
-    ItemCreate,
-    ItemPublic,
-    ItemsPublic,
-    ItemUpdate,
-    Message,
-)
+from app.features.expenses import service as expense_service
+from app.features.expenses.models import ExpenseCreate, ExpensePublic
+from app.features.groups.models import ExpenseGroup
 
-router = APIRouter()
-
-# Items router - temporary placeholder until proper expenses are implemented
-items_router = APIRouter(prefix="/items", tags=["items"])
+router = APIRouter(prefix="/expenses", tags=["expenses"])
 
 
-@items_router.get("/", response_model=ItemsPublic)
-def read_items(
-    session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
-) -> Any:
-    """
-    Retrieve items.
-    """
-    if current_user.is_superuser:
-        count_statement = select(func.count()).select_from(Item)
-        count = session.exec(count_statement).one()
-        statement = select(Item).offset(skip).limit(limit)
-        items = session.exec(statement).all()
-    else:
-        count_statement = (
-            select(func.count())
-            .select_from(Item)
-            .where(Item.owner_id == current_user.id)
-        )
-        count = session.exec(count_statement).one()
-        statement = (
-            select(Item)
-            .where(Item.owner_id == current_user.id)
-            .offset(skip)
-            .limit(limit)
-        )
-        items = session.exec(statement).all()
-
-    return ItemsPublic(data=items, count=count)
-
-
-@items_router.get("/{id}", response_model=ItemPublic)
-def read_item(session: SessionDep, current_user: CurrentUser, id: uuid.UUID) -> Any:
-    """
-    Get item by ID.
-    """
-    item = session.get(Item, id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    if not current_user.is_superuser and (item.owner_id != current_user.id):
-        raise HTTPException(status_code=400, detail="Not enough permissions")
-    return item
-
-
-@items_router.post("/", response_model=ItemPublic)
-def create_item(
-    *, session: SessionDep, current_user: CurrentUser, item_in: ItemCreate
-) -> Any:
-    """
-    Create new item.
-    """
-    item = Item.model_validate(item_in, update={"owner_id": current_user.id})
-    session.add(item)
-    session.commit()
-    session.refresh(item)
-    return item
-
-
-@items_router.put("/{id}", response_model=ItemPublic)
-def update_item(
+@router.post("/", response_model=ExpensePublic)
+def create_expense(
     *,
     session: SessionDep,
     current_user: CurrentUser,
-    id: uuid.UUID,
-    item_in: ItemUpdate,
-) -> Any:
+    expense_in: ExpenseCreate,
+) -> ExpensePublic:
     """
-    Update an item.
+    Create a new expense in a group.
+
+    The current user must be a member of the group.
+    If payer_id is not provided, defaults to the current user.
+    New expenses start with status 'draft'.
     """
-    item = session.get(Item, id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    if not current_user.is_superuser and (item.owner_id != current_user.id):
-        raise HTTPException(status_code=400, detail="Not enough permissions")
-    update_dict = item_in.model_dump(exclude_unset=True)
-    item.sqlmodel_update(update_dict)
-    session.add(item)
-    session.commit()
-    session.refresh(item)
-    return item
+    # Verify group exists
+    group = session.get(ExpenseGroup, expense_in.group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
 
+    # Verify user is member of group
+    if not expense_service.is_user_group_member(
+        session, current_user.id, expense_in.group_id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of the group to create expenses",
+        )
 
-@items_router.delete("/{id}")
-def delete_item(
-    session: SessionDep, current_user: CurrentUser, id: uuid.UUID
-) -> Message:
-    """
-    Delete an item.
-    """
-    item = session.get(Item, id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    if not current_user.is_superuser and (item.owner_id != current_user.id):
-        raise HTTPException(status_code=400, detail="Not enough permissions")
-    session.delete(item)
-    session.commit()
-    return Message(message="Item deleted successfully")
+    # If payer_id provided, verify payer is also a group member
+    if expense_in.payer_id and expense_in.payer_id != current_user.id:
+        if not expense_service.is_user_group_member(
+            session, expense_in.payer_id, expense_in.group_id
+        ):
+            raise HTTPException(
+                status_code=400, detail="Payer must be a member of the group"
+            )
 
-
-# Include items router
-router.include_router(items_router)
+    expense = expense_service.create_expense(session, expense_in, current_user.id)
+    return ExpensePublic.model_validate(expense)

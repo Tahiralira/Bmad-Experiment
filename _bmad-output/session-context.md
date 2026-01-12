@@ -11,10 +11,10 @@
 |------|--------|---------|
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
-| Epic 3: Expenses | BACKLOG | 0/8 |
+| Epic 3: Expenses | IN-PROGRESS | 1/8 |
 | Epic 4-7 | BACKLOG | 0/18 |
 
-**Current Progress:** 10 stories completed, 25 remaining
+**Current Progress:** 11 stories completed, 24 remaining
 
 ---
 
@@ -36,6 +36,7 @@ Before starting ANY work, check these logs:
 ### Docker Issues
 - **"ModuleNotFoundError in container"** → Rebuild: `docker compose build --no-cache`
 - **"Connection refused localhost:5432"** → Use service name `db` not `localhost`
+- **"File changes not visible in Docker"** (Windows) → Use `docker compose cp` to sync files
 
 ### Import Issues
 - **Circular imports between features** → Import inside function OR use `TYPE_CHECKING`
@@ -100,8 +101,9 @@ cd cleardues/frontend && npm run build
 ## Next Up
 
 **Epic 3: Smart Expense Entry** (8 stories)
-- Story 3.1: Create expense model and basic entry
-- Story 3.2: Natural language input interface
+- ~~Story 3.1: Create expense model and basic entry~~ DONE
+- Story 3.2: Natural language input interface ← **NEXT**
+- Story 3.3: AI parsing service integration
 - ...
 
 ---

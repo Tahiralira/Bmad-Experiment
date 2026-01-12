@@ -13,7 +13,7 @@ api_router = APIRouter()
 
 # Feature routers - organized by domain
 api_router.include_router(auth_router)  # login + users routes
-api_router.include_router(expenses_router)  # items routes (temporary)
+api_router.include_router(expenses_router)  # expense management routes
 api_router.include_router(groups_router)  # expense groups routes
 
 # Infrastructure routes

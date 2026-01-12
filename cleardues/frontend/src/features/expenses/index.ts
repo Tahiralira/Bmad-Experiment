@@ -1,3 +1,4 @@
 // Expenses feature - handles expense creation and management
-// Placeholder for future stories (Epic 3: Smart Expense Entry)
-export {}
+export * from "./api"
+export * from "./components"
+export * from "./types"

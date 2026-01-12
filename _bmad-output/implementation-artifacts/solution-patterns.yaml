@@ -11,7 +11,7 @@
 
 metadata:
   version: "1.0"
-  total_patterns: 8
+  total_patterns: 9
   categories:
     - docker
     - database
@@ -56,6 +56,21 @@ docker:
     tokens_saved_estimate: "~300 per occurrence"
 
   - id: "DOCKER-003"
+    title: "Windows Docker volume sync lag"
+    symptoms:
+      - "File changes on Windows host not visible in container"
+      - "pytest shows fewer tests than expected"
+      - "Code changes don't take effect"
+    root_cause: "Windows Docker Desktop volume mounts can have sync delays"
+    solution: |
+      1. Copy files explicitly: `docker compose cp local/path container:/path`
+      2. Or restart container: `docker compose restart backend`
+      3. Or check Docker Desktop settings for file sharing
+    prevention: "Use docker compose cp when files must sync immediately"
+    stories_encountered: ["3.1"]
+    tokens_saved_estimate: "~300 per occurrence"
+
+  - id: "DOCKER-004"
     title: "File permissions issues with mounted volumes"
     symptoms:
       - "Permission denied when writing files"
@@ -267,6 +282,10 @@ quick_reference:
   - trigger: "Data not updating after mutation"
     pattern_id: "FE-002"
     quick_fix: "Add queryClient.invalidateQueries in onSuccess"
+
+  - trigger: "File changes not visible in Docker"
+    pattern_id: "DOCKER-003"
+    quick_fix: "docker compose cp local/path container:/path"
 
 # =============================================================================
 # HOW TO ADD NEW PATTERNS
