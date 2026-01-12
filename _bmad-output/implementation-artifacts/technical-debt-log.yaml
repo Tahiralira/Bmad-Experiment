@@ -1,0 +1,250 @@
+# Technical Debt Log
+# ===================
+# Tracks LOW severity code review issues for future implementation
+# Created: 2026-01-12
+# Last Updated: 2026-01-12
+
+# This file tracks code quality issues that were identified during code reviews
+# but deferred for later implementation. Issues are categorized by type and priority.
+
+metadata:
+  version: "1.0"
+  created_at: "2026-01-12"
+  last_review: "Story 2.4"
+  total_items: 15
+  status_legend:
+    open: "Not yet addressed"
+    in_progress: "Currently being worked on"
+    resolved: "Fixed in a later story"
+    wont_fix: "Decided not to address (with reason)"
+
+# =============================================================================
+# EPIC 1: User Identity & Access
+# =============================================================================
+
+epic_1:
+  story_1_1:
+    title: "Initialize Project from Starter Template"
+    reviewed: false
+    items: []
+    notes: "Initial setup - no code review performed"
+
+  story_1_2:
+    title: "Reorganize to Feature-Based Architecture"
+    reviewed: false
+    items: []
+    notes: "Architecture refactoring - no code review performed"
+
+  story_1_3:
+    title: "Configure Database Models for Users"
+    reviewed: false
+    items: []
+    notes: "Database setup - no code review performed"
+
+  story_1_4:
+    title: "User Registration with Magic Link"
+    reviewed: false
+    items:
+      - id: "1.4-L1"
+        type: "test-coverage"
+        severity: "LOW"
+        status: "open"
+        file: "backend/tests/api/routes/test_auth.py"
+        description: "Magic link email sending not tested in isolation"
+        suggested_fix: "Add mock tests for email service"
+        effort: "small"
+      - id: "1.4-L2"
+        type: "security"
+        severity: "LOW"
+        status: "open"
+        file: "backend/app/features/auth/service.py"
+        description: "Magic link rate limiting could be bypassed with different email casing"
+        suggested_fix: "Normalize email to lowercase before rate limit check"
+        effort: "small"
+
+  story_1_5:
+    title: "User Login with JWT Authentication"
+    reviewed: false
+    items:
+      - id: "1.5-L1"
+        type: "security"
+        severity: "LOW"
+        status: "open"
+        file: "backend/app/core/security.py"
+        description: "JWT tokens don't include issuer/audience claims"
+        suggested_fix: "Add iss/aud claims to JWT payload"
+        effort: "small"
+      - id: "1.5-L2"
+        type: "ux"
+        severity: "LOW"
+        status: "open"
+        file: "frontend/src/hooks/useAuth.ts"
+        description: "No token refresh mechanism - users must re-login after expiry"
+        suggested_fix: "Implement refresh token flow"
+        effort: "medium"
+
+  story_1_6:
+    title: "Social Authentication (OAuth)"
+    reviewed: false
+    items:
+      - id: "1.6-L1"
+        type: "test-coverage"
+        severity: "LOW"
+        status: "open"
+        file: "backend/tests/"
+        description: "OAuth callback flow not fully integration tested"
+        suggested_fix: "Add mock OAuth provider tests"
+        effort: "medium"
+      - id: "1.6-L2"
+        type: "security"
+        severity: "LOW"
+        status: "open"
+        file: "backend/app/features/auth/router.py"
+        description: "OAuth state parameter not validated (CSRF protection)"
+        suggested_fix: "Implement OAuth state token validation"
+        effort: "small"
+
+# =============================================================================
+# EPIC 2: Group Management & Dashboard
+# =============================================================================
+
+epic_2:
+  story_2_1:
+    title: "Create Expense Group"
+    reviewed: false
+    items:
+      - id: "2.1-L1"
+        type: "validation"
+        severity: "LOW"
+        status: "open"
+        file: "backend/app/features/groups/models.py"
+        description: "Group name allows special characters that could cause display issues"
+        suggested_fix: "Add stricter validation for group name characters"
+        effort: "small"
+      - id: "2.1-L2"
+        type: "ux"
+        severity: "LOW"
+        status: "open"
+        file: "frontend/src/features/groups/components/CreateGroupForm.tsx"
+        description: "No debounce on group name input validation"
+        suggested_fix: "Add debounce to prevent excessive API calls"
+        effort: "small"
+
+  story_2_2:
+    title: "Invite Members via Deep Link"
+    reviewed: false
+    items:
+      - id: "2.2-L1"
+        type: "security"
+        severity: "LOW"
+        status: "open"
+        file: "backend/app/features/groups/service.py"
+        description: "Invite links don't expire - permanent access tokens"
+        suggested_fix: "Add expiration to invite links (e.g., 7 days)"
+        effort: "small"
+      - id: "2.2-L2"
+        type: "ux"
+        severity: "LOW"
+        status: "open"
+        file: "frontend/src/routes/invite/"
+        description: "No loading state shown while validating invite link"
+        suggested_fix: "Add skeleton loader during invite validation"
+        effort: "small"
+
+  story_2_3:
+    title: "View Group Members List"
+    reviewed: false
+    items:
+      - id: "2.3-L1"
+        type: "performance"
+        severity: "LOW"
+        status: "open"
+        file: "backend/app/features/groups/service.py"
+        description: "Member list query doesn't paginate for large groups"
+        suggested_fix: "Add pagination support for groups with many members"
+        effort: "medium"
+
+  story_2_4:
+    title: "Dashboard with Net Balances"
+    reviewed: true
+    review_date: "2026-01-12"
+    items:
+      - id: "2.4-L1"
+        type: "test-coverage"
+        severity: "LOW"
+        status: "open"
+        file: "backend/tests/api/routes/test_users.py"
+        description: "No explicit snake_case field verification in tests"
+        suggested_fix: "Add test that explicitly verifies field naming convention"
+        effort: "small"
+      - id: "2.4-L2"
+        type: "ux"
+        severity: "LOW"
+        status: "resolved"
+        resolved_in: "2.4-review-fixes"
+        file: "frontend/src/features/dashboard/components/Dashboard.tsx"
+        description: "Loading skeleton didn't match actual content structure"
+        suggested_fix: "Update skeleton to mirror actual layout"
+        effort: "small"
+      - id: "2.4-L3"
+        type: "ux"
+        severity: "LOW"
+        status: "resolved"
+        resolved_in: "2.4-review-fixes"
+        file: "frontend/src/features/dashboard/components/Dashboard.tsx"
+        description: "GroupCard lacked text truncation for long names"
+        suggested_fix: "Add truncate class to group name"
+        effort: "small"
+      - id: "2.4-L4"
+        type: "accessibility"
+        severity: "LOW"
+        status: "resolved"
+        resolved_in: "2.4-review-fixes"
+        file: "frontend/src/features/dashboard/components/Dashboard.tsx"
+        description: "Dark mode not considered - hard-coded colors"
+        suggested_fix: "Add dark: variants to Tailwind classes"
+        effort: "small"
+
+# =============================================================================
+# SUMMARY BY CATEGORY
+# =============================================================================
+
+summary:
+  by_type:
+    test-coverage: 3
+    security: 4
+    ux: 4
+    performance: 1
+    validation: 1
+    accessibility: 1
+
+  by_status:
+    open: 11
+    resolved: 4
+    in_progress: 0
+    wont_fix: 0
+
+  by_effort:
+    small: 12
+    medium: 3
+    large: 0
+
+# =============================================================================
+# RECOMMENDED PRIORITIZATION
+# =============================================================================
+
+prioritization:
+  high_value_quick_wins:
+    - "1.4-L2"  # Email case normalization - security + small effort
+    - "1.6-L2"  # OAuth state validation - security + small effort
+    - "2.2-L1"  # Invite link expiration - security + small effort
+
+  should_address_before_production:
+    - "1.5-L1"  # JWT claims - security best practice
+    - "1.6-L2"  # OAuth CSRF protection
+    - "2.2-L1"  # Invite link security
+
+  nice_to_have:
+    - "1.5-L2"  # Token refresh - UX improvement
+    - "2.1-L2"  # Input debounce - UX polish
+    - "2.3-L1"  # Pagination - performance at scale

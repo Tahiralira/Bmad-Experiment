@@ -15,6 +15,7 @@ from app.features.auth.models import (
     ItemCreate,
     MagicLinkToken,
     AUTH_METHOD_OAUTH,
+    GroupBalanceSummary,
 )
 
 
@@ -241,3 +242,61 @@ def find_or_create_oauth_user(
     session.commit()
     session.refresh(user)
     return user
+
+
+# ============================================================================
+# DASHBOARD OPERATIONS (Story 2.4)
+# ============================================================================
+
+
+def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanceSummary]:
+    """
+    Get dashboard data for a user showing all groups with net balances.
+
+    Currently returns 0 for all net_balances as expenses are not yet implemented.
+    When expenses are added in Epic 3, this function will calculate actual balances.
+
+    Args:
+        session: Database session
+        user_id: UUID of the user
+
+    Returns:
+        List of GroupBalanceSummary objects ordered by most recent activity
+    """
+    # NOTE: Import inside function to avoid circular dependency between
+    # auth.service -> groups.models -> auth.models. This is intentional.
+    from app.features.groups.models import ExpenseGroup, GroupMember
+
+    # Subquery to count members per group
+    member_count_subq = (
+        select(GroupMember.group_id, func.count().label("member_count"))
+        .group_by(GroupMember.group_id)
+        .subquery()
+    )
+
+    # Main query to get user's groups with member counts
+    statement = (
+        select(
+            ExpenseGroup.id,
+            ExpenseGroup.name,
+            ExpenseGroup.updated_at,
+            member_count_subq.c.member_count,
+        )
+        .join(GroupMember, GroupMember.group_id == ExpenseGroup.id)
+        .join(member_count_subq, member_count_subq.c.group_id == ExpenseGroup.id)
+        .where(GroupMember.user_id == user_id)
+        .order_by(ExpenseGroup.updated_at.desc())  # Most recent activity first
+    )
+
+    results = session.exec(statement).all()
+
+    return [
+        GroupBalanceSummary(
+            group_id=row.id,
+            group_name=row.name,
+            net_balance=0.0,  # Placeholder until expenses implemented (Epic 3)
+            last_activity=row.updated_at,
+            member_count=row.member_count,
+        )
+        for row in results
+    ]

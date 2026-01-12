@@ -1,0 +1,291 @@
+# Solution Patterns Log
+# =====================
+# Tracks problems encountered and their solutions to avoid repeating mistakes.
+# This file is automatically checked at the start of each session/workflow.
+#
+# FORMAT: Problem -> Root Cause -> Solution -> Prevention
+# GOAL: Save tokens by not re-debugging known issues
+#
+# Created: 2026-01-12
+# Last Updated: 2026-01-12
+
+metadata:
+  version: "1.0"
+  total_patterns: 8
+  categories:
+    - docker
+    - database
+    - frontend
+    - backend
+    - testing
+    - git
+    - imports
+    - deployment
+
+# =============================================================================
+# DOCKER PATTERNS
+# =============================================================================
+
+docker:
+  - id: "DOCKER-001"
+    title: "Poetry/pip packages not found after container rebuild"
+    symptoms:
+      - "ModuleNotFoundError in container"
+      - "Package installed locally but not in Docker"
+    root_cause: "Docker layer caching doesn't pick up new dependencies"
+    solution: |
+      1. Rebuild without cache: `docker compose build --no-cache backend`
+      2. Or copy requirements explicitly in Dockerfile
+      3. Or use volume mount for development
+    prevention: "Always rebuild containers after adding dependencies"
+    stories_encountered: ["1.1", "1.3"]
+    tokens_saved_estimate: "~500 per occurrence"
+
+  - id: "DOCKER-002"
+    title: "Database connection refused in tests"
+    symptoms:
+      - "Connection refused to localhost:5432"
+      - "Tests pass locally, fail in Docker"
+    root_cause: "Container networking - 'localhost' inside container != host"
+    solution: |
+      Use service name instead of localhost:
+      - In docker-compose: `db` not `localhost`
+      - Or use `host.docker.internal` for host access
+    prevention: "Always use service names in Docker environments"
+    stories_encountered: ["1.3"]
+    tokens_saved_estimate: "~300 per occurrence"
+
+  - id: "DOCKER-003"
+    title: "File permissions issues with mounted volumes"
+    symptoms:
+      - "Permission denied when writing files"
+      - "Root-owned files in mounted directories"
+    root_cause: "Container runs as root, host has different UID"
+    solution: |
+      1. Add user mapping in docker-compose:
+         ```yaml
+         user: "${UID}:${GID}"
+         ```
+      2. Or set permissions in Dockerfile:
+         ```dockerfile
+         RUN chown -R app:app /app
+         ```
+    prevention: "Define user in Dockerfile for development containers"
+    stories_encountered: []
+    tokens_saved_estimate: "~400 per occurrence"
+
+# =============================================================================
+# DATABASE PATTERNS
+# =============================================================================
+
+database:
+  - id: "DB-001"
+    title: "Alembic migration conflicts"
+    symptoms:
+      - "Multiple heads detected"
+      - "Target database is not up to date"
+    root_cause: "Multiple developers created migrations from same base"
+    solution: |
+      1. Check heads: `alembic heads`
+      2. Merge: `alembic merge -m "merge" rev1 rev2`
+      3. Or delete conflicting migration and regenerate
+    prevention: "Always pull latest before creating migrations"
+    stories_encountered: []
+    tokens_saved_estimate: "~600 per occurrence"
+
+  - id: "DB-002"
+    title: "SQLModel relationship not loading"
+    symptoms:
+      - "Related objects are None"
+      - "Lazy loading not working"
+    root_cause: "SQLModel requires explicit relationship configuration"
+    solution: |
+      Use `Relationship` with `back_populates`:
+      ```python
+      class User(SQLModel, table=True):
+          items: list["Item"] = Relationship(back_populates="owner")
+
+      class Item(SQLModel, table=True):
+          owner_id: uuid.UUID = Field(foreign_key="user.id")
+          owner: User = Relationship(back_populates="items")
+      ```
+    prevention: "Always define both sides of relationships"
+    stories_encountered: ["1.3", "2.1"]
+    tokens_saved_estimate: "~400 per occurrence"
+
+# =============================================================================
+# IMPORT / CIRCULAR DEPENDENCY PATTERNS
+# =============================================================================
+
+imports:
+  - id: "IMPORT-001"
+    title: "Circular import between feature modules"
+    symptoms:
+      - "ImportError: cannot import name X"
+      - "Partially initialized module"
+    root_cause: "Module A imports B, B imports A"
+    solution: |
+      Options (in order of preference):
+      1. Move shared types to a common module
+      2. Use TYPE_CHECKING for type hints only:
+         ```python
+         from typing import TYPE_CHECKING
+         if TYPE_CHECKING:
+             from app.features.groups.models import ExpenseGroup
+         ```
+      3. Import inside function (last resort, add comment explaining why)
+    prevention: "Plan module dependencies before implementing"
+    stories_encountered: ["2.4"]
+    tokens_saved_estimate: "~300 per occurrence"
+    example_file: "backend/app/features/auth/service.py:266"
+
+# =============================================================================
+# FRONTEND PATTERNS
+# =============================================================================
+
+frontend:
+  - id: "FE-001"
+    title: "TanStack Router file-based route not found"
+    symptoms:
+      - "Route not matching"
+      - "404 on navigation"
+    root_cause: "File naming must match route pattern exactly"
+    solution: |
+      Route structure:
+      - `/` → `routes/_layout/index.tsx`
+      - `/groups` → `routes/_layout/groups/index.tsx`
+      - `/groups/:id` → `routes/_layout/groups/$id.tsx`
+
+      Use `_layout` prefix for layout routes.
+    prevention: "Check TanStack Router docs for file conventions"
+    stories_encountered: ["2.4"]
+    tokens_saved_estimate: "~200 per occurrence"
+
+  - id: "FE-002"
+    title: "TanStack Query not refetching after mutation"
+    symptoms:
+      - "Data stale after create/update"
+      - "Need to refresh to see changes"
+    root_cause: "Query cache not invalidated"
+    solution: |
+      Invalidate queries after mutation:
+      ```typescript
+      const queryClient = useQueryClient()
+
+      const mutation = useMutation({
+        mutationFn: createGroup,
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["groups"] })
+        },
+      })
+      ```
+    prevention: "Always invalidate related queries in mutation onSuccess"
+    stories_encountered: ["2.1"]
+    tokens_saved_estimate: "~250 per occurrence"
+
+# =============================================================================
+# TESTING PATTERNS
+# =============================================================================
+
+testing:
+  - id: "TEST-001"
+    title: "Pytest fixture not found"
+    symptoms:
+      - "fixture 'X' not found"
+    root_cause: "Fixture not in conftest.py or wrong scope"
+    solution: |
+      1. Check fixture is in `conftest.py` (not just test file)
+      2. Check fixture scope matches usage
+      3. Check fixture name matches exactly (case-sensitive)
+    prevention: "Keep fixtures in conftest.py at appropriate level"
+    stories_encountered: []
+    tokens_saved_estimate: "~150 per occurrence"
+
+  - id: "TEST-002"
+    title: "Test database not cleaned between tests"
+    symptoms:
+      - "Tests pass individually, fail together"
+      - "Duplicate key errors"
+    root_cause: "Database state leaking between tests"
+    solution: |
+      Use transaction rollback or truncate:
+      ```python
+      @pytest.fixture
+      def db(session):
+          yield session
+          session.rollback()  # Rollback after each test
+      ```
+    prevention: "Use session-scoped fixtures with rollback"
+    stories_encountered: ["1.4"]
+    tokens_saved_estimate: "~400 per occurrence"
+
+# =============================================================================
+# GIT PATTERNS
+# =============================================================================
+
+git:
+  - id: "GIT-001"
+    title: "Pre-commit hook failing on generated files"
+    symptoms:
+      - "Commit rejected due to formatting"
+      - "Auto-generated files don't pass linting"
+    root_cause: "Linters running on generated/vendored code"
+    solution: |
+      Add to `.gitignore` or `.pre-commit-config.yaml`:
+      ```yaml
+      exclude: |
+        (?x)^(
+          frontend/src/client/.*|
+          migrations/versions/.*
+        )$
+      ```
+    prevention: "Configure exclusions when adding code generation"
+    stories_encountered: []
+    tokens_saved_estimate: "~200 per occurrence"
+
+# =============================================================================
+# QUICK REFERENCE (Most Common Issues)
+# =============================================================================
+
+quick_reference:
+  - trigger: "ModuleNotFoundError in Docker"
+    pattern_id: "DOCKER-001"
+    quick_fix: "docker compose build --no-cache"
+
+  - trigger: "Connection refused localhost:5432"
+    pattern_id: "DOCKER-002"
+    quick_fix: "Use service name 'db' instead of 'localhost'"
+
+  - trigger: "ImportError: cannot import name"
+    pattern_id: "IMPORT-001"
+    quick_fix: "Check for circular imports, use TYPE_CHECKING"
+
+  - trigger: "Route not found 404"
+    pattern_id: "FE-001"
+    quick_fix: "Check file naming matches TanStack Router conventions"
+
+  - trigger: "Data not updating after mutation"
+    pattern_id: "FE-002"
+    quick_fix: "Add queryClient.invalidateQueries in onSuccess"
+
+# =============================================================================
+# HOW TO ADD NEW PATTERNS
+# =============================================================================
+#
+# When you encounter a new issue:
+# 1. Add pattern under appropriate category
+# 2. Include: symptoms, root_cause, solution, prevention
+# 3. Add to quick_reference if common
+# 4. Update metadata.total_patterns count
+#
+# Example:
+#   - id: "CATEGORY-XXX"
+#     title: "Brief description"
+#     symptoms:
+#       - "What you see"
+#     root_cause: "Why it happens"
+#     solution: |
+#       Step by step fix
+#     prevention: "How to avoid in future"
+#     stories_encountered: ["X.X"]
+#     tokens_saved_estimate: "~XXX per occurrence"

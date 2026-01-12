@@ -51,11 +51,11 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: Group Management & Dashboard (4 stories)
-  epic-2: in-progress
+  epic-2: done
   2-1-create-expense-group: done
   2-2-invite-members-via-deep-link: done
   2-3-view-group-members-list: done
-  2-4-dashboard-with-net-balances: backlog
+  2-4-dashboard-with-net-balances: done
   epic-2-retrospective: optional
 
   # Epic 3: Smart Expense Entry (8 stories)

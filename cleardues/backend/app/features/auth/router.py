@@ -36,6 +36,7 @@ from app.features.auth.models import (
     UserUpdateMe,
     MagicLinkRequest,
     AUTH_METHOD_MAGIC_LINK,
+    DashboardResponse,
 )
 from app.features.auth import service as auth_service
 from app.core.oauth import oauth, SUPPORTED_PROVIDERS, is_provider_configured
@@ -264,6 +265,28 @@ def read_user_me(current_user: CurrentUser) -> Any:
     Get current user.
     """
     return current_user
+
+
+@users_router.get("/me/dashboard", response_model=DashboardResponse)
+def get_dashboard(
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> DashboardResponse:
+    """
+    Get the current user's dashboard with group balances.
+
+    Returns all groups the user is a member of with their net balance
+    (positive if owed to user, negative if user owes).
+    Groups are sorted by most recent activity.
+    """
+    groups = auth_service.get_user_dashboard(session, current_user.id)
+    total_balance = sum(g.net_balance for g in groups)
+
+    return DashboardResponse(
+        groups=groups,
+        total_balance=total_balance,
+        count=len(groups),
+    )
 
 
 @users_router.delete("/me", response_model=Message)

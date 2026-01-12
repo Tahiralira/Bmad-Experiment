@@ -163,3 +163,24 @@ class ItemPublic(ItemBase):
 class ItemsPublic(SQLModel):
     data: list[ItemPublic]
     count: int
+
+
+# === Dashboard Schemas (Story 2.4) ===
+
+
+class GroupBalanceSummary(SQLModel):
+    """Summary of a group with net balance for dashboard display."""
+
+    group_id: uuid.UUID
+    group_name: str
+    net_balance: float  # Positive = owed to user, negative = user owes
+    last_activity: datetime
+    member_count: int
+
+
+class DashboardResponse(SQLModel):
+    """Response schema for user dashboard."""
+
+    groups: list[GroupBalanceSummary]
+    total_balance: float  # Sum of all net_balances
+    count: int  # Number of groups
