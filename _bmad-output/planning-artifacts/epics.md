@@ -124,7 +124,7 @@ This document provides the complete epic and story breakdown for ClearDues, deco
 ### Epic 1: Project Foundation & Authentication
 Users can securely access the ClearDues platform with modern authentication methods and have a working development environment ready for all features.
 
-**FRs covered:** FR1  
+**FRs covered:** FR1
 **Additional Requirements:** Starter template initialization, project reorganization, database setup, deployment infrastructure
 
 **User Outcome:** New users can register and log in; development team has a production-ready foundation.
@@ -140,10 +140,20 @@ Users can create expense groups, invite friends, and view their financial standi
 
 ---
 
+### Epic 2.5: UX Foundation & Design System
+Establish the distinctive ClearDues visual identity and core interaction components defined in the UX specification before building expense features.
+
+**UX Spec Reference:** `_bmad-output/planning-artifacts/ux-design-specification.md`
+
+**User Outcome:** The app has a distinctive, warm, minimal aesthetic with the Agent Orb as the signature interaction element, replacing generic fintech patterns.
+
+---
+
 ### Epic 3: Smart Expense Entry
 Users can add expenses naturally using conversational text, with AI parsing the details and allowing manual corrections before saving.
 
 **FRs covered:** FR4, FR5, FR6, FR7, FR8
+**UX Enhancement:** Uses SmartInputModal, Agent Orb entry, AI streaming personality
 
 **User Outcome:** Users can record expenses in seconds without tedious forms or manual calculations.
 
@@ -179,10 +189,17 @@ Users receive intelligent, context-aware reminders about outstanding debts and c
 ### Epic 7: Offline Capability & Sync
 Users can view balances and create expenses even without internet connectivity, with automatic synchronization when connection returns.
 
-**FRs covered:** FR17, FR18  
+**FRs covered:** FR17, FR18
 **Additional Requirements:** Offline strategy (TanStack Query Persist, Mutation Queue)
 
 **User Outcome:** Users can use ClearDues anywhere, anytime, without worrying about connectivity.
+
+---
+
+### Epic 8: UX Polish & Advanced Features (Post-MVP)
+Polish the user experience with advanced features, accessibility audit, and animation refinements after core functionality is complete.
+
+**User Outcome:** The app reaches production-quality polish with delightful micro-interactions, full accessibility compliance, and power-user features.
 
 ---
 
@@ -364,6 +381,144 @@ So that I can quickly understand my overall financial standing.
 
 ---
 
+## Epic 2.5: UX Foundation & Design System
+
+Establish the distinctive ClearDues visual identity and core interaction components defined in the UX specification before building expense features.
+
+### Story 2.5.1: Design System Token Migration
+
+As a **frontend developer**,
+I want to replace the current color/typography tokens with the UX specification palette,
+So that all subsequent components use the correct visual language.
+
+**Acceptance Criteria:**
+
+**Given** the existing Tailwind/shadcn configuration
+**When** I update the design tokens
+**Then** the warm minimal palette is applied:
+- background: #FDFBF7 (light), #1A1A1A (dark)
+- surface: #FAF8F5 (light), #252525 (dark)
+- action: #3D9A94 (muted teal)
+- success: #D4A857 (warm amber)
+**And** Inter font family is configured (variable font)
+**And** spacing scale uses 4px base unit
+**And** border-radius tokens are soft (8-12px)
+**And** shadow system uses subtle depth
+**And** existing components are updated to use new tokens
+**And** both light and dark themes work correctly
+
+### Story 2.5.2: Agent Orb Component
+
+As a **user**,
+I want to see an animated Agent Orb as the primary action trigger,
+So that I have a distinctive, engaging way to interact with ClearDues.
+
+**Acceptance Criteria:**
+
+**Given** I am on any authenticated screen
+**When** I view the interface
+**Then** the Agent Orb component appears with squircle shape (56-64px)
+**And** idle animation shows gentle pulse glow, breathing scale (1.0→1.02→1.0)
+**And** tap/click states include scale up (1.0→1.1), ripple effect
+**And** processing state shows faster pulse
+**And** success state shows amber flash
+**And** position is bottom-right corner, elevated above content
+**And** component is accessible: keyboard focusable, aria-label="Add new expense"
+**And** respects `prefers-reduced-motion` setting
+
+### Story 2.5.3: Orbital Navigation System
+
+As a **user**,
+I want navigation options that orbit from the Agent Orb,
+So that I can navigate without persistent nav chrome cluttering the screen.
+
+**Acceptance Criteria:**
+
+**Given** the Agent Orb is visible
+**When** I tap the Orb (mobile) or hover (desktop)
+**Then** 4 orbital icons animate outward: Home, Groups, Activity, Profile
+**And** icons emerge with staggered spring timing (50ms apart)
+**And** tapping an orbital icon navigates to that screen and retracts orbitals
+**And** tapping Orb again or tapping away dismisses the nav
+**And** auto-hides after 3 seconds of inactivity
+**And** keyboard navigation works: arrows to cycle, enter to select, escape to close
+**And** current sidebar navigation is replaced
+**And** animation timing: 300ms expand, 200ms collapse
+
+### Story 2.5.4: Smart Input Modal Foundation
+
+As a **user**,
+I want a full-screen Smart Input modal that slides up from the Orb,
+So that I have a focused, distraction-free expense entry experience.
+
+**Acceptance Criteria:**
+
+**Given** I tap/long-press the Agent Orb
+**When** the Smart Input modal opens
+**Then** it slides up from the Orb position
+**And** full-screen on mobile, centered dialog (600px max) on desktop
+**And** contains natural language input field with placeholder "Paid 150 for dinner, split with everyone except Tom"
+**And** AI commentary bubble area appears above input
+**And** preview card area appears below input
+**And** group selector appears when entered from dashboard
+**And** close button with slide-down dismiss animation
+**And** Escape key closes on desktop
+
+### Story 2.5.5: Swipeable Card Base Component
+
+As a **user**,
+I want to swipe cards left/right to reveal quick actions,
+So that I can edit or settle expenses with minimal taps.
+
+**Acceptance Criteria:**
+
+**Given** I am viewing a card (expense, group, etc.)
+**When** I swipe left on mobile
+**Then** Edit action is revealed at 30% threshold
+**And** auto-triggers at 60% threshold
+**When** I swipe right on mobile
+**Then** Mark Paid action is revealed at 30%, auto-triggers at 60%
+**And** haptic feedback fires on mobile (if available)
+**And** snap-back animation occurs on incomplete swipe
+**And** desktop fallback: hover reveals action buttons
+**And** accessibility: hidden action buttons receive focus after card
+
+### Story 2.5.6: Balance Display Component
+
+As a **user**,
+I want to see monetary amounts in a consistent, neutral format,
+So that debt amounts feel factual, not judgmental.
+
+**Acceptance Criteria:**
+
+**Given** any monetary amount is displayed
+**When** I view the balance
+**Then** BalanceDisplay component is used with size variants (display/title/body)
+**And** text-primary color is always used (never red for debt)
+**And** format is "Rs" prefix with comma separators (Rs 1,500)
+**And** context labels show "You owe" / "You're owed"
+**And** aria-label includes full context for screen readers ("You owe 450 rupees to Sam")
+
+### Story 2.5.7: Update Existing Screens to New Design System
+
+As a **user**,
+I want the existing dashboard and group screens to use the new design,
+So that the app feels consistent with the new UX direction.
+
+**Acceptance Criteria:**
+
+**Given** the new design system components are ready
+**When** I navigate through the app
+**Then** Dashboard uses new color palette and typography
+**And** Group list uses new card styling with warm minimal aesthetic
+**And** Sidebar is replaced with Orbital Navigation
+**And** Agent Orb appears on all authenticated screens
+**And** All existing functionality is preserved
+**And** Dark mode works correctly with new tokens
+**And** No regression in existing features
+
+---
+
 ## Epic 3: Smart Expense Entry
 
 Users can add expenses naturally using conversational text, with AI parsing the details and allowing manual corrections before saving.
@@ -392,12 +547,18 @@ So that I can add expenses quickly without forms.
 
 **Acceptance Criteria:**
 
-**Given** I am on the expense creation page
-**When** I type "Paid 60 for lunch" in a text input field
+**Given** I am on the expense creation page (via SmartInputModal)
+**When** I type "Paid 60 for lunch" in the natural language input field
 **Then** the text is captured and ready to be sent to the parsing service
-**And** the frontend UI shows a loading state while parsing
+**And** the frontend UI shows AI commentary bubble with streaming text
 **And** the input field supports multi-line for complex descriptions
 **And** there is a fallback button to switch to manual/structured form if preferred
+
+**UX Enhancement (from Epic 2.5.4):**
+**And** input opens via Agent Orb tap (long-press) or via + button in Group View
+**And** AI commentary bubble shows during processing with personality-driven text
+**And** streaming text appears at 30-50ms per character for natural reading pace
+**And** placeholder text shows: "Paid 150 for dinner, split with everyone except Tom"
 
 ### Story 3.3: AI Parsing Service Integration
 
@@ -416,6 +577,12 @@ So that users don't have to manually fill forms.
 **And** the AI service endpoint: `POST /api/v1/expenses/parse`
 **And** the service uses OpenAI API or similar NLP provider
 
+**UX Enhancement (AI Personality):**
+**And** API supports 4 personality modes: Professional, Friendly, Funny, F3-PBS (Roast)
+**And** response includes streaming-compatible format for character-by-character display
+**And** response includes personality-flavored commentary in addition to parsed data
+**And** personality is determined by group settings (configurable per group)
+
 ### Story 3.4: Manual Override of Parsed Data
 
 As a **group member**,
@@ -431,6 +598,13 @@ So that I can correct any mistakes before finalizing.
 **And** the original AI suggestion is available for reference
 **And** I can confirm and save the expense after reviewing
 **And** or discard and start over if completely wrong
+
+**UX Enhancement (Dual-Mode Editing):**
+**And** simple edits (amount, description) happen inline in the preview card
+**And** complex edits (split logic, members) tap to expand full modal
+**And** changes are highlighted with subtle animation (color fade or border pulse)
+**And** confirmation uses auto-confirm countdown (3s) if user has enabled preference
+**And** or requires tap to confirm if auto-confirm is disabled
 
 ### Story 3.5: Split Logic - Equal Split
 
@@ -448,6 +622,12 @@ So that everyone pays their fair share automatically.
 **And** the split is calculated server-side for accuracy
 **And** the API call: `PUT /api/v1/expenses/{expense_id}/split` with `{type: "equal"}`
 
+**UX Enhancement (Visual Split Picker):**
+**And** split type is selected via visual card selector component
+**And** Equal split card shows three equal horizontal bars icon
+**And** selected card has teal border + tinted background
+**And** member chips display below with toggle include/exclude capability
+
 ### Story 3.6: Split Logic - Unequal/Custom Amounts
 
 As a **expense creator**,
@@ -463,6 +643,12 @@ So that I can handle unequal splits (e.g., someone ordered more).
 **And** if amounts don't match total, an error is shown
 **And** the API validates the split logic on the backend
 **And** the API call: `PUT /api/v1/expenses/{expense_id}/split` with `{type: "unequal", splits: [{user_id, amount}]}`
+
+**UX Enhancement (Visual Split Picker):**
+**And** Unequal split card shows three bars of different lengths icon
+**And** inline amount input appears next to each member chip
+**And** real-time validation shows remaining amount to allocate
+**And** BalanceDisplay component used for amount formatting (Rs prefix)
 
 ### Story 3.7: Split Logic - Percentage Split
 
@@ -480,6 +666,12 @@ So that I can handle proportional sharing (e.g., 60/40 split).
 **And** amounts are calculated server-side to avoid rounding errors
 **And** the API call: `PUT /api/v1/expenses/{expense_id}/split` with `{type: "percentage", splits: [{user_id, percentage}]}`
 
+**UX Enhancement (Visual Split Picker):**
+**And** Percentage split card shows "%" symbol with example percentages icon
+**And** percentage input appears next to each member chip
+**And** real-time calculation shows resulting amount for each percentage
+**And** visual indicator shows total percentage progress toward 100%
+
 ### Story 3.8: Exclude Members from Expense
 
 As a **expense creator**,
@@ -495,6 +687,13 @@ So that I can handle situations where not everyone participated.
 **And** the UI shows clearly who is included/excluded
 **And** I can change exclusions before finalizing the expense
 **And** the API accepts an `excluded_user_ids` array in the split request
+
+**UX Enhancement (Member Chips):**
+**And** members displayed as chips with avatar + name
+**And** tap chip to toggle include/exclude status
+**And** excluded members shown grayed out + struck through name (not hidden)
+**And** included members show teal checkmark, excluded show muted X
+**And** maintains group context — user sees who's out, not just who's in
 
 ---
 
@@ -584,6 +783,12 @@ So that I can see who did what and when for transparency.
 **And** the feed is paginated (20 entries per page)
 **And** the API endpoint: `GET /api/v1/expenses/{expense_id}/activity` or `GET /api/v1/expense-groups/{group_id}/activity`
 
+**UX Enhancement (Chat-Style Feed):**
+**And** activity items styled as chat bubbles in Group View
+**And** AI personality comments appear inline with streaming effect
+**And** new entries animate in with fade-up effect
+**And** timestamps shown relatively ("2 hours ago") with exact date on hover
+
 ---
 
 ## Epic 5: Settlement & Payment Tracking
@@ -606,6 +811,12 @@ So that I can notify the expense creator that payment is complete.
 **And** I see the expense in my "Pending Settlement Confirmation" list
 **And** the API endpoint: `POST /api/v1/expenses/{expense_id}/settle`
 
+**UX Enhancement (Swipe-to-Settle):**
+**And** swipe right on expense card triggers Mark Paid action
+**And** optimistic UI shows immediate visual update (card styling changes)
+**And** undo toast appears with 3-second countdown
+**And** card shows "Awaiting confirmation from [Owner]" state
+
 ### Story 5.2: Owner Confirms Settlement
 
 As an **expense creator (owner)**,
@@ -622,6 +833,12 @@ So that the debt is officially cleared from the system.
 **And** the debt is removed from balance calculations
 **And** the settlement is recorded in the audit log
 **And** the API endpoint: `POST /api/v1/settlement-claims/{claim_id}/confirm`
+
+**UX Enhancement (Payment = Silence):**
+**And** confirmed settlement causes expense card to fade out with amber glow animation
+**And** card disappears completely after confirmation (silence is the reward)
+**And** zero balance state shows celebratory empty state with amber tint
+**And** no unnecessary notifications sent after settlement is confirmed
 
 ### Story 5.3: Settlement Audit Trail
 
@@ -708,6 +925,11 @@ So that I can defer reminders without being nagged repeatedly.
 **And** after the snooze period ends, normal notification schedule resumes
 **And** the snooze is stored: `{notification_id, snoozed_until}`
 **And** the API endpoint: `POST /api/v1/notifications/{notification_id}/snooze`
+
+**UX Enhancement (Swipe Gesture):**
+**And** swipe left on notification reveals snooze options
+**And** duration picker shows: 1 day, 3 days, 1 week as tap options
+**And** snooze confirmation shown via toast with undo option
 
 ### Story 6.5: Settlement Cycle Configuration
 
@@ -811,3 +1033,81 @@ So that creator-only restrictions are enforced even during sync.
 **And** the rejected changes are shown to the user with explanation
 **And** the user can choose to "Discard" the rejected local change
 **And** legitimate changes (user's own expenses) sync successfully
+
+---
+
+## Epic 8: UX Polish & Advanced Features (Post-MVP)
+
+Polish the user experience with advanced features, accessibility audit, and animation refinements after core functionality is complete.
+
+### Story 8.1: AI Personality Selector
+
+As a **group creator/admin**,
+I want to select the AI personality for my group's expense commentary,
+So that the tone matches my group's social dynamic.
+
+**Acceptance Criteria:**
+
+**Given** I am viewing group settings
+**When** I access the AI personality section
+**Then** I see 4 personality options: Professional, Friendly, Funny, F3-PBS (Roast)
+**And** each option shows icon, name, and sample commentary preview
+**And** selecting F3-PBS displays warning: "This mode is unhinged. Dark humor, savage roasts, no boundaries. You asked for this."
+**And** F3-PBS requires explicit opt-in confirmation
+**And** personality setting is stored per group in database
+**And** preview sample commentary plays before final selection
+
+### Story 8.2: Desktop Power Features
+
+As a **power user on desktop**,
+I want keyboard shortcuts and enhanced interactions,
+So that I can work faster without touching the mouse.
+
+**Acceptance Criteria:**
+
+**Given** I am using ClearDues on desktop (>1024px viewport)
+**When** I press keyboard shortcuts
+**Then** `Cmd/Ctrl+N` opens Smart Input modal instantly
+**And** `Cmd/Ctrl+K` opens command palette for search/navigation
+**And** `Escape` closes any modal or overlay
+**And** `Backspace` or `Alt+←` navigates back
+**And** `Cmd/Ctrl+Enter` confirms expense or settlement
+**And** `Cmd/Ctrl+↑/↓` cycles between groups in dashboard
+**And** hover on Agent Orb expands Orbital Nav (no tap required)
+**And** all shortcuts shown in command palette help
+
+### Story 8.3: Animation Polish
+
+As a **user**,
+I want smooth, delightful animations throughout the app,
+So that interactions feel polished and professional.
+
+**Acceptance Criteria:**
+
+**Given** animations are implemented
+**When** I navigate and interact with the app
+**Then** page transitions use slide animations (300ms, ease-out)
+**And** micro-interactions on buttons/cards are refined (subtle scale, shadow)
+**And** loading states use skeleton patterns matching component shapes
+**And** success states use amber glow/pulse effects
+**And** all animations respect `prefers-reduced-motion` setting
+**And** reduced motion alternatives are functional (no decorative animation)
+
+### Story 8.4: Accessibility Audit & Fixes
+
+As a **user with accessibility needs**,
+I want the app to meet WCAG AA standards,
+So that I can use ClearDues regardless of my abilities.
+
+**Acceptance Criteria:**
+
+**Given** the app is feature-complete
+**When** an accessibility audit is performed
+**Then** screen reader testing passes with VoiceOver and NVDA
+**And** keyboard navigation works for all interactive elements
+**And** color contrast meets WCAG AA (4.5:1 body, 3:1 large text)
+**And** touch targets are minimum 44x44px
+**And** focus indicators are visible on all focusable elements
+**And** all images have meaningful alt text or aria-hidden
+**And** dynamic content uses aria-live regions appropriately
+**And** Lighthouse accessibility score is 95+

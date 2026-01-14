@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClearDues - Design Directions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Light Mode */
+      --background: #FDFBF7;
+      --surface: #FAF8F5;
+      --surface-elevated: #FFFFFF;
+      --border: #E8E4DD;
+      --text-primary: #1F1E1C;
+      --text-secondary: #6B6660;
+      --text-muted: #9C9790;
+      --action: #3D9A94;
+      --action-hover: #2D7A75;
+      --success: #D4A857;
+      --success-subtle: #FDF8ED;
+      --info: #5B8FB9;
+      --warning: #CC8B4D;
+      --error: #C97C7C;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+    }
+
+    .dark {
+      --background: #1A1A1A;
+      --surface: #252525;
+      --surface-elevated: #2E2E2E;
+      --border: #3A3A3A;
+      --text-primary: #F5F5F5;
+      --text-secondary: #A0A0A0;
+      --text-muted: #707070;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--background);
+      color: var(--text-primary);
+      line-height: 1.5;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* Header Controls */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .theme-toggle {
+      padding: 8px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background: var(--action);
+      color: white;
+      border-color: var(--action);
+    }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      position: fixed;
+      top: 65px;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      overflow-x: auto;
+      padding: 0 24px;
+      z-index: 99;
+    }
+
+    .nav-tab {
+      padding: 16px 20px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-tab.active {
+      color: var(--action);
+      border-bottom-color: var(--action);
+      font-weight: 500;
+    }
+
+    /* Main Content */
+    .main {
+      padding-top: 130px;
+      min-height: 100vh;
+    }
+
+    /* Design Direction Container */
+    .direction {
+      display: none;
+      padding: 24px;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .direction.active {
+      display: block;
+    }
+
+    .direction-title {
+      font-size: 24px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .direction-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    /* Phone Frame */
+    .phone-frame {
+      background: var(--surface-elevated);
+      border-radius: 32px;
+      border: 8px solid var(--border);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      aspect-ratio: 9/19;
+      max-height: 700px;
+    }
+
+    .phone-screen {
+      height: 100%;
+      overflow-y: auto;
+      background: var(--background);
+    }
+
+    /* ========== DIRECTION 1: Classic Bottom Nav ========== */
+    .d1-header {
+      padding: 16px 20px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .d1-group-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+
+    .d1-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--action);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .d1-balance-card {
+      margin: 20px;
+      padding: 24px;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      text-align: center;
+    }
+
+    .d1-balance-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .d1-balance-amount {
+      font-size: 32px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .d1-balance-amount.positive {
+      color: var(--action);
+    }
+
+    .d1-balance-amount.settled {
+      color: var(--success);
+    }
+
+    .d1-section-title {
+      padding: 12px 20px 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .d1-expense-list {
+      padding: 0 20px;
+    }
+
+    .d1-expense-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: var(--surface-elevated);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .d1-expense-info {
+      flex: 1;
+    }
+
+    .d1-expense-title {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .d1-expense-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .d1-expense-amount {
+      font-weight: 500;
+      text-align: right;
+    }
+
+    .d1-expense-share {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .d1-fab {
+      position: absolute;
+      bottom: 80px;
+      right: 20px;
+      width: 56px;
+      height: 56px;
+      background: var(--action);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+      box-shadow: var(--shadow-md);
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .d1-fab:hover {
+      background: var(--action-hover);
+      transform: scale(1.05);
+    }
+
+    .d1-bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface-elevated);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      padding: 12px 0 20px;
+    }
+
+    .d1-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      font-size: 10px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .d1-nav-item.active {
+      color: var(--action);
+    }
+
+    .d1-nav-icon {
+      font-size: 20px;
+    }
+
+    /* ========== DIRECTION 2: Chat-First Input ========== */
+    .d2-screen {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .d2-header {
+      padding: 16px 20px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .d2-group-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .d2-group-tab {
+      padding: 8px 16px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .d2-group-tab.active {
+      background: var(--action);
+      color: white;
+    }
+
+    .d2-balance-bar {
+      display: flex;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--surface);
+    }
+
+    .d2-balance-item {
+      text-align: center;
+    }
+
+    .d2-balance-item-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .d2-balance-item-value {
+      font-weight: 500;
+      font-size: 16px;
+    }
+
+    .d2-chat-area {
+      flex: 1;
+      padding: 16px 20px;
+      overflow-y: auto;
+    }
+
+    .d2-ai-message {
+      background: var(--surface);
+      padding: 16px;
+      border-radius: var(--radius-md);
+      margin-bottom: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .d2-ai-typing {
+      display: flex;
+      gap: 4px;
+      padding: 8px 0;
+    }
+
+    .d2-ai-typing span {
+      width: 8px;
+      height: 8px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
+    }
+
+    .d2-ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+    .d2-ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing {
+      0%, 60%, 100% { opacity: 0.3; }
+      30% { opacity: 1; }
+    }
+
+    .d2-expense-card {
+      background: var(--surface-elevated);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .d2-expense-card-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .d2-expense-card-title {
+      font-weight: 500;
+    }
+
+    .d2-expense-card-amount {
+      font-weight: 500;
+      color: var(--action);
+    }
+
+    .d2-expense-card-splits {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .d2-split-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+    }
+
+    .d2-split-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .d2-input-area {
+      padding: 16px 20px 24px;
+      background: var(--surface-elevated);
+      border-top: 1px solid var(--border);
+    }
+
+    .d2-input-field {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+    }
+
+    .d2-input-field input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .d2-input-field input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .d2-send-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--action);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      cursor: pointer;
+    }
+
+    /* ========== DIRECTION 3: Card Stack Dashboard ========== */
+    .d3-header {
+      padding: 20px;
+      background: var(--surface-elevated);
+    }
+
+    .d3-greeting {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .d3-total-balance {
+      font-size: 28px;
+      font-weight: 500;
+    }
+
+    .d3-total-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .d3-group-cards {
+      padding: 16px 20px;
+    }
+
+    .d3-group-card {
+      background: var(--surface-elevated);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .d3-group-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .d3-group-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 16px;
+    }
+
+    .d3-group-card-name {
+      font-weight: 500;
+      font-size: 16px;
+    }
+
+    .d3-group-card-members {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .d3-group-card-balance {
+      text-align: right;
+    }
+
+    .d3-group-card-balance-amount {
+      font-weight: 500;
+      font-size: 18px;
+    }
+
+    .d3-group-card-balance-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .d3-group-card-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .d3-action-btn {
+      flex: 1;
+      padding: 10px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .d3-action-btn:hover {
+      background: var(--action);
+      color: white;
+    }
+
+    .d3-action-btn.primary {
+      background: var(--action);
+      color: white;
+    }
+
+    .d3-settled-card {
+      background: var(--success-subtle);
+      border: 1px solid var(--success);
+    }
+
+    .d3-settled-card .d3-group-card-balance-amount {
+      color: var(--success);
+    }
+
+    /* ========== DIRECTION 4: Minimal List View ========== */
+    .d4-header {
+      padding: 20px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .d4-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .d4-title {
+      font-size: 20px;
+      font-weight: 500;
+    }
+
+    .d4-add-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--action);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .d4-summary {
+      margin-top: 16px;
+      display: flex;
+      gap: 24px;
+    }
+
+    .d4-summary-item {
+      flex: 1;
+    }
+
+    .d4-summary-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .d4-summary-value {
+      font-size: 20px;
+      font-weight: 500;
+      margin-top: 4px;
+    }
+
+    .d4-list {
+      padding: 8px 0;
+    }
+
+    .d4-list-item {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .d4-list-item:hover {
+      background: var(--surface);
+    }
+
+    .d4-list-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .d4-list-info {
+      flex: 1;
+    }
+
+    .d4-list-name {
+      font-weight: 500;
+    }
+
+    .d4-list-subtext {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .d4-list-amount {
+      text-align: right;
+    }
+
+    .d4-list-amount-value {
+      font-weight: 500;
+    }
+
+    .d4-list-amount-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .d4-quick-input {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 16px 20px 32px;
+      background: var(--surface-elevated);
+      border-top: 1px solid var(--border);
+    }
+
+    .d4-quick-input-field {
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* ========== DIRECTION 5: Side Panel Groups ========== */
+    .d5-container {
+      display: flex;
+      height: 100%;
+    }
+
+    .d5-sidebar {
+      width: 72px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .d5-sidebar-item {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .d5-sidebar-item:hover {
+      background: var(--surface-elevated);
+    }
+
+    .d5-sidebar-item.active {
+      background: var(--action);
+      color: white;
+    }
+
+    .d5-main {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .d5-main-header {
+      padding: 20px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .d5-main-title {
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .d5-main-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .d5-balance-display {
+      padding: 20px;
+      text-align: center;
+      background: var(--surface);
+    }
+
+    .d5-balance-amount {
+      font-size: 36px;
+      font-weight: 500;
+    }
+
+    .d5-balance-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .d5-action-bar {
+      display: flex;
+      gap: 8px;
+      padding: 0 20px 20px;
+      background: var(--surface);
+    }
+
+    .d5-action-btn {
+      flex: 1;
+      padding: 12px;
+      background: var(--surface-elevated);
+      border-radius: var(--radius-sm);
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .d5-action-btn.primary {
+      background: var(--action);
+      color: white;
+    }
+
+    .d5-activity {
+      padding: 20px;
+    }
+
+    .d5-activity-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .d5-activity-item {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .d5-activity-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .d5-activity-content {
+      flex: 1;
+    }
+
+    .d5-activity-text {
+      font-size: 14px;
+    }
+
+    .d5-activity-time {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .d5-activity-amount {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    /* ========== DIRECTION 6: Full-Screen Smart Input ========== */
+    .d6-screen {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface-elevated);
+    }
+
+    .d6-header {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .d6-close {
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .d6-group-pill {
+      padding: 8px 16px;
+      background: var(--surface);
+      border-radius: 20px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .d6-input-area {
+      flex: 1;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .d6-input-label {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .d6-input-field {
+      font-size: 24px;
+      font-weight: 500;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      margin-bottom: 24px;
+    }
+
+    .d6-input-field::placeholder {
+      color: var(--text-muted);
+    }
+
+    .d6-ai-preview {
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-top: auto;
+    }
+
+    .d6-ai-preview-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .d6-ai-indicator {
+      width: 8px;
+      height: 8px;
+      background: var(--action);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .d6-ai-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .d6-preview-content {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .d6-preview-amount {
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin: 16px 0;
+    }
+
+    .d6-preview-splits {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .d6-preview-chip {
+      padding: 8px 12px;
+      background: var(--surface-elevated);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .d6-preview-chip-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .d6-bottom {
+      padding: 16px 20px 32px;
+      background: var(--background);
+      border-top: 1px solid var(--border);
+    }
+
+    .d6-submit-btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--action);
+      border-radius: var(--radius-md);
+      color: white;
+      font-weight: 500;
+      font-size: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .d6-submit-btn:hover {
+      background: var(--action-hover);
+    }
+
+    /* Key Features Section */
+    .key-features {
+      margin-top: 24px;
+      padding: 20px;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+    }
+
+    .key-features h3 {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .key-features ul {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .key-features li {
+      padding: 6px 0;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .key-features li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--action);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>ClearDues - Design Directions</h1>
+    <div class="header-controls">
+      <button class="theme-toggle" onclick="toggleTheme()">Toggle Dark Mode</button>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <div class="nav-tab active" data-direction="1">1. Classic Bottom Nav</div>
+    <div class="nav-tab" data-direction="2">2. Chat-First Input</div>
+    <div class="nav-tab" data-direction="3">3. Card Stack Dashboard</div>
+    <div class="nav-tab" data-direction="4">4. Minimal List View</div>
+    <div class="nav-tab" data-direction="5">5. Side Panel Groups</div>
+    <div class="nav-tab" data-direction="6">6. Full-Screen Input</div>
+  </nav>
+
+  <main class="main">
+    <!-- Direction 1: Classic Bottom Nav -->
+    <section class="direction active" id="direction-1">
+      <h2 class="direction-title">Direction 1: Classic Bottom Nav</h2>
+      <p class="direction-desc">Traditional mobile navigation with floating action button. Familiar pattern, easy to understand. Dashboard shows single group view with quick expense access.</p>
+
+      <div class="phone-frame">
+        <div class="phone-screen" style="position: relative;">
+          <div class="d1-header">
+            <div class="d1-group-selector">
+              <div class="d1-avatar">R</div>
+              <span>Roommates</span>
+              <span style="color: var(--text-muted);">▼</span>
+            </div>
+            <span style="font-size: 20px;">⚙</span>
+          </div>
+
+          <div class="d1-balance-card">
+            <div class="d1-balance-label">Your Balance</div>
+            <div class="d1-balance-amount positive">+Rs 1,250</div>
+          </div>
+
+          <div class="d1-section-title">Recent Expenses</div>
+          <div class="d1-expense-list">
+            <div class="d1-expense-item">
+              <div class="d1-expense-info">
+                <div class="d1-expense-title">Groceries</div>
+                <div class="d1-expense-meta">You paid • Today</div>
+              </div>
+              <div>
+                <div class="d1-expense-amount">Rs 2,400</div>
+                <div class="d1-expense-share">Rs 800/person</div>
+              </div>
+            </div>
+            <div class="d1-expense-item">
+              <div class="d1-expense-info">
+                <div class="d1-expense-title">Electricity Bill</div>
+                <div class="d1-expense-meta">Amit paid • Yesterday</div>
+              </div>
+              <div>
+                <div class="d1-expense-amount">Rs 1,800</div>
+                <div class="d1-expense-share">Rs 600/person</div>
+              </div>
+            </div>
+            <div class="d1-expense-item">
+              <div class="d1-expense-info">
+                <div class="d1-expense-title">Netflix</div>
+                <div class="d1-expense-meta">Priya paid • 3 days ago</div>
+              </div>
+              <div>
+                <div class="d1-expense-amount">Rs 649</div>
+                <div class="d1-expense-share">Rs 216/person</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d1-fab">+</div>
+
+          <div class="d1-bottom-nav">
+            <div class="d1-nav-item active">
+              <span class="d1-nav-icon">🏠</span>
+              <span>Home</span>
+            </div>
+            <div class="d1-nav-item">
+              <span class="d1-nav-icon">📊</span>
+              <span>Activity</span>
+            </div>
+            <div class="d1-nav-item">
+              <span class="d1-nav-icon">👥</span>
+              <span>Groups</span>
+            </div>
+            <div class="d1-nav-item">
+              <span class="d1-nav-icon">👤</span>
+              <span>Profile</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="key-features">
+        <h3>Key Features</h3>
+        <ul>
+          <li>Familiar bottom navigation pattern</li>
+          <li>Floating action button for quick expense entry</li>
+          <li>Group selector dropdown in header</li>
+          <li>Balance prominently displayed</li>
+          <li>Recent expenses in card list</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Direction 2: Chat-First Input -->
+    <section class="direction" id="direction-2">
+      <h2 class="direction-title">Direction 2: Chat-First Input</h2>
+      <p class="direction-desc">Smart input lives at the bottom like a chat app. AI responses stream in the conversation area. Most natural for the "type and go" experience.</p>
+
+      <div class="phone-frame">
+        <div class="phone-screen d2-screen">
+          <div class="d2-header">
+            <div class="d2-group-tabs">
+              <div class="d2-group-tab active">Roommates</div>
+              <div class="d2-group-tab">Office Lunch</div>
+              <div class="d2-group-tab">Trip</div>
+            </div>
+          </div>
+
+          <div class="d2-balance-bar">
+            <div class="d2-balance-item">
+              <div class="d2-balance-item-label">You're owed</div>
+              <div class="d2-balance-item-value" style="color: var(--action);">Rs 1,250</div>
+            </div>
+            <div class="d2-balance-item">
+              <div class="d2-balance-item-label">You owe</div>
+              <div class="d2-balance-item-value">Rs 0</div>
+            </div>
+            <div class="d2-balance-item">
+              <div class="d2-balance-item-label">Total</div>
+              <div class="d2-balance-item-value">Rs 4,849</div>
+            </div>
+          </div>
+
+          <div class="d2-chat-area">
+            <div class="d2-expense-card">
+              <div class="d2-expense-card-header">
+                <div class="d2-expense-card-title">Groceries</div>
+                <div class="d2-expense-card-amount">Rs 2,400</div>
+              </div>
+              <div class="d2-expense-card-splits">
+                <div class="d2-split-chip">
+                  <div class="d2-split-avatar"></div>
+                  <span>You: Rs 800</span>
+                </div>
+                <div class="d2-split-chip">
+                  <div class="d2-split-avatar"></div>
+                  <span>Amit: Rs 800</span>
+                </div>
+                <div class="d2-split-chip">
+                  <div class="d2-split-avatar"></div>
+                  <span>Priya: Rs 800</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="d2-ai-message">
+              Another grocery run? You guys really know how to stock up! 🛒 Split evenly between 3 roommates.
+              <div class="d2-ai-typing">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="d2-input-area">
+            <div class="d2-input-field">
+              <input type="text" placeholder="Paid 500 for dinner with everyone...">
+              <div class="d2-send-btn">→</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="key-features">
+        <h3>Key Features</h3>
+        <ul>
+          <li>Chat-like interface for natural input</li>
+          <li>AI personality streams in conversation</li>
+          <li>Horizontal group tabs for quick switching</li>
+          <li>Balance summary bar always visible</li>
+          <li>Expense cards with split details inline</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Direction 3: Card Stack Dashboard -->
+    <section class="direction" id="direction-3">
+      <h2 class="direction-title">Direction 3: Card Stack Dashboard</h2>
+      <p class="direction-desc">All groups visible at once as cards. Quick actions on each card. Great for users with multiple groups who need overview.</p>
+
+      <div class="phone-frame">
+        <div class="phone-screen">
+          <div class="d3-header">
+            <div class="d3-greeting">Good evening, Aheed</div>
+            <div class="d3-total-balance">Rs 3,450</div>
+            <div class="d3-total-label">Total owed to you across all groups</div>
+          </div>
+
+          <div class="d3-group-cards">
+            <div class="d3-group-card">
+              <div class="d3-group-card-header">
+                <div>
+                  <div class="d3-group-card-name">Roommates</div>
+                  <div class="d3-group-card-members">3 members</div>
+                </div>
+                <div class="d3-group-card-balance">
+                  <div class="d3-group-card-balance-amount" style="color: var(--action);">+Rs 1,250</div>
+                  <div class="d3-group-card-balance-label">You're owed</div>
+                </div>
+              </div>
+              <div class="d3-group-card-actions">
+                <div class="d3-action-btn primary">Add Expense</div>
+                <div class="d3-action-btn">Settle Up</div>
+              </div>
+            </div>
+
+            <div class="d3-group-card">
+              <div class="d3-group-card-header">
+                <div>
+                  <div class="d3-group-card-name">Office Lunch</div>
+                  <div class="d3-group-card-members">8 members</div>
+                </div>
+                <div class="d3-group-card-balance">
+                  <div class="d3-group-card-balance-amount" style="color: var(--action);">+Rs 2,200</div>
+                  <div class="d3-group-card-balance-label">You're owed</div>
+                </div>
+              </div>
+              <div class="d3-group-card-actions">
+                <div class="d3-action-btn primary">Add Expense</div>
+                <div class="d3-action-btn">Settle Up</div>
+              </div>
+            </div>
+
+            <div class="d3-group-card d3-settled-card">
+              <div class="d3-group-card-header">
+                <div>
+                  <div class="d3-group-card-name">Goa Trip 2025</div>
+                  <div class="d3-group-card-members">5 members</div>
+                </div>
+                <div class="d3-group-card-balance">
+                  <div class="d3-group-card-balance-amount">Rs 0</div>
+                  <div class="d3-group-card-balance-label">All settled ✓</div>
+                </div>
+              </div>
+              <div class="d3-group-card-actions">
+                <div class="d3-action-btn">View History</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="key-features">
+        <h3>Key Features</h3>
+        <ul>
+          <li>All groups visible in card layout</li>
+          <li>Total balance across all groups</li>
+          <li>Quick actions directly on cards</li>
+          <li>Settled groups visually distinct</li>
+          <li>No navigation needed for overview</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Direction 4: Minimal List View -->
+    <section class="direction" id="direction-4">
+      <h2 class="direction-title">Direction 4: Minimal List View</h2>
+      <p class="direction-desc">Ultra-clean, information-dense view focused on people, not groups. Shows who owes what directly. Bottom input always visible.</p>
+
+      <div class="phone-frame">
+        <div class="phone-screen" style="position: relative;">
+          <div class="d4-header">
+            <div class="d4-header-row">
+              <div class="d4-title">Balances</div>
+              <div class="d4-add-btn">+</div>
+            </div>
+            <div class="d4-summary">
+              <div class="d4-summary-item">
+                <div class="d4-summary-label">You're Owed</div>
+                <div class="d4-summary-value" style="color: var(--action);">Rs 3,450</div>
+              </div>
+              <div class="d4-summary-item">
+                <div class="d4-summary-label">You Owe</div>
+                <div class="d4-summary-value">Rs 800</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d4-list">
+            <div class="d4-list-item">
+              <div class="d4-list-avatar">A</div>
+              <div class="d4-list-info">
+                <div class="d4-list-name">Amit</div>
+                <div class="d4-list-subtext">Roommates • 2 expenses</div>
+              </div>
+              <div class="d4-list-amount">
+                <div class="d4-list-amount-value" style="color: var(--action);">+Rs 650</div>
+                <div class="d4-list-amount-label">owes you</div>
+              </div>
+            </div>
+            <div class="d4-list-item">
+              <div class="d4-list-avatar">P</div>
+              <div class="d4-list-info">
+                <div class="d4-list-name">Priya</div>
+                <div class="d4-list-subtext">Roommates • 1 expense</div>
+              </div>
+              <div class="d4-list-amount">
+                <div class="d4-list-amount-value" style="color: var(--action);">+Rs 600</div>
+                <div class="d4-list-amount-label">owes you</div>
+              </div>
+            </div>
+            <div class="d4-list-item">
+              <div class="d4-list-avatar">R</div>
+              <div class="d4-list-info">
+                <div class="d4-list-name">Rahul</div>
+                <div class="d4-list-subtext">Office Lunch • 3 expenses</div>
+              </div>
+              <div class="d4-list-amount">
+                <div class="d4-list-amount-value">Rs 800</div>
+                <div class="d4-list-amount-label">you owe</div>
+              </div>
+            </div>
+            <div class="d4-list-item">
+              <div class="d4-list-avatar">S</div>
+              <div class="d4-list-info">
+                <div class="d4-list-name">Sneha</div>
+                <div class="d4-list-subtext">Office Lunch • 1 expense</div>
+              </div>
+              <div class="d4-list-amount">
+                <div class="d4-list-amount-value" style="color: var(--action);">+Rs 2,200</div>
+                <div class="d4-list-amount-label">owes you</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d4-quick-input">
+            <div class="d4-quick-input-field">Paid 500 for dinner with Amit...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="key-features">
+        <h3>Key Features</h3>
+        <ul>
+          <li>People-centric view, not group-centric</li>
+          <li>Ultra-minimal, dense information</li>
+          <li>Quick input always visible at bottom</li>
+          <li>Clear owe/owed distinction</li>
+          <li>Tap person to see expense details</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Direction 5: Side Panel Groups -->
+    <section class="direction" id="direction-5">
+      <h2 class="direction-title">Direction 5: Side Panel Groups</h2>
+      <p class="direction-desc">Vertical group rail on the left, inspired by Slack/Discord. Quick group switching without losing context. Works well for power users.</p>
+
+      <div class="phone-frame">
+        <div class="phone-screen d5-container">
+          <div class="d5-sidebar">
+            <div class="d5-sidebar-item active">R</div>
+            <div class="d5-sidebar-item">O</div>
+            <div class="d5-sidebar-item">G</div>
+            <div class="d5-sidebar-item" style="margin-top: auto; font-size: 20px;">+</div>
+          </div>
+
+          <div class="d5-main">
+            <div class="d5-main-header">
+              <div class="d5-main-title">Roommates</div>
+              <div class="d5-main-subtitle">3 members • 12 expenses</div>
+            </div>
+
+            <div class="d5-balance-display">
+              <div class="d5-balance-amount" style="color: var(--action);">+Rs 1,250</div>
+              <div class="d5-balance-label">You're owed from this group</div>
+            </div>
+
+            <div class="d5-action-bar">
+              <div class="d5-action-btn primary">Add Expense</div>
+              <div class="d5-action-btn">Settle Up</div>
+            </div>
+
+            <div class="d5-activity">
+              <div class="d5-activity-title">Recent Activity</div>
+
+              <div class="d5-activity-item">
+                <div class="d5-activity-icon">🛒</div>
+                <div class="d5-activity-content">
+                  <div class="d5-activity-text">You added Groceries</div>
+                  <div class="d5-activity-time">Today, 6:30 PM</div>
+                </div>
+                <div class="d5-activity-amount">Rs 2,400</div>
+              </div>
+
+              <div class="d5-activity-item">
+                <div class="d5-activity-icon">⚡</div>
+                <div class="d5-activity-content">
+                  <div class="d5-activity-text">Amit added Electricity</div>
+                  <div class="d5-activity-time">Yesterday</div>
+                </div>
+                <div class="d5-activity-amount">Rs 1,800</div>
+              </div>
+
+              <div class="d5-activity-item">
+                <div class="d5-activity-icon" style="background: var(--success-subtle);">✓</div>
+                <div class="d5-activity-content">
+                  <div class="d5-activity-text">Priya settled with you</div>
+                  <div class="d5-activity-time">3 days ago</div>
+                </div>
+                <div class="d5-activity-amount" style="color: var(--success);">Rs 500</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="key-features">
+        <h3>Key Features</h3>
+        <ul>
+          <li>Vertical group rail for quick switching</li>
+          <li>Inspired by Slack/Discord navigation</li>
+          <li>Full group view without navigation</li>
+          <li>Activity feed with expense history</li>
+          <li>Settlement confirmation inline</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Direction 6: Full-Screen Smart Input -->
+    <section class="direction" id="direction-6">
+      <h2 class="direction-title">Direction 6: Full-Screen Smart Input</h2>
+      <p class="direction-desc">The Smart Input experience as a full-screen modal. Maximum focus on the core "15-second magic" moment. AI preview builds confidence.</p>
+
+      <div class="phone-frame">
+        <div class="phone-screen d6-screen">
+          <div class="d6-header">
+            <div class="d6-close">×</div>
+            <div class="d6-group-pill">
+              <span>Roommates</span>
+              <span style="color: var(--text-muted);">▼</span>
+            </div>
+            <div style="width: 24px;"></div>
+          </div>
+
+          <div class="d6-input-area">
+            <div class="d6-input-label">What did you pay for?</div>
+            <input class="d6-input-field" type="text" placeholder="Paid 2400 for groceries..." value="Paid 2400 for groceries, split with everyone">
+
+            <div class="d6-ai-preview">
+              <div class="d6-ai-preview-header">
+                <div class="d6-ai-indicator"></div>
+                <div class="d6-ai-label">AI Preview</div>
+              </div>
+              <div class="d6-preview-content">
+                Stocking up again! Splitting groceries evenly between all 3 roommates...
+              </div>
+              <div class="d6-preview-amount">Rs 2,400</div>
+              <div class="d6-preview-splits">
+                <div class="d6-preview-chip">
+                  <div class="d6-preview-chip-avatar"></div>
+                  <span>You: Rs 800</span>
+                </div>
+                <div class="d6-preview-chip">
+                  <div class="d6-preview-chip-avatar"></div>
+                  <span>Amit: Rs 800</span>
+                </div>
+                <div class="d6-preview-chip">
+                  <div class="d6-preview-chip-avatar"></div>
+                  <span>Priya: Rs 800</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d6-bottom">
+            <div class="d6-submit-btn">Confirm Expense</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="key-features">
+        <h3>Key Features</h3>
+        <ul>
+          <li>Full-screen focus on input experience</li>
+          <li>AI preview builds before confirmation</li>
+          <li>Real-time split calculation visible</li>
+          <li>Personality commentary streams in</li>
+          <li>Maximum trust through transparency</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Theme toggle
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+    }
+
+    // Navigation tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Update active tab
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        // Show corresponding direction
+        const directionId = tab.dataset.direction;
+        document.querySelectorAll('.direction').forEach(d => d.classList.remove('active'));
+        document.getElementById(`direction-${directionId}`).classList.add('active');
+      });
+    });
+
+    // Check system preference for dark mode
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.body.classList.add('dark');
+    }
+  </script>
+</body>
+</html>

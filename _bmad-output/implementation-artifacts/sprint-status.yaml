@@ -9,6 +9,7 @@
 # Epic Status:
 #   - backlog: Epic not yet started
 #   - in-progress: Epic actively being worked on
+#   - paused: Epic started but waiting for another epic to complete
 #   - done: All stories in epic completed
 #
 # Epic Status Transitions:
@@ -58,8 +59,24 @@ development_status:
   2-4-dashboard-with-net-balances: done
   epic-2-retrospective: optional
 
-  # Epic 3: Smart Expense Entry (8 stories)
-  epic-3: in-progress
+  # Epic 2.5: UX Foundation & Design System (7 stories)
+  # NOTE: Epic 2.5 was INSERTED after Epic 3 started (Story 3.1 done).
+  # PRIORITY: Complete Epic 2.5 FIRST before resuming Epic 3.
+  # This provides the UX foundation needed for remaining Epic 3 stories.
+  epic-2-5: in-progress
+  2-5-1-design-system-token-migration: done
+  2-5-2-agent-orb-component: backlog
+  2-5-3-orbital-navigation-system: backlog
+  2-5-4-smart-input-modal-foundation: backlog
+  2-5-5-swipeable-card-base-component: backlog
+  2-5-6-balance-display-component: backlog
+  2-5-7-update-existing-screens-to-new-design-system: backlog
+  epic-2-5-retrospective: optional
+
+  # Epic 3: Smart Expense Entry (8 stories) - UX-Enhanced
+  # NOTE: Epic 3 is PAUSED - Story 3.1 done, but waiting for Epic 2.5 to complete.
+  # Resume Epic 3 after Epic 2.5 is done (UX foundation required for remaining stories).
+  epic-3: paused
   3-1-create-expense-model-and-basic-entry: done
   3-2-natural-language-input-interface: backlog
   3-3-ai-parsing-service-integration: backlog
@@ -103,3 +120,11 @@ development_status:
   7-4-sync-offline-changes-on-reconnection: backlog
   7-5-conflict-resolution-reject-unauthorized-edits: backlog
   epic-7-retrospective: optional
+
+  # Epic 8: UX Polish & Advanced Features (4 stories) - Post-MVP
+  epic-8: backlog
+  8-1-ai-personality-selector: backlog
+  8-2-desktop-power-features: backlog
+  8-3-animation-polish: backlog
+  8-4-accessibility-audit-and-fixes: backlog
+  epic-8-retrospective: optional

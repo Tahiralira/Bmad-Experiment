@@ -10,8 +10,8 @@
 metadata:
   version: "1.0"
   created_at: "2026-01-12"
-  last_review: "Story 2.4"
-  total_items: 15
+  last_review: "Story 2.5.1"
+  total_items: 18
   status_legend:
     open: "Not yet addressed"
     in_progress: "Currently being worked on"
@@ -206,6 +206,41 @@ epic_2:
         effort: "small"
 
 # =============================================================================
+# EPIC 2.5: UX Foundation & Design System
+# =============================================================================
+
+epic_2_5:
+  story_2_5_1:
+    title: "Design System Token Migration"
+    reviewed: true
+    review_date: "2026-01-14"
+    items:
+      - id: "2.5.1-L1"
+        type: "performance"
+        severity: "LOW"
+        status: "open"
+        file: "frontend/dist/assets/index-*.js"
+        description: "Main JS bundle exceeds 500KB (680KB). Consider code splitting."
+        suggested_fix: "Use dynamic imports for route-level code splitting"
+        effort: "medium"
+      - id: "2.5.1-L2"
+        type: "architecture"
+        severity: "LOW"
+        status: "open"
+        file: "frontend/src/index.css"
+        description: "Typography tokens (--font-display, etc.) defined but not mapped to Tailwind utilities"
+        suggested_fix: "Add typography tokens to @theme inline block for Tailwind class access"
+        effort: "small"
+      - id: "2.5.1-L3"
+        type: "documentation"
+        severity: "LOW"
+        status: "open"
+        file: "frontend/src/index.css"
+        description: "Duplicate radius definition (--radius and --radius-md both = 10px)"
+        suggested_fix: "Document that --radius is for shadcn compatibility, --radius-md is the semantic token"
+        effort: "small"
+
+# =============================================================================
 # SUMMARY BY CATEGORY
 # =============================================================================
 
@@ -214,19 +249,21 @@ summary:
     test-coverage: 3
     security: 4
     ux: 4
-    performance: 1
+    performance: 2  # +1 from 2.5.1
     validation: 1
     accessibility: 1
+    architecture: 1  # +1 from 2.5.1
+    documentation: 1  # +1 from 2.5.1
 
   by_status:
-    open: 11
+    open: 14  # +3 from 2.5.1
     resolved: 4
     in_progress: 0
     wont_fix: 0
 
   by_effort:
-    small: 12
-    medium: 3
+    small: 14  # +2 from 2.5.1
+    medium: 4  # +1 from 2.5.1
     large: 0
 
 # =============================================================================

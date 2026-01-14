@@ -4,21 +4,23 @@ ClearDues is an AI-powered "Agentic Mediator" PWA designed to manage and settle 
 
 ## CRITICAL: Session Startup Protocol
 
-**Before starting ANY work, load these files in order:**
+**BMAD workflows automatically load tracking files via pre-hooks (Step 0).**
 
-1. **Quick Context** (ALWAYS): `_bmad-output/session-context.md`
-   - Project status, key learnings, common mistakes to avoid
+When running `/bmad:bmm:workflows:dev-story` or `/bmad:bmm:workflows:code-review`, these files are auto-loaded:
 
-2. **Sprint Status** (ALWAYS): `_bmad-output/implementation-artifacts/sprint-status.yaml`
-   - Current epic/story status, what's in progress
+| File | Purpose | Auto-Loaded | Auto-Updated |
+|------|---------|-------------|--------------|
+| `session-context.md` | Project status, key learnings | Yes (Step 0) | Yes (Post-hook) |
+| `sprint-status.yaml` | Epic/story progress | Yes (Step 1) | Yes (Step 9/5) |
+| `solution-patterns.yaml` | Known issues and fixes | Yes (Step 0) | Yes (Post-hook) |
+| `technical-debt-log.yaml` | Deferred LOW issues | Yes (Step 0) | Yes (code-review) |
 
-3. **Solution Patterns** (When debugging): `_bmad-output/implementation-artifacts/solution-patterns.yaml`
-   - Known issues and their fixes (saves tokens by not re-debugging)
+**For non-BMAD work**, manually load these files first:
+1. `_bmad-output/session-context.md` - Quick context
+2. `_bmad-output/implementation-artifacts/sprint-status.yaml` - Current progress
+3. `_bmad-output/implementation-artifacts/solution-patterns.yaml` - Debugging help
 
-4. **Technical Debt** (During reviews): `_bmad-output/implementation-artifacts/technical-debt-log.yaml`
-   - Deferred LOW severity issues to address later
-
-**Why?** These logs contain learned solutions that save debugging time and tokens.
+**Full setup guide:** `_bmad/bmm/docs/TRACKING-SETUP-GUIDE.md`
 
 ## 📊 Current Status
 
@@ -26,10 +28,12 @@ ClearDues is an AI-powered "Agentic Mediator" PWA designed to manage and settle 
 |------|--------|----------|
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
-| Epic 3: Expenses | BACKLOG | 0/8 |
+| **Epic 2.5: UX Foundation** | **NEXT** | 0/7 |
+| Epic 3: Expenses | IN-PROGRESS | 1/8 |
 | Epic 4-7 | BACKLOG | 0/18 |
+| Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Next:** Epic 3, Story 3.1 - Create expense model and basic entry
+**Next:** Epic 2.5, Story 2.5.1 - Design System Token Migration
 
 ## 🛠 Tech Stack
 
@@ -80,15 +84,33 @@ docker compose exec backend alembic upgrade head
 
 ## Logging Requirements
 
-When encountering and solving new issues:
-1. **Add to solution-patterns.yaml** with symptoms, cause, solution, prevention
-2. **Update session-context.md** if it's a critical learning
-3. **Update technical-debt-log.yaml** for deferred LOW issues
+**BMAD workflows automatically update tracking files via post-hooks.**
+
+| Workflow | Auto-Updates |
+|----------|--------------|
+| `dev-story` | session-context.md, solution-patterns.yaml (if new issues solved) |
+| `code-review` | session-context.md, technical-debt-log.yaml (LOW items), solution-patterns.yaml (if patterns found) |
+
+**For non-BMAD work**, manually update when:
+1. **New issue solved** -> Add to `solution-patterns.yaml` (symptoms, cause, solution, prevention)
+2. **Critical learning** -> Update `session-context.md`
+3. **Deferred LOW issue** -> Add to `technical-debt-log.yaml`
 
 ## References
 
+### Planning
 - [PRD](./_bmad-output/planning-artifacts/prd.md)
 - [Architecture](./_bmad-output/planning-artifacts/architecture.md)
 - [Epics](./_bmad-output/planning-artifacts/epics.md)
+- [UX Design Specification](./_bmad-output/planning-artifacts/ux-design-specification.md)
+- [Design Artifact Plan](./_bmad-output/planning-artifacts/design-artifact-plan.md)
+
+### Tracking (Auto-managed by BMAD)
 - [Sprint Status](./_bmad-output/implementation-artifacts/sprint-status.yaml)
 - [Solution Patterns](./_bmad-output/implementation-artifacts/solution-patterns.yaml)
+- [Technical Debt](./_bmad-output/implementation-artifacts/technical-debt-log.yaml)
+- [Session Context](./_bmad-output/session-context.md)
+
+### Guides
+- [BMAD Usage Guide](./_bmad/bmm/docs/BMAD-USAGE-GUIDE.md) - Complete workflow guide from planning to deployment
+- [Tracking Setup Guide](./_bmad/bmm/docs/TRACKING-SETUP-GUIDE.md) - Pre/post hooks and tracking files documentation

@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-01-12
+**Last Updated:** 2026-01-14
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -11,10 +11,14 @@
 |------|--------|---------|
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
-| Epic 3: Expenses | IN-PROGRESS | 1/8 |
+| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 1/7 (2.5.1 done) |
+| Epic 3: Expenses | PAUSED | 1/8 (3.1 done, waiting for 2.5) |
 | Epic 4-7 | BACKLOG | 0/18 |
+| Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 11 stories completed, 24 remaining
+**Current Progress:** 12 stories completed/in-review, 34 remaining
+
+> **IMPORTANT:** Epic 2.5 was inserted AFTER Epic 3 started. Complete Epic 2.5 FIRST before resuming Epic 3. The UX foundation is required for remaining Epic 3 stories.
 
 ---
 
@@ -100,11 +104,16 @@ cd cleardues/frontend && npm run build
 
 ## Next Up
 
-**Epic 3: Smart Expense Entry** (8 stories)
-- ~~Story 3.1: Create expense model and basic entry~~ DONE
-- Story 3.2: Natural language input interface ← **NEXT**
-- Story 3.3: AI parsing service integration
-- ...
+**Epic 2.5: UX Foundation & Design System** (7 stories)
+- Story 2.5.1: Design System Token Migration ← **DONE** ✓
+- Story 2.5.2: Agent Orb Component ← **NEXT**
+- Story 2.5.3: Orbital Navigation System
+- Story 2.5.4: Smart Input Modal Foundation
+- Story 2.5.5: Swipeable Card Base Component
+- Story 2.5.6: Balance Display Component
+- Story 2.5.7: Update Existing Screens
+
+**Then:** Epic 3: Smart Expense Entry (8 stories, Story 3.1 done)
 
 ---
 
