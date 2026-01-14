@@ -94,11 +94,12 @@ function Login() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">Check your email</h1>
             <p className="text-muted-foreground">
-              We've sent a login link to <strong>{form.getValues("email")}</strong>
+              We've sent a login link to{" "}
+              <strong>{form.getValues("email")}</strong>
             </p>
             <p className="text-sm text-muted-foreground">
-              Click the link in the email to log in.
-              The link expires in 15 minutes.
+              Click the link in the email to log in. The link expires in 15
+              minutes.
             </p>
           </div>
 

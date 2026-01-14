@@ -11,10 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useUserGroups } from "@/features/groups/api/groups"
-import {
-  CreateGroupForm,
-  GroupDetail,
-} from "@/features/groups/components"
+import { CreateGroupForm, GroupDetail } from "@/features/groups/components"
 import type { ExpenseGroup } from "@/features/groups/types"
 
 export const Route = createFileRoute("/_layout/groups")({

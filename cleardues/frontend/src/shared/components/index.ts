@@ -2,6 +2,14 @@
 // These re-exports allow new code to import from @/shared/components
 // while maintaining backward compatibility with existing @/components imports
 
+// Common components (named exports)
+export { Appearance, SidebarAppearance } from "@/components/Common/Appearance"
+export { AuthLayout } from "@/components/Common/AuthLayout"
+export { DataTable } from "@/components/Common/DataTable"
+export { default as ErrorComponent } from "@/components/Common/ErrorComponent"
+export { Footer } from "@/components/Common/Footer"
+export { Logo } from "@/components/Common/Logo"
+export { default as NotFound } from "@/components/Common/NotFound"
 // UI components (shadcn/ui)
 export * from "@/components/ui/alert"
 export * from "@/components/ui/avatar"
@@ -27,12 +35,3 @@ export * from "@/components/ui/sonner"
 export * from "@/components/ui/table"
 export * from "@/components/ui/tabs"
 export * from "@/components/ui/tooltip"
-
-// Common components (named exports)
-export { Appearance, SidebarAppearance } from "@/components/Common/Appearance"
-export { AuthLayout } from "@/components/Common/AuthLayout"
-export { DataTable } from "@/components/Common/DataTable"
-export { default as ErrorComponent } from "@/components/Common/ErrorComponent"
-export { Footer } from "@/components/Common/Footer"
-export { Logo } from "@/components/Common/Logo"
-export { default as NotFound } from "@/components/Common/NotFound"

@@ -11,14 +11,14 @@ export function Dashboard() {
       <div className="animate-pulse space-y-4">
         {/* Total Balance skeleton */}
         <div className="bg-gray-200 dark:bg-gray-700 rounded-lg p-6">
-          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-24 mb-2"></div>
-          <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-32 mb-1"></div>
-          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-24 mb-2" />
+          <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-32 mb-1" />
+          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-20" />
         </div>
         {/* Group cards skeleton */}
-        <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-28"></div>
-        <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-28" />
+        <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded" />
       </div>
     )
   }
@@ -60,8 +60,12 @@ export function Dashboard() {
     <div className="space-y-6">
       {/* Total Balance Header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h1 className="text-lg font-medium text-gray-500 dark:text-gray-400">Total Balance</h1>
-        <p className={`text-3xl font-bold ${getBalanceColor(data.total_balance)}`}>
+        <h1 className="text-lg font-medium text-gray-500 dark:text-gray-400">
+          Total Balance
+        </h1>
+        <p
+          className={`text-3xl font-bold ${getBalanceColor(data.total_balance)}`}
+        >
           {formatBalance(data.total_balance)}
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -91,11 +95,13 @@ function GroupCard({ group }: { group: GroupBalanceSummary }) {
         <div className="min-w-0 flex-1 mr-4">
           <h3 className="font-medium truncate">{group.group_name}</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {group.member_count} member{group.member_count !== 1 ? "s" : ""} &bull;{" "}
-            {formatLastActivity(group.last_activity)}
+            {group.member_count} member{group.member_count !== 1 ? "s" : ""}{" "}
+            &bull; {formatLastActivity(group.last_activity)}
           </p>
         </div>
-        <div className={`text-lg font-semibold flex-shrink-0 ${getBalanceColor(group.net_balance)}`}>
+        <div
+          className={`text-lg font-semibold flex-shrink-0 ${getBalanceColor(group.net_balance)}`}
+        >
           {formatBalance(group.net_balance)}
         </div>
       </div>

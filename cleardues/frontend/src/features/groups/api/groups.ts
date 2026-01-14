@@ -76,7 +76,7 @@ export function useAcceptInvite() {
 // === Members API ===
 
 async function getGroupMembers(
-  groupId: string
+  groupId: string,
 ): Promise<GroupMembersListResponse> {
   return __request(OpenAPI, {
     method: "GET",

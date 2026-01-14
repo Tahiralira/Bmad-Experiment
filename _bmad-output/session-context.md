@@ -11,12 +11,12 @@
 |------|--------|---------|
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
-| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 1/7 (2.5.1 done) |
+| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 2/7 (2.5.1-2.5.2 done) |
 | Epic 3: Expenses | PAUSED | 1/8 (3.1 done, waiting for 2.5) |
 | Epic 4-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 12 stories completed/in-review, 34 remaining
+**Current Progress:** 13 stories completed/in-review, 33 remaining
 
 > **IMPORTANT:** Epic 2.5 was inserted AFTER Epic 3 started. Complete Epic 2.5 FIRST before resuming Epic 3. The UX foundation is required for remaining Epic 3 stories.
 
@@ -49,6 +49,7 @@ Before starting ANY work, check these logs:
 ### Frontend Patterns
 - **TanStack Router**: Use `_layout` prefix, `$param.tsx` for dynamic routes
 - **TanStack Query**: Always `invalidateQueries` after mutations
+- **Framer Motion**: Use `TargetAndTransition` type, not `Variants` when passing animations to `animate` prop directly
 
 ### Testing
 - **Tests pass alone, fail together** → Database state leaking, use rollback fixtures
@@ -106,8 +107,8 @@ cd cleardues/frontend && npm run build
 
 **Epic 2.5: UX Foundation & Design System** (7 stories)
 - Story 2.5.1: Design System Token Migration ← **DONE** ✓
-- Story 2.5.2: Agent Orb Component ← **NEXT**
-- Story 2.5.3: Orbital Navigation System
+- Story 2.5.2: Agent Orb Component ← **DONE** ✓
+- Story 2.5.3: Orbital Navigation System ← **NEXT**
 - Story 2.5.4: Smart Input Modal Foundation
 - Story 2.5.5: Swipeable Card Base Component
 - Story 2.5.6: Balance Display Component

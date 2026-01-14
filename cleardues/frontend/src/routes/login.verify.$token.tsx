@@ -1,9 +1,8 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-
-import { AuthLayout } from "@/components/Common/AuthLayout"
 import { AuthService } from "@/client"
+import { AuthLayout } from "@/components/Common/AuthLayout"
 import { isLoggedIn } from "@/hooks/useAuth"
 import { processPendingInvite } from "./invite.$token"
 
@@ -43,14 +42,18 @@ function VerifyLoginMagicLink() {
       const pendingInviteToken = processPendingInvite()
       if (pendingInviteToken) {
         // Redirect to accept the pending invite
-        navigate({ to: "/invite/$token", params: { token: pendingInviteToken } })
+        navigate({
+          to: "/invite/$token",
+          params: { token: pendingInviteToken },
+        })
       } else {
         // Redirect to dashboard
         navigate({ to: "/" })
       }
     },
     onError: (error: Error & { body?: { detail?: string } }) => {
-      const message = error.body?.detail || error.message || "Login verification failed"
+      const message =
+        error.body?.detail || error.message || "Login verification failed"
       setError(message)
     },
   })

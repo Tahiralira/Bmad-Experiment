@@ -1,6 +1,6 @@
+import type { ExpenseGroup } from "../types"
 import { GenerateInviteButton } from "./GenerateInviteButton"
 import { MembersList } from "./MembersList"
-import type { ExpenseGroup } from "../types"
 
 interface Props {
   group: ExpenseGroup

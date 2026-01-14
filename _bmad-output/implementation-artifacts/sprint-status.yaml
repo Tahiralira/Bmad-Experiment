@@ -65,7 +65,7 @@ development_status:
   # This provides the UX foundation needed for remaining Epic 3 stories.
   epic-2-5: in-progress
   2-5-1-design-system-token-migration: done
-  2-5-2-agent-orb-component: backlog
+  2-5-2-agent-orb-component: done
   2-5-3-orbital-navigation-system: backlog
   2-5-4-smart-input-modal-foundation: backlog
   2-5-5-swipeable-card-base-component: backlog

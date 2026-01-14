@@ -1,9 +1,8 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-
-import { AuthLayout } from "@/components/Common/AuthLayout"
 import { AuthService } from "@/client"
+import { AuthLayout } from "@/components/Common/AuthLayout"
 import { isLoggedIn } from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/verify/$token")({
@@ -42,7 +41,8 @@ function VerifyMagicLink() {
       navigate({ to: "/" })
     },
     onError: (error: Error & { body?: { detail?: string } }) => {
-      const message = error.body?.detail || error.message || "Verification failed"
+      const message =
+        error.body?.detail || error.message || "Verification failed"
       setError(message)
     },
   })

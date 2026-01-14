@@ -106,9 +106,14 @@ function OAuthCallbackPage() {
 function getErrorMessage(errorCode: string): string {
   const errorMessages: Record<string, string> = {
     oauth_failed: "OAuth authentication failed. Please try again.",
-    no_email: "Could not retrieve your email from the OAuth provider. Please try a different login method.",
-    no_provider_id: "Could not verify your identity with the OAuth provider. Please try again.",
+    no_email:
+      "Could not retrieve your email from the OAuth provider. Please try a different login method.",
+    no_provider_id:
+      "Could not verify your identity with the OAuth provider. Please try again.",
     inactive: "Your account has been deactivated. Please contact support.",
   }
-  return errorMessages[errorCode] || "An unexpected error occurred. Please try again."
+  return (
+    errorMessages[errorCode] ||
+    "An unexpected error occurred. Please try again."
+  )
 }

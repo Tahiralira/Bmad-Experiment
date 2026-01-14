@@ -2,8 +2,8 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
 import { AuthLayout } from "@/components/Common/AuthLayout"
-import { isLoggedIn } from "@/hooks/useAuth"
 import { useAcceptInvite } from "@/features/groups/api/groups"
+import { isLoggedIn } from "@/hooks/useAuth"
 
 const PENDING_INVITE_KEY = "pending_invite_token"
 
@@ -46,7 +46,8 @@ function AcceptInvitePage() {
           navigate({ to: "/" })
         },
         onError: (err: Error & { body?: { detail?: string } }) => {
-          const message = err.body?.detail || err.message || "Failed to accept invite"
+          const message =
+            err.body?.detail || err.message || "Failed to accept invite"
           setError(message)
         },
       })

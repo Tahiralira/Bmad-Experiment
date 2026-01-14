@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
 
 import { Footer } from "@/components/Common/Footer"
 import AppSidebar from "@/components/Sidebar/AppSidebar"
+import { AgentOrb } from "@/components/ui/agent-orb"
 import {
   SidebarInset,
   SidebarProvider,
@@ -21,6 +22,11 @@ export const Route = createFileRoute("/_layout")({
 })
 
 function Layout() {
+  const handleAgentOrbClick = () => {
+    // Placeholder for Smart Input Modal - will be connected in Story 2.5.4
+    console.log("Agent Orb clicked - Smart Input will open here")
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -35,6 +41,11 @@ function Layout() {
         </main>
         <Footer />
       </SidebarInset>
+
+      {/* Agent Orb - Fixed position, bottom-right, elevated above content */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <AgentOrb onClick={handleAgentOrbClick} />
+      </div>
     </SidebarProvider>
   )
 }

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -72,7 +72,8 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   /* Font Family */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root {
@@ -127,160 +128,160 @@
   /* ========== LIGHT THEME ========== */
 
   /* Background Colors */
-  --background: #FDFBF7;
-  --foreground: #1F1E1C;
+  --background: #fdfbf7;
+  --foreground: #1f1e1c;
 
   /* Surface Colors */
-  --surface: #FAF8F5;
-  --surface-elevated: #FFFFFF;
+  --surface: #faf8f5;
+  --surface-elevated: #ffffff;
 
   /* Border Colors */
-  --border: #E8E4DD;
-  --input: #E8E4DD;
-  --ring: #3D9A94;
+  --border: #e8e4dd;
+  --input: #e8e4dd;
+  --ring: #3d9a94;
 
   /* Text Colors */
-  --text-primary: #1F1E1C;
-  --text-secondary: #6B6660;
-  --text-muted: #9C9790;
+  --text-primary: #1f1e1c;
+  --text-secondary: #6b6660;
+  --text-muted: #9c9790;
 
   /* Action Colors (Primary - Muted Teal) */
-  --primary: #3D9A94;
-  --primary-foreground: #FFFFFF;
-  --action: #3D9A94;
-  --action-hover: #2D7A75;
+  --primary: #3d9a94;
+  --primary-foreground: #ffffff;
+  --action: #3d9a94;
+  --action-hover: #2d7a75;
 
   /* Secondary Colors */
-  --secondary: #FAF8F5;
-  --secondary-foreground: #1F1E1C;
+  --secondary: #faf8f5;
+  --secondary-foreground: #1f1e1c;
 
   /* Muted Colors */
-  --muted: #FAF8F5;
-  --muted-foreground: #6B6660;
+  --muted: #faf8f5;
+  --muted-foreground: #6b6660;
 
   /* Accent Colors */
-  --accent: #FAF8F5;
-  --accent-foreground: #1F1E1C;
+  --accent: #faf8f5;
+  --accent-foreground: #1f1e1c;
 
   /* Success Colors (Warm Amber - NOT Green) */
-  --success: #D4A857;
-  --success-foreground: #1F1E1C;
-  --success-subtle: #FDF8ED;
+  --success: #d4a857;
+  --success-foreground: #1f1e1c;
+  --success-subtle: #fdf8ed;
 
   /* Semantic Colors */
-  --info: #5B8FB9;
-  --info-foreground: #FFFFFF;
-  --warning: #CC8B4D;
-  --warning-foreground: #1F1E1C;
-  --error: #C97C7C;
-  --error-foreground: #FFFFFF;
-  --destructive: #C97C7C;
-  --destructive-foreground: #FFFFFF;
+  --info: #5b8fb9;
+  --info-foreground: #ffffff;
+  --warning: #cc8b4d;
+  --warning-foreground: #1f1e1c;
+  --error: #c97c7c;
+  --error-foreground: #ffffff;
+  --destructive: #c97c7c;
+  --destructive-foreground: #ffffff;
 
   /* Card Colors */
-  --card: #FAF8F5;
-  --card-foreground: #1F1E1C;
+  --card: #faf8f5;
+  --card-foreground: #1f1e1c;
 
   /* Popover Colors */
-  --popover: #FFFFFF;
-  --popover-foreground: #1F1E1C;
+  --popover: #ffffff;
+  --popover-foreground: #1f1e1c;
 
   /* Chart Colors (Data Visualization) */
-  --chart-1: #3D9A94;
-  --chart-2: #D4A857;
-  --chart-3: #5B8FB9;
-  --chart-4: #CC8B4D;
-  --chart-5: #8B7355;
+  --chart-1: #3d9a94;
+  --chart-2: #d4a857;
+  --chart-3: #5b8fb9;
+  --chart-4: #cc8b4d;
+  --chart-5: #8b7355;
 
   /* Sidebar Colors */
-  --sidebar-background: #FAF8F5;
-  --sidebar-foreground: #1F1E1C;
-  --sidebar-primary: #3D9A94;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #FDFBF7;
-  --sidebar-accent-foreground: #1F1E1C;
-  --sidebar-border: #E8E4DD;
-  --sidebar-ring: #3D9A94;
+  --sidebar-background: #faf8f5;
+  --sidebar-foreground: #1f1e1c;
+  --sidebar-primary: #3d9a94;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fdfbf7;
+  --sidebar-accent-foreground: #1f1e1c;
+  --sidebar-border: #e8e4dd;
+  --sidebar-ring: #3d9a94;
 }
 
 .dark {
   /* ========== DARK THEME ========== */
 
   /* Background Colors */
-  --background: #1A1A1A;
-  --foreground: #F5F5F5;
+  --background: #1a1a1a;
+  --foreground: #f5f5f5;
 
   /* Surface Colors */
   --surface: #252525;
-  --surface-elevated: #2E2E2E;
+  --surface-elevated: #2e2e2e;
 
   /* Border Colors */
-  --border: #3A3A3A;
-  --input: #3A3A3A;
-  --ring: #3D9A94;
+  --border: #3a3a3a;
+  --input: #3a3a3a;
+  --ring: #3d9a94;
 
   /* Text Colors */
-  --text-primary: #F5F5F5;
-  --text-secondary: #A0A0A0;
+  --text-primary: #f5f5f5;
+  --text-secondary: #a0a0a0;
   --text-muted: #707070;
 
   /* Action Colors */
-  --primary: #3D9A94;
-  --primary-foreground: #FFFFFF;
-  --action: #3D9A94;
-  --action-hover: #4DB0A9;
+  --primary: #3d9a94;
+  --primary-foreground: #ffffff;
+  --action: #3d9a94;
+  --action-hover: #4db0a9;
 
   /* Secondary Colors */
   --secondary: #252525;
-  --secondary-foreground: #F5F5F5;
+  --secondary-foreground: #f5f5f5;
 
   /* Muted Colors */
   --muted: #252525;
-  --muted-foreground: #A0A0A0;
+  --muted-foreground: #a0a0a0;
 
   /* Accent Colors */
   --accent: #252525;
-  --accent-foreground: #F5F5F5;
+  --accent-foreground: #f5f5f5;
 
   /* Success Colors */
-  --success: #D4A857;
-  --success-foreground: #1A1A1A;
-  --success-subtle: #2A2518;
+  --success: #d4a857;
+  --success-foreground: #1a1a1a;
+  --success-subtle: #2a2518;
 
   /* Semantic Colors */
-  --info: #5B8FB9;
-  --info-foreground: #1A1A1A;
-  --warning: #CC8B4D;
-  --warning-foreground: #1A1A1A;
-  --error: #C97C7C;
-  --error-foreground: #1A1A1A;
-  --destructive: #C97C7C;
-  --destructive-foreground: #1A1A1A;
+  --info: #5b8fb9;
+  --info-foreground: #1a1a1a;
+  --warning: #cc8b4d;
+  --warning-foreground: #1a1a1a;
+  --error: #c97c7c;
+  --error-foreground: #1a1a1a;
+  --destructive: #c97c7c;
+  --destructive-foreground: #1a1a1a;
 
   /* Card Colors */
   --card: #252525;
-  --card-foreground: #F5F5F5;
+  --card-foreground: #f5f5f5;
 
   /* Popover Colors */
-  --popover: #2E2E2E;
-  --popover-foreground: #F5F5F5;
+  --popover: #2e2e2e;
+  --popover-foreground: #f5f5f5;
 
   /* Chart Colors */
-  --chart-1: #4DB0A9;
-  --chart-2: #E5BC6A;
-  --chart-3: #6BA0CA;
-  --chart-4: #DD9C5E;
-  --chart-5: #9C8466;
+  --chart-1: #4db0a9;
+  --chart-2: #e5bc6a;
+  --chart-3: #6ba0ca;
+  --chart-4: #dd9c5e;
+  --chart-5: #9c8466;
 
   /* Sidebar Colors */
-  --sidebar-background: #1A1A1A;
-  --sidebar-foreground: #F5F5F5;
-  --sidebar-primary: #3D9A94;
-  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-background: #1a1a1a;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #3d9a94;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #252525;
-  --sidebar-accent-foreground: #F5F5F5;
-  --sidebar-border: #3A3A3A;
-  --sidebar-ring: #3D9A94;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3a3a3a;
+  --sidebar-ring: #3d9a94;
 }
 
 /* Reduced Motion Support */
@@ -288,9 +289,9 @@
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
   }
 }
 
@@ -308,8 +309,9 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-family:
+      "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

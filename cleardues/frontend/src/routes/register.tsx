@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation } from "@tanstack/react-query"
 import {
   createFileRoute,
   Link as RouterLink,
@@ -7,8 +8,7 @@ import {
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { useMutation } from "@tanstack/react-query"
-
+import { AuthService } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import {
   Form,
@@ -22,7 +22,6 @@ import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { OAuthButtons } from "@/features/auth/components"
 import { isLoggedIn } from "@/hooks/useAuth"
-import { AuthService } from "@/client"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
 import { handleError } from "@/utils"
 
@@ -101,11 +100,12 @@ function Register() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">Check your email</h1>
             <p className="text-muted-foreground">
-              We've sent a magic link to <strong>{form.getValues("email")}</strong>
+              We've sent a magic link to{" "}
+              <strong>{form.getValues("email")}</strong>
             </p>
             <p className="text-sm text-muted-foreground">
-              Click the link in the email to complete your registration.
-              The link expires in 15 minutes.
+              Click the link in the email to complete your registration. The
+              link expires in 15 minutes.
             </p>
           </div>
 

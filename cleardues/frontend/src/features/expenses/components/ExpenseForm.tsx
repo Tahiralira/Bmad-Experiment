@@ -13,7 +13,11 @@ interface ExpenseFormProps {
   onCancel?: () => void
 }
 
-export function ExpenseForm({ groupId, onSuccess, onCancel }: ExpenseFormProps) {
+export function ExpenseForm({
+  groupId,
+  onSuccess,
+  onCancel,
+}: ExpenseFormProps) {
   const [amount, setAmount] = useState("")
   const [description, setDescription] = useState("")
   const createExpense = useCreateExpense()

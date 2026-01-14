@@ -1,5 +1,5 @@
-import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,15 +69,9 @@ export function CreateGroupForm({ onSuccess }: Props) {
         </p>
       </div>
 
-      {error && (
-        <div className="text-sm text-destructive">{error}</div>
-      )}
+      {error && <div className="text-sm text-destructive">{error}</div>}
 
-      <Button
-        type="submit"
-        disabled={createGroup.isPending}
-        className="w-full"
-      >
+      <Button type="submit" disabled={createGroup.isPending} className="w-full">
         {createGroup.isPending ? "Creating..." : "Create Group"}
       </Button>
     </form>

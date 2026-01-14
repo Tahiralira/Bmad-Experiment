@@ -9,8 +9,8 @@ import {
   type UserRegister,
   UsersService,
 } from "@/shared/api"
-import { handleError } from "@/utils"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
+import { handleError } from "@/utils"
 
 const isLoggedIn = () => {
   return localStorage.getItem("access_token") !== null

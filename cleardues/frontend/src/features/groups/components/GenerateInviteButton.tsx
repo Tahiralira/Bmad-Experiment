@@ -22,7 +22,8 @@ export function GenerateInviteButton({ groupId }: Props) {
         setExpiresAt(result.invite.expires_at ?? null)
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create invite"
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create invite"
       setError(errorMessage)
     }
   }
@@ -71,9 +72,7 @@ export function GenerateInviteButton({ groupId }: Props) {
         >
           {createInvite.isPending ? "Generating..." : "Generate Invite Link"}
         </button>
-        {error && (
-          <p className="text-sm text-red-600">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
     )
   }
