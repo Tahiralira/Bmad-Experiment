@@ -160,7 +160,6 @@ function AgentOrb({
   return (
     <motion.button
       type="button"
-      role="button"
       tabIndex={0}
       aria-label={ariaLabel}
       onClick={onClick}

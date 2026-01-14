@@ -1,13 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
 
 import { Footer } from "@/components/Common/Footer"
-import AppSidebar from "@/components/Sidebar/AppSidebar"
-import { AgentOrb } from "@/components/ui/agent-orb"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+import { OrbitalNav } from "@/components/ui/orbital-nav"
 import { isLoggedIn } from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout")({
@@ -22,31 +16,21 @@ export const Route = createFileRoute("/_layout")({
 })
 
 function Layout() {
-  const handleAgentOrbClick = () => {
-    // Placeholder for Smart Input Modal - will be connected in Story 2.5.4
-    console.log("Agent Orb clicked - Smart Input will open here")
-  }
-
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1 text-muted-foreground" />
-        </header>
-        <main className="flex-1 p-6 md:p-8">
-          <div className="mx-auto max-w-7xl">
-            <Outlet />
-          </div>
-        </main>
-        <Footer />
-      </SidebarInset>
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* Main content area - full width without sidebar */}
+      <main className="flex-1 p-6 md:p-8">
+        <div className="mx-auto max-w-7xl">
+          <Outlet />
+        </div>
+      </main>
 
-      {/* Agent Orb - Fixed position, bottom-right, elevated above content */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <AgentOrb onClick={handleAgentOrbClick} />
-      </div>
-    </SidebarProvider>
+      <Footer />
+
+      {/* OrbitalNav - wraps AgentOrb with orbital navigation */}
+      {/* Note: Smart Input Modal will be connected in Story 2.5.4 via long-press */}
+      <OrbitalNav />
+    </div>
   )
 }
 

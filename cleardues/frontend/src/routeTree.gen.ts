@@ -23,6 +23,7 @@ import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutGroupsRouteImport } from './routes/_layout/groups'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
+import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
 import { Route as LoginVerifyTokenRouteImport } from './routes/login.verify.$token'
 
 const SignupRoute = SignupRouteImport.update({
@@ -94,6 +95,11 @@ const LayoutAdminRoute = LayoutAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutActivityRoute = LayoutActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LoginVerifyTokenRoute = LoginVerifyTokenRouteImport.update({
   id: '/verify/$token',
   path: '/verify/$token',
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/activity': typeof LayoutActivityRoute
   '/admin': typeof LayoutAdminRoute
   '/groups': typeof LayoutGroupsRoute
   '/items': typeof LayoutItemsRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/activity': typeof LayoutActivityRoute
   '/admin': typeof LayoutAdminRoute
   '/groups': typeof LayoutGroupsRoute
   '/items': typeof LayoutItemsRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/groups': typeof LayoutGroupsRoute
   '/_layout/items': typeof LayoutItemsRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/signup'
+    | '/activity'
     | '/admin'
     | '/groups'
     | '/items'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/signup'
+    | '/activity'
     | '/admin'
     | '/groups'
     | '/items'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/signup'
+    | '/_layout/activity'
     | '/_layout/admin'
     | '/_layout/groups'
     | '/_layout/items'
@@ -314,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/activity': {
+      id: '/_layout/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof LayoutActivityRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/login/verify/$token': {
       id: '/login/verify/$token'
       path: '/verify/$token'
@@ -325,6 +344,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface LayoutRouteChildren {
+  LayoutActivityRoute: typeof LayoutActivityRoute
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutGroupsRoute: typeof LayoutGroupsRoute
   LayoutItemsRoute: typeof LayoutItemsRoute
@@ -333,6 +353,7 @@ interface LayoutRouteChildren {
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
+  LayoutActivityRoute: LayoutActivityRoute,
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutGroupsRoute: LayoutGroupsRoute,
   LayoutItemsRoute: LayoutItemsRoute,
