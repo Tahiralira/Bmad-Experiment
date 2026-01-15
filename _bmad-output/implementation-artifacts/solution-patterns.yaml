@@ -11,7 +11,7 @@
 
 metadata:
   version: "1.0"
-  total_patterns: 9
+  total_patterns: 11
   categories:
     - docker
     - database
@@ -198,6 +198,54 @@ frontend:
     stories_encountered: ["2.1"]
     tokens_saved_estimate: "~250 per occurrence"
 
+  - id: "FE-003"
+    title: "TypeScript error: 'React' is declared but its value is never read"
+    symptoms:
+      - "TS6133: 'React' is declared but its value is never read"
+      - "Build fails with unused import warning"
+    root_cause: "React 17+ with new JSX transform doesn't require importing React for JSX"
+    solution: |
+      Remove unused React import:
+      ```typescript
+      // WRONG - React import not needed for JSX
+      import * as React from "react"
+      import { useMemo } from "react"
+
+      // CORRECT - Import only what you use
+      import { useMemo } from "react"
+      ```
+    prevention: "Only import React when using React-specific APIs (React.useRef, React.ComponentType, etc.)"
+    stories_encountered: ["2.5.6"]
+    tokens_saved_estimate: "~100 per occurrence"
+
+  - id: "FE-004"
+    title: "Numbers look unnatural in UI - tabular vs proportional figures"
+    symptoms:
+      - "Numbers in text don't flow naturally"
+      - "Monospace appearance in headings/body text"
+    root_cause: "Using tabular-nums instead of proportional-nums for inline text"
+    solution: |
+      Use proportional-nums for UI numbers:
+      ```css
+      /* WRONG - Makes numbers monospaced */
+      .number { font-variant-numeric: tabular-nums; }
+
+      /* CORRECT - Numbers flow with text */
+      .number { font-variant-numeric: proportional-nums; }
+      ```
+      In Tailwind:
+      ```tsx
+      // WRONG
+      className="tabular-nums"
+
+      // CORRECT
+      className="proportional-nums"
+      ```
+      Only use tabular-nums for data tables where alignment matters.
+    prevention: "Default to proportional-nums for all UI text. Use tabular-nums only for financial tables/spreadsheets."
+    stories_encountered: ["2.5.6"]
+    tokens_saved_estimate: "~50 per occurrence"
+
 # =============================================================================
 # TESTING PATTERNS
 # =============================================================================
@@ -286,6 +334,10 @@ quick_reference:
   - trigger: "File changes not visible in Docker"
     pattern_id: "DOCKER-003"
     quick_fix: "docker compose cp local/path container:/path"
+
+  - trigger: "React is declared but its value is never read"
+    pattern_id: "FE-003"
+    quick_fix: "Remove unused 'import * as React from \"react\"' - only import specific hooks"
 
 # =============================================================================
 # HOW TO ADD NEW PATTERNS

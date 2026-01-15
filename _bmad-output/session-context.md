@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-01-15
+**Last Updated:** 2026-01-15 (Story 2.5.6 completed - Balance Display Component, code review fixes applied)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -11,12 +11,12 @@
 |------|--------|---------|
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
-| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 6/7 (2.5.1-2.5.5 done, 2.5.6 NEXT) |
+| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 6/7 (2.5.1-2.5.6 done, 2.5.7 NEXT) |
 | Epic 3: Expenses | PAUSED | 1/8 (3.1 done, waiting for 2.5) |
 | Epic 4-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 17 stories completed, 29 remaining
+**Current Progress:** 18 stories completed, 28 remaining
 
 > **IMPORTANT:** Epic 2.5 was inserted AFTER Epic 3 started. Complete Epic 2.5 FIRST before resuming Epic 3. The UX foundation is required for remaining Epic 3 stories.
 
@@ -53,6 +53,7 @@ Before starting ANY work, check these logs:
 - **Focus Management**: When managing refs for focus, use callback refs (`(el) => refsArray[index] = el`) rather than `useRef` alone
 - **Modal Animations**: When animating from a specific element position, use `originX` and `originY` to set transform origin
 - **Focus Return Timing**: Focus return timeout must be longer than exit animation duration (e.g., 250ms > 200ms animation)
+- **Typography for Numbers**: Use `proportional-nums` for inline text (natural flow), NOT `tabular-nums` (monospace). Only use tabular-nums for data tables where alignment matters.
 
 ### Testing
 - **Tests pass alone, fail together** → Database state leaking, use rollback fixtures
@@ -114,7 +115,8 @@ cd cleardues/frontend && npm run build
 - Story 2.5.3: Orbital Navigation System ← **DONE** ✓
 - Story 2.5.4: Smart Input Modal Foundation ← **DONE** ✓
 - Story 2.5.5: Swipeable Card Base Component ← **DONE** ✓
-- Story 2.5.6: Balance Display Component ← **NEXT**
+- Story 2.5.6: Balance Display Component ← **DONE** ✓
+- Story 2.5.7: Update Existing Screens ← **NEXT**
 - Story 2.5.7: Update Existing Screens
 
 **Then:** Epic 3: Smart Expense Entry (8 stories, Story 3.1 done)
