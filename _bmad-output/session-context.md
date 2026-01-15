@@ -11,12 +11,12 @@
 |------|--------|---------|
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
-| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 4/7 (2.5.1-2.5.4 done) |
+| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 6/7 (2.5.1-2.5.5 done, 2.5.6 NEXT) |
 | Epic 3: Expenses | PAUSED | 1/8 (3.1 done, waiting for 2.5) |
 | Epic 4-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 15 stories completed, 31 remaining
+**Current Progress:** 17 stories completed, 29 remaining
 
 > **IMPORTANT:** Epic 2.5 was inserted AFTER Epic 3 started. Complete Epic 2.5 FIRST before resuming Epic 3. The UX foundation is required for remaining Epic 3 stories.
 
@@ -113,8 +113,8 @@ cd cleardues/frontend && npm run build
 - Story 2.5.2: Agent Orb Component ← **DONE** ✓
 - Story 2.5.3: Orbital Navigation System ← **DONE** ✓
 - Story 2.5.4: Smart Input Modal Foundation ← **DONE** ✓
-- Story 2.5.5: Swipeable Card Base Component ← **NEXT**
-- Story 2.5.6: Balance Display Component
+- Story 2.5.5: Swipeable Card Base Component ← **DONE** ✓
+- Story 2.5.6: Balance Display Component ← **NEXT**
 - Story 2.5.7: Update Existing Screens
 
 **Then:** Epic 3: Smart Expense Entry (8 stories, Story 3.1 done)

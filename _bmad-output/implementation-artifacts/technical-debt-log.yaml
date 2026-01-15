@@ -2,7 +2,7 @@
 # ===================
 # Tracks LOW severity code review issues for future implementation
 # Created: 2026-01-12
-# Last Updated: 2026-01-12
+# Last Updated: 2026-01-15
 
 # This file tracks code quality issues that were identified during code reviews
 # but deferred for later implementation. Issues are categorized by type and priority.
@@ -10,8 +10,8 @@
 metadata:
   version: "1.0"
   created_at: "2026-01-12"
-  last_review: "Story 2.5.1"
-  total_items: 18
+  last_review: "Story 2.5.5"
+  total_items: 23
   status_legend:
     open: "Not yet addressed"
     in_progress: "Currently being worked on"
@@ -210,6 +210,51 @@ epic_2:
 # =============================================================================
 
 epic_2_5:
+  story_2_5_5:
+    title: "Swipeable Card Base Component"
+    reviewed: true
+    review_date: "2026-01-15"
+    items:
+      - id: "2.5.5-L1"
+        type: "documentation"
+        severity: "LOW"
+        status: "open"
+        file: "_bmad-output/implementation-artifacts/2-5-5-swipeable-card-base-component.md"
+        description: "Story's 'Files to Modify' lists non-existent index.ts file"
+        suggested_fix: "Remove index.ts reference from story docs or create barrel export file"
+        effort: "small"
+      - id: "2.5.5-L2"
+        type: "accessibility"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/frontend/src/components/ui/swipeable-card.tsx"
+        description: "Duplicate screen reader announcements (sr-only text + aria-label)"
+        suggested_fix: "Remove redundant sr-only hint, buttons already have aria-label"
+        effort: "small"
+      - id: "2.5.5-L3"
+        type: "performance"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/frontend/src/components/ui/swipeable-card.tsx"
+        description: "Dual opacity transition mechanism (CSS transition + Framer Motion)"
+        suggested_fix: "Choose one approach - remove CSS transition or Framer Motion animate"
+        effort: "small"
+      - id: "2.5.5-L4"
+        type: "documentation"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/frontend/src/components/ui/swipeable-card.tsx"
+        description: "Haptic 'success' intensity used but not documented in constants"
+        suggested_fix: "Document 'success' intensity (30ms) in constants section"
+        effort: "small"
+      - id: "2.5.5-L5"
+        type: "ux"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/frontend/src/components/ui/swipeable-card.tsx"
+        description: "Drag constraint (70%) vs visual indicator scale (60%) mismatch"
+        suggested_fix: "Align visual indicator max scale with drag constraint or document difference"
+        effort: "small"
   story_2_5_1:
     title: "Design System Token Migration"
     reviewed: true
@@ -248,22 +293,22 @@ summary:
   by_type:
     test-coverage: 3
     security: 4
-    ux: 4
-    performance: 2  # +1 from 2.5.1
+    ux: 5  # +1 from 2.5.5
+    performance: 3  # +1 from 2.5.5
     validation: 1
-    accessibility: 1
-    architecture: 1  # +1 from 2.5.1
-    documentation: 1  # +1 from 2.5.1
+    accessibility: 2  # +1 from 2.5.5
+    architecture: 1
+    documentation: 3  # +2 from 2.5.5
 
   by_status:
-    open: 14  # +3 from 2.5.1
+    open: 19  # +5 from 2.5.5
     resolved: 4
     in_progress: 0
     wont_fix: 0
 
   by_effort:
-    small: 14  # +2 from 2.5.1
-    medium: 4  # +1 from 2.5.1
+    small: 19  # +5 from 2.5.5
+    medium: 4
     large: 0
 
 # =============================================================================
