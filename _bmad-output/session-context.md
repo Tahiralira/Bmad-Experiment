@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-01-15
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -11,12 +11,12 @@
 |------|--------|---------|
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
-| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 3/7 (2.5.1-2.5.3 done) |
+| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 4/7 (2.5.1-2.5.4 done) |
 | Epic 3: Expenses | PAUSED | 1/8 (3.1 done, waiting for 2.5) |
 | Epic 4-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 14 stories completed/in-review, 32 remaining
+**Current Progress:** 15 stories completed, 31 remaining
 
 > **IMPORTANT:** Epic 2.5 was inserted AFTER Epic 3 started. Complete Epic 2.5 FIRST before resuming Epic 3. The UX foundation is required for remaining Epic 3 stories.
 
@@ -51,6 +51,8 @@ Before starting ANY work, check these logs:
 - **TanStack Query**: Always `invalidateQueries` after mutations
 - **Framer Motion**: Use `TargetAndTransition` type, not `Variants` when passing animations to `animate` prop directly
 - **Focus Management**: When managing refs for focus, use callback refs (`(el) => refsArray[index] = el`) rather than `useRef` alone
+- **Modal Animations**: When animating from a specific element position, use `originX` and `originY` to set transform origin
+- **Focus Return Timing**: Focus return timeout must be longer than exit animation duration (e.g., 250ms > 200ms animation)
 
 ### Testing
 - **Tests pass alone, fail together** → Database state leaking, use rollback fixtures
@@ -110,8 +112,8 @@ cd cleardues/frontend && npm run build
 - Story 2.5.1: Design System Token Migration ← **DONE** ✓
 - Story 2.5.2: Agent Orb Component ← **DONE** ✓
 - Story 2.5.3: Orbital Navigation System ← **DONE** ✓
-- Story 2.5.4: Smart Input Modal Foundation ← **NEXT** (ready for create-story)
-- Story 2.5.5: Swipeable Card Base Component
+- Story 2.5.4: Smart Input Modal Foundation ← **DONE** ✓
+- Story 2.5.5: Swipeable Card Base Component ← **NEXT**
 - Story 2.5.6: Balance Display Component
 - Story 2.5.7: Update Existing Screens
 

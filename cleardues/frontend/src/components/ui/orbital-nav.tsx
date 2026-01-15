@@ -26,6 +26,10 @@ export interface OrbitalNavProps {
   isProcessing?: boolean
   /** Whether to show success state */
   showSuccess?: boolean
+  /** Callback when orb is long-pressed (500ms hold) for Smart Input Modal */
+  onLongPress?: () => void
+  /** Ref to the Agent Orb element for focus return */
+  orbRef?: React.RefObject<HTMLButtonElement | null>
 }
 
 // ============================================================================
@@ -200,6 +204,8 @@ function OrbitalNav({
   className,
   isProcessing = false,
   showSuccess = false,
+  onLongPress,
+  orbRef,
 }: OrbitalNavProps) {
   const navigate = useNavigate()
   const shouldReduceMotion = useReducedMotion()
@@ -464,7 +470,9 @@ function OrbitalNav({
 
       {/* Agent Orb at center */}
       <AgentOrb
+        ref={orbRef}
         onClick={handleOrbClick}
+        onLongPress={onLongPress}
         isProcessing={isProcessing}
         showSuccess={showSuccess}
         ariaLabel={isExpanded ? "Close navigation menu" : "Open navigation menu"}

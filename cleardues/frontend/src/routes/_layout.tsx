@@ -1,7 +1,9 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
+import { createFileRoute, Outlet, redirect, useLocation } from "@tanstack/react-router"
+import { useState, useCallback, useRef } from "react"
 
 import { Footer } from "@/components/Common/Footer"
 import { OrbitalNav } from "@/components/ui/orbital-nav"
+import { SmartInputModal } from "@/components/ui/smart-input-modal"
 import { isLoggedIn } from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout")({
@@ -16,6 +18,25 @@ export const Route = createFileRoute("/_layout")({
 })
 
 function Layout() {
+  const [isSmartInputOpen, setIsSmartInputOpen] = useState(false)
+  const location = useLocation()
+  // Ref for Agent Orb to return focus when modal closes
+  const orbRef = useRef<HTMLButtonElement>(null as HTMLButtonElement | null)
+
+  const handleOpenSmartInput = useCallback(() => {
+    setIsSmartInputOpen(true)
+  }, [])
+
+  const handleCloseSmartInput = useCallback(() => {
+    setIsSmartInputOpen(false)
+    // Focus return is handled by SmartInputModal using triggerRef
+  }, [])
+
+  // Determine entry point from route
+  const entryPoint = location.pathname === "/" || location.pathname === "/dashboard"
+    ? "dashboard"
+    : "group"
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Main content area - full width without sidebar */}
@@ -28,8 +49,15 @@ function Layout() {
       <Footer />
 
       {/* OrbitalNav - wraps AgentOrb with orbital navigation */}
-      {/* Note: Smart Input Modal will be connected in Story 2.5.4 via long-press */}
-      <OrbitalNav />
+      <OrbitalNav onLongPress={handleOpenSmartInput} orbRef={orbRef} />
+
+      {/* Smart Input Modal - triggered by long-press on Agent Orb */}
+      <SmartInputModal
+        isOpen={isSmartInputOpen}
+        onClose={handleCloseSmartInput}
+        entryPoint={entryPoint}
+        triggerRef={orbRef}
+      />
     </div>
   )
 }

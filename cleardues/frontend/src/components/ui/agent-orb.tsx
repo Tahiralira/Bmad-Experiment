@@ -3,6 +3,7 @@ import { motion, useReducedMotion, type TargetAndTransition } from "framer-motio
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+import { useLongPress } from "@/shared/hooks/useLongPress"
 
 const agentOrbVariants = cva(
   // Base styles: squircle shape with proper border-radius
@@ -26,6 +27,8 @@ export interface AgentOrbProps
     VariantProps<typeof agentOrbVariants> {
   /** Callback when the orb is clicked */
   onClick?: () => void
+  /** Callback when the orb is long-pressed (500ms hold) */
+  onLongPress?: () => void
   /** Shows processing/loading state with faster pulse */
   isProcessing?: boolean
   /** Triggers success animation with amber flash */
@@ -109,17 +112,28 @@ const staticStyles: React.CSSProperties = {
   boxShadow: "0 0 20px rgba(61, 154, 148, 0.4)",
 }
 
-function AgentOrb({
-  className,
-  size,
-  onClick,
-  isProcessing = false,
-  showSuccess = false,
-  ariaLabel = "Add new expense",
-  ...props
-}: AgentOrbProps) {
+// Inner component that receives the forwarded ref
+function AgentOrbInner(
+  {
+    className,
+    size,
+    onClick,
+    onLongPress,
+    isProcessing = false,
+    showSuccess = false,
+    ariaLabel = "Add new expense",
+    ...props
+  }: AgentOrbProps,
+  forwardedRef: React.Ref<HTMLButtonElement>
+) {
   const shouldReduceMotion = useReducedMotion()
   const [isSuccessAnimating, setIsSuccessAnimating] = React.useState(false)
+
+  // Long-press detection for Smart Input Modal
+  const longPressHandlers = useLongPress(
+    onLongPress ?? (() => {}),
+    { delay: 500 }
+  )
 
   // Handle success state trigger
   React.useEffect(() => {
@@ -159,9 +173,11 @@ function AgentOrb({
 
   return (
     <motion.button
+      ref={forwardedRef}
       type="button"
       tabIndex={0}
       aria-label={ariaLabel}
+      {...longPressHandlers}
       onClick={onClick}
       onKeyDown={handleKeyDown}
       className={cn(
@@ -217,6 +233,11 @@ function AgentOrb({
     </motion.button>
   )
 }
+
+// Forward ref wrapper for AgentOrb
+const AgentOrb = React.forwardRef(AgentOrbInner) as (
+  props: AgentOrbProps & { ref?: React.Ref<HTMLButtonElement> }
+) => React.JSX.Element
 
 // Ripple effect on click
 function RippleEffect({ shouldReduceMotion }: { shouldReduceMotion: boolean }) {
@@ -278,3 +299,6 @@ function SparkIcon() {
 }
 
 export { AgentOrb, agentOrbVariants }
+
+// Display name for debugging
+;(AgentOrb as React.ForwardRefExoticComponent<AgentOrbProps & React.RefAttributes<HTMLButtonElement>>).displayName = "AgentOrb"
