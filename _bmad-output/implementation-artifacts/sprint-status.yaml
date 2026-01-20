@@ -63,14 +63,15 @@ development_status:
   # NOTE: Epic 2.5 was INSERTED after Epic 3 started (Story 3.1 done).
   # PRIORITY: Complete Epic 2.5 FIRST before resuming Epic 3.
   # This provides the UX foundation needed for remaining Epic 3 stories.
-  epic-2-5: in-progress
+  # ✅ Epic 2.5 COMPLETE! All 7 stories done. Ready to resume Epic 3.
+  epic-2-5: done
   2-5-1-design-system-token-migration: done
   2-5-2-agent-orb-component: done
   2-5-3-orbital-navigation-system: done
   2-5-4-smart-input-modal-foundation: done
   2-5-5-swipeable-card-base-component: done
   2-5-6-balance-display-component: done
-  2-5-7-update-existing-screens-to-new-design-system: backlog
+  2-5-7-update-existing-screens-to-new-design-system: done
   epic-2-5-retrospective: optional
 
   # Epic 3: Smart Expense Entry (8 stories) - UX-Enhanced

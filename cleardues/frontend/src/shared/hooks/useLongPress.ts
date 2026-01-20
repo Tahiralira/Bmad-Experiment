@@ -27,7 +27,7 @@ export interface LongPressHandlers {
  */
 export function useLongPress(
   callback: () => void,
-  options: UseLongPressOptions = {}
+  options: UseLongPressOptions = {},
 ): LongPressHandlers {
   const { delay = 500, onCancel } = options
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)

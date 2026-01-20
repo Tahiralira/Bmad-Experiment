@@ -1,5 +1,10 @@
-import { createFileRoute, Outlet, redirect, useLocation } from "@tanstack/react-router"
-import { useState, useCallback, useRef } from "react"
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useLocation,
+} from "@tanstack/react-router"
+import { useCallback, useRef, useState } from "react"
 
 import { Footer } from "@/components/Common/Footer"
 import { OrbitalNav } from "@/components/ui/orbital-nav"
@@ -33,9 +38,10 @@ function Layout() {
   }, [])
 
   // Determine entry point from route
-  const entryPoint = location.pathname === "/" || location.pathname === "/dashboard"
-    ? "dashboard"
-    : "group"
+  const entryPoint =
+    location.pathname === "/" || location.pathname === "/dashboard"
+      ? "dashboard"
+      : "group"
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-01-15 (Story 2.5.6 completed - Balance Display Component, code review fixes applied)
+**Last Updated:** 2026-01-20 (Story 2.5.7 review follow-ups completed - Epic 2.5 COMPLETE, ready for Epic 3)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -11,14 +11,14 @@
 |------|--------|---------|
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
-| **Epic 2.5: UX Foundation** | **IN-PROGRESS** | 6/7 (2.5.1-2.5.6 done, 2.5.7 NEXT) |
-| Epic 3: Expenses | PAUSED | 1/8 (3.1 done, waiting for 2.5) |
+| **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
+| Epic 3: Expenses | NEXT | 1/8 (3.1 done, ready to resume) |
 | Epic 4-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 18 stories completed, 28 remaining
+**Current Progress:** 19 stories completed, 27 remaining
 
-> **IMPORTANT:** Epic 2.5 was inserted AFTER Epic 3 started. Complete Epic 2.5 FIRST before resuming Epic 3. The UX foundation is required for remaining Epic 3 stories.
+> **IMPORTANT:** Epic 2.5 is COMPLETE! All 7 UX Foundation stories done. Ready to resume Epic 3 (Smart Expense Entry) with Story 3.2.
 
 ---
 
@@ -104,22 +104,23 @@ cd cleardues/frontend && npm run build
 3. **Don't forget query invalidation** - Frontend will show stale data
 4. **Don't create circular imports** - Plan module dependencies first
 5. **Don't mark tasks done without evidence** - Code review WILL catch false claims
+6. **Don't let story File List drift from git reality** - Update File List after EVERY commit to match actual changes
+7. **Don't claim testing without documentation** - Add testing evidence section (browsers, breakpoints tested, accessibility checks)
 
 ---
 
 ## Next Up
 
-**Epic 2.5: UX Foundation & Design System** (7 stories)
+**Epic 2.5: UX Foundation & Design System** ✅ COMPLETE
 - Story 2.5.1: Design System Token Migration ← **DONE** ✓
 - Story 2.5.2: Agent Orb Component ← **DONE** ✓
 - Story 2.5.3: Orbital Navigation System ← **DONE** ✓
 - Story 2.5.4: Smart Input Modal Foundation ← **DONE** ✓
 - Story 2.5.5: Swipeable Card Base Component ← **DONE** ✓
 - Story 2.5.6: Balance Display Component ← **DONE** ✓
-- Story 2.5.7: Update Existing Screens ← **NEXT**
-- Story 2.5.7: Update Existing Screens
+- Story 2.5.7: Update Existing Screens ← **DONE** ✓
 
-**Then:** Epic 3: Smart Expense Entry (8 stories, Story 3.1 done)
+**Next:** Epic 3: Smart Expense Entry (8 stories, Story 3.1 done, resume with 3.2)
 
 ---
 
