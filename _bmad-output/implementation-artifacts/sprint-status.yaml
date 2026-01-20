@@ -49,7 +49,7 @@ development_status:
   1-4-user-registration-with-magic-link: done
   1-5-user-login-with-jwt-authentication: done
   1-6-social-authentication-oauth: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   # Epic 2: Group Management & Dashboard (4 stories)
   epic-2: done
@@ -57,7 +57,7 @@ development_status:
   2-2-invite-members-via-deep-link: done
   2-3-view-group-members-list: done
   2-4-dashboard-with-net-balances: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   # Epic 2.5: UX Foundation & Design System (7 stories)
   # NOTE: Epic 2.5 was INSERTED after Epic 3 started (Story 3.1 done).
@@ -72,14 +72,21 @@ development_status:
   2-5-5-swipeable-card-base-component: done
   2-5-6-balance-display-component: done
   2-5-7-update-existing-screens-to-new-design-system: done
-  epic-2-5-retrospective: optional
+  epic-2-5-retrospective: done
 
   # Epic 3: Smart Expense Entry (8 stories) - UX-Enhanced
   # NOTE: Epic 3 is PAUSED - Story 3.1 done, but waiting for Epic 2.5 to complete.
   # Resume Epic 3 after Epic 2.5 is done (UX foundation required for remaining stories).
-  epic-3: paused
+  #
+  # ⚠️ BEFORE PRODUCTION: Must complete Epic 2.5 retrospective action items:
+  #   - Remove console.log placeholders (RETRO-2.5-H1) - 1 hour
+  #   - Fix group detail navigation (RETRO-2.5-H2) - 3-4 hours
+  #   - Add automated testing infrastructure (RETRO-2.5-H3) - 4-6 hours setup
+  # See: technical-debt-log.yaml > retrospective_actions > epic_2_5_retrospective
+  #
+  epic-3: in-progress
   3-1-create-expense-model-and-basic-entry: done
-  3-2-natural-language-input-interface: backlog
+  3-2-natural-language-input-interface: done
   3-3-ai-parsing-service-integration: backlog
   3-4-manual-override-of-parsed-data: backlog
   3-5-split-logic-equal-split: backlog

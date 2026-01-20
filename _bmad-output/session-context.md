@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-01-20 (Story 2.5.7 review follow-ups completed - Epic 2.5 COMPLETE, ready for Epic 3)
+**Last Updated:** 2026-01-20 (Story 3.2 code reviewed and fixed - Natural Language Input Interface)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -12,13 +12,13 @@
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
-| Epic 3: Expenses | NEXT | 1/8 (3.1 done, ready to resume) |
+| Epic 3: Expenses | **IN-PROGRESS** | 2/8 (3.1 done, 3.2 done) |
 | Epic 4-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 19 stories completed, 27 remaining
+**Current Progress:** 20 stories completed, 26 remaining
 
-> **IMPORTANT:** Epic 2.5 is COMPLETE! All 7 UX Foundation stories done. Ready to resume Epic 3 (Smart Expense Entry) with Story 3.2.
+> **IMPORTANT:** Story 3.2 (Natural Language Input Interface) completed! Code review fixed all issues. Next: Story 3.3 (AI Parsing Service Integration).
 
 ---
 
@@ -54,6 +54,8 @@ Before starting ANY work, check these logs:
 - **Modal Animations**: When animating from a specific element position, use `originX` and `originY` to set transform origin
 - **Focus Return Timing**: Focus return timeout must be longer than exit animation duration (e.g., 250ms > 200ms animation)
 - **Typography for Numbers**: Use `proportional-nums` for inline text (natural flow), NOT `tabular-nums` (monospace). Only use tabular-nums for data tables where alignment matters.
+- **Streaming Text Effect**: Use `setInterval` with character-by-character string concatenation for natural reading pace (30-50ms per character). Cleanup intervals on unmount to prevent memory leaks. Use refs to avoid stale closure issues in setInterval callbacks.
+- **Feature-Specific Components**: Create feature-specific versions of generic UI components (e.g., `/features/expenses/components/SmartInputModal` vs `/components/ui/smart-input-modal`) for better separation of concerns.
 
 ### Testing
 - **Tests pass alone, fail together** → Database state leaking, use rollback fixtures
@@ -106,6 +108,7 @@ cd cleardues/frontend && npm run build
 5. **Don't mark tasks done without evidence** - Code review WILL catch false claims
 6. **Don't let story File List drift from git reality** - Update File List after EVERY commit to match actual changes
 7. **Don't claim testing without documentation** - Add testing evidence section (browsers, breakpoints tested, accessibility checks)
+8. **Don't leave unused variables** - Fix TypeScript "declared but never used" errors immediately
 
 ---
 
@@ -120,7 +123,7 @@ cd cleardues/frontend && npm run build
 - Story 2.5.6: Balance Display Component ← **DONE** ✓
 - Story 2.5.7: Update Existing Screens ← **DONE** ✓
 
-**Next:** Epic 3: Smart Expense Entry (8 stories, Story 3.1 done, resume with 3.2)
+**Next:** Epic 3: Smart Expense Entry (8 stories, 3.1 done, 3.2 done, 3.3 next)
 
 ---
 

@@ -8,7 +8,7 @@ import { useCallback, useRef, useState } from "react"
 
 import { Footer } from "@/components/Common/Footer"
 import { OrbitalNav } from "@/components/ui/orbital-nav"
-import { SmartInputModal } from "@/components/ui/smart-input-modal"
+import { SmartInputModal } from "@/features/expenses/components"
 import { isLoggedIn } from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout")({
@@ -59,8 +59,8 @@ function Layout() {
 
       {/* Smart Input Modal - triggered by long-press on Agent Orb */}
       <SmartInputModal
-        isOpen={isSmartInputOpen}
-        onClose={handleCloseSmartInput}
+        open={isSmartInputOpen}
+        onOpenChange={(open) => !open && handleCloseSmartInput()}
         entryPoint={entryPoint}
         triggerRef={orbRef}
       />
