@@ -99,6 +99,7 @@ class ExpenseGroup(SQLModel, table=True):
     members: list["GroupMember"] = Relationship(
         back_populates="group", cascade_delete=True
     )
+    settings: "GroupSettings | None" = Relationship(back_populates="group")
 
 
 # Role constants
@@ -131,6 +132,31 @@ class GroupMember(SQLModel, table=True):
 
 # Invite expiration constant (30 days)
 INVITE_EXPIRATION_DAYS = 30
+
+
+# === AI Personality Settings ===
+
+
+class GroupSettings(SQLModel, table=True):
+    """
+    AI personality and other group-specific settings.
+
+    Stores per-group configuration for AI features,
+    such as personality mode for expense parsing commentary.
+    """
+
+    __tablename__ = "group_settings"
+
+    id: uuid.UUID | None = Field(default_factory=uuid.uuid4, primary_key=True)
+    group_id: uuid.UUID = Field(foreign_key="expense_group.id", unique=True, index=True)
+    ai_personality: str = Field(default="friendly", index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(
+        default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now}
+    )
+
+    # Relationship
+    group: ExpenseGroup = Relationship(back_populates="settings")
 
 
 class GroupInvite(SQLModel, table=True):

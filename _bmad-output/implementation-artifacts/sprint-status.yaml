@@ -87,7 +87,7 @@ development_status:
   epic-3: in-progress
   3-1-create-expense-model-and-basic-entry: done
   3-2-natural-language-input-interface: done
-  3-3-ai-parsing-service-integration: backlog
+  3-3-ai-parsing-service-integration: in-progress
   3-4-manual-override-of-parsed-data: backlog
   3-5-split-logic-equal-split: backlog
   3-6-split-logic-unequal-custom-amounts: backlog

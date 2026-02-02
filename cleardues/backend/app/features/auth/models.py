@@ -63,6 +63,12 @@ class User(UserBase, table=True):
     # OAuth fields
     oauth_provider: str | None = Field(default=None, max_length=50)
     oauth_provider_id: str | None = Field(default=None, max_length=255)
+    # AI API key field (encrypted at rest per NFR4)
+    gemini_api_key_encrypted: str | None = Field(
+        default=None,
+        max_length=512,
+        description="Encrypted Gemini API key for this user (AES-256)",
+    )
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now})
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
