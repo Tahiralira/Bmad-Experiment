@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { motion, type PanInfo, type TargetAndTransition, useReducedMotion, useMotionValue } from "framer-motion"
 import { X } from "lucide-react"
 import FocusTrap from "focus-trap-react"
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { AICommentaryBubble } from "./AICommentaryBubble"
 import { ExpensePreviewCard } from "./ExpensePreviewCard"
 import { ExpenseForm } from "./ExpenseForm"
 import { useStreamingText } from "../hooks/useStreamingText"
+import { useCreateExpense } from "../api/expenses"
+import type { ExpenseParseResponse, ExpenseCreate } from "../types"
 
 // ============================================================================
 // Types and Interfaces
@@ -83,7 +87,7 @@ const modalVariants = {
  * - Slide-up animation from Agent Orb position
  * - Natural language input field with contextual placeholder
  * - AI commentary bubble with streaming text effect
- * - Expense preview card area (placeholder for Story 3.4)
+ * - Expense preview card with editable fields (Story 3.4)
  * - Toggle between smart input and manual form
  * - Close via X button, Escape key, backdrop tap, or swipe down
  * - Full keyboard accessibility with focus trap
@@ -112,6 +116,16 @@ export function SmartInputModal({
   const [inputText, setInputText] = useState("")
   const [mode, setMode] = useState<"smart" | "manual">("smart")
   const [isProcessing, setIsProcessing] = useState(false)
+  const [parsedData, setParsedData] = useState<ExpenseParseResponse | null>(null)
+  const [previewStatus, setPreviewStatus] = useState<"placeholder" | "loading" | "ready" | "error">("placeholder")
+  // TODO: Get currentUserId from auth context
+  const [currentUserId] = useState<string>("user-123")
+
+  // Query client for cache invalidation
+  const queryClient = useQueryClient()
+
+  // Expense creation mutation
+  const createExpenseMutation = useCreateExpense()
 
   // Streaming text hook
   const { streamedText, startStream, resetStream } = useStreamingText({
@@ -129,21 +143,68 @@ export function SmartInputModal({
 
   // Handle smart input submission
   const handleSmartSubmit = async () => {
-    if (!inputText.trim()) return
+    if (!inputText.trim() || !groupId) return
 
     setIsProcessing(true)
+    setPreviewStatus("loading")
 
     // Story 3.3: Call AI parsing service
-    // For now: simulate streaming with placeholder commentary
+    // For now: simulate parsing with mock data
+    // TODO: Replace with actual SSE endpoint call in Story 3.3 integration
     startStream("Got it! Parsing that expense for you...")
 
-    // Story 3.4: Show preview card and confirm
-    // Reset isProcessing after streaming completes (isStreaming becomes false)
-    // For now: use setTimeout to simulate processing delay
+    // Simulate AI parsing delay
     setTimeout(() => {
+      // Mock parsed data (replace with actual API response in Story 3.3)
+      const mockParsedData: ExpenseParseResponse = {
+        amount: 60.00,
+        description: "Lunch with team",
+        payer_id: currentUserId || "user-123",
+        confidence_score: 0.95,
+        commentary: "Got it! Lunch for $60."
+      }
+
+      setParsedData(mockParsedData)
+      setPreviewStatus("ready")
       setIsProcessing(false)
-      // In Story 3.4, we would show the preview card here
     }, 2000)
+  }
+
+  // Handle confirm action from editable preview
+  const handleConfirm = async (editedData: ExpenseCreate) => {
+    if (!groupId) return
+
+    try {
+      await createExpenseMutation.mutateAsync(editedData)
+
+      // Invalidate queries to refresh expense list and group balances
+      queryClient.invalidateQueries({ queryKey: ["expenses", groupId] })
+      queryClient.invalidateQueries({ queryKey: ["groups", groupId] })
+
+      // Show success toast
+      toast.success("Expense added successfully!")
+
+      // Close modal
+      onOpenChange(false)
+
+      // Reset state
+      setParsedData(null)
+      setPreviewStatus("placeholder")
+      setInputText("")
+    } catch (error) {
+      // Show error toast
+      toast.error("Failed to add expense. Please try again.")
+      console.error("Failed to create expense:", error)
+    }
+  }
+
+  // Handle discard action from editable preview
+  const handleDiscard = () => {
+    // Reset preview state
+    setParsedData(null)
+    setPreviewStatus("placeholder")
+    setInputText("")
+    resetStream()
   }
 
   // Handle manual form success
@@ -191,6 +252,8 @@ export function SmartInputModal({
       setMode("smart")
       setIsProcessing(false)
       resetStream()
+      setParsedData(null)
+      setPreviewStatus("placeholder")
     }, 200) // Match slide-down animation duration
   }
 
@@ -212,6 +275,8 @@ export function SmartInputModal({
       setMode("smart")
       setIsProcessing(false)
       resetStream()
+      setParsedData(null)
+      setPreviewStatus("placeholder")
     }
   }, [open, resetStream])
 
@@ -326,8 +391,12 @@ export function SmartInputModal({
 
                       {/* Expense Preview Card */}
                       <ExpensePreviewCard
-                        data={null} // No parsed data yet (Story 3.3)
-                        status="placeholder"
+                        data={parsedData}
+                        status={previewStatus}
+                        onConfirm={handleConfirm}
+                        onDiscard={handleDiscard}
+                        groupId={groupId}
+                        autoConfirmEnabled={false} // TODO: Add user preference setting
                       />
 
                       {/* Submit Button */}

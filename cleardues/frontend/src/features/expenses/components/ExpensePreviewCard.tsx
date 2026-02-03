@@ -1,12 +1,23 @@
 import { motion, useReducedMotion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
+import { EditableExpensePreview } from "./EditableExpensePreview"
+import type { ExpenseParseResponse } from "../types"
+import type { ExpenseCreate } from "../types"
 
 export interface ExpensePreviewCardProps {
   /** Parsed expense data (null in placeholder state) */
-  data: null
+  data: ExpenseParseResponse | null
   /** Current state of the preview card */
   status: "placeholder" | "loading" | "ready" | "error"
+  /** Called when expense is confirmed/saved */
+  onConfirm?: (editedData: ExpenseCreate) => Promise<void>
+  /** Called when user discards the expense */
+  onDiscard?: () => void
+  /** Group ID for fetching members */
+  groupId?: string
+  /** Auto-confirm enabled preference (default: false) */
+  autoConfirmEnabled?: boolean
   /** Additional className for styling */
   className?: string
 }
@@ -15,19 +26,26 @@ export interface ExpensePreviewCardProps {
  * Expense Preview Card - displays parsed expense data below the input field.
  *
  * In Story 3.2, this component shows a placeholder state.
- * In Story 3.4, it will display actual parsed expense details with editable fields.
+ * In Story 3.4, it displays actual parsed expense details with editable fields.
  *
  * @example
  * ```tsx
  * <ExpensePreviewCard
- *   data={null} // No parsed data yet (Story 3.3)
- *   status="placeholder"
+ *   data={parsedData} // Parsed expense data from AI
+ *   status="ready"
+ *   onConfirm={handleConfirm}
+ *   onDiscard={handleDiscard}
+ *   groupId="group-123"
  * />
  * ```
  */
 export function ExpensePreviewCard({
-  data: _data, // Will be used in Story 3.4 to display parsed expense details
+  data,
   status,
+  onConfirm,
+  onDiscard,
+  groupId,
+  autoConfirmEnabled = false,
   className,
 }: ExpensePreviewCardProps) {
   const shouldReduceMotion = useReducedMotion()
@@ -68,7 +86,39 @@ export function ExpensePreviewCard({
     )
   }
 
-  // Ready/Error states (Story 3.4)
-  // TODO: Implement in Story 3.4 after AI parsing is ready
+  // Ready state (Story 3.4) - Display editable preview
+  if (status === "ready" && data && onConfirm && onDiscard && groupId) {
+    return (
+      <EditableExpensePreview
+        parsedData={data}
+        onConfirm={onConfirm}
+        onDiscard={onDiscard}
+        groupId={groupId}
+        autoConfirmEnabled={autoConfirmEnabled}
+        className={cn("mt-4", className)}
+      />
+    )
+  }
+
+  // Error state (Story 3.4)
+  if (status === "error") {
+    return (
+      <motion.div
+        initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className={cn(
+          "mt-4 p-4 rounded-lg",
+          "bg-error/10 border border-error/30",
+          className
+        )}
+      >
+        <p className="text-error text-sm">
+          Failed to parse expense. Please try again or switch to manual form.
+        </p>
+      </motion.div>
+    )
+  }
+
   return null
 }
