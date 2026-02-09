@@ -2,9 +2,14 @@
 import secrets
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
+
+# Avoid circular imports - ExpenseSplit is only used for type hints
+if TYPE_CHECKING:
+    from app.features.expenses.models import ExpenseSplit
 
 
 # Shared properties
@@ -72,6 +77,7 @@ class User(UserBase, table=True):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now})
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
+    expense_splits: list["ExpenseSplit"] = Relationship(back_populates="user")
 
 
 # Magic link token for passwordless authentication

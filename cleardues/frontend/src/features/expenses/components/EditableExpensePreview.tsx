@@ -1,20 +1,26 @@
 import { useEffect, useState } from "react"
-import { motion, useReducedMotion } from "framer-motion"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import * as SelectPrimitive from "@radix-ui/react-select"
-import { Check, ChevronDown } from "lucide-react"
+import { Check, ChevronDown, ChevronUp, Settings } from "lucide-react"
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { InlineEditableField } from "@/components/ui/inline-input"
 import { useExpenseEdit } from "../hooks/useExpenseEdit"
 import { useAutoConfirm } from "../hooks/useAutoConfirm"
+import { useSplitState } from "../hooks/useSplitState"
 import { useGroupMembers } from "@/features/groups/api/groups"
-import type { ExpenseParseResponse, ExpenseCreate } from "../types"
+import { useUpdateExpenseSplit } from "../api/expenses"
+import { SplitPicker } from "./SplitPicker"
+import { MemberChips } from "./MemberChips"
+import { SplitAmountsDisplay } from "./SplitAmountsDisplay"
+import type { ExpenseParseResponse, ExpenseCreate, GroupMember as GroupMemberType } from "../types"
 
 interface EditableExpensePreviewProps {
   /** Parsed expense data from AI */
   parsedData: ExpenseParseResponse
-  /** Called when expense is confirmed/saved */
-  onConfirm: (editedData: ExpenseCreate) => Promise<void>
+  /** Called when expense is confirmed/saved - returns the created expense ID */
+  onConfirm: (editedData: ExpenseCreate) => Promise<string>
   /** Called when user discards the expense */
   onDiscard: () => void
   /** Group ID for fetching members */
@@ -36,6 +42,7 @@ interface EditableExpensePreviewProps {
  * - Auto-confirm countdown (if enabled)
  * - Confirm/Discard actions
  * - Payer selection from group members
+ * - Complex edit mode: Split type selection, member exclusions (Story 3.5)
  *
  * @example
  * ```tsx
@@ -66,7 +73,7 @@ export function EditableExpensePreview({
     handleChange,
     handleReset,
     isEdited,
-    isValid,
+    isValid: isBasicValid,
     validationErrors,
   } = useExpenseEdit(parsedData)
 
@@ -78,19 +85,40 @@ export function EditableExpensePreview({
       onCountdownComplete: () => handleConfirm(),
     })
 
-  // Fetch group members for payer selection
+  // Fetch group members for payer selection and split
   const { data: membersData, isLoading: isLoadingMembers } = useGroupMembers(groupId)
-  const members = membersData?.members || []
+  const members: GroupMemberType[] = membersData?.members || []
+
+  // Complex edit mode state
+  const [isComplexMode, setIsComplexMode] = useState(false)
+
+  // Split state management
+  const {
+    splitType,
+    setSplitType,
+    excludedMembers,
+    toggleMemberExclusion,
+    splitAmounts,
+    isValid: isSplitValid,
+    validationError: splitValidationError,
+  } = useSplitState({
+    totalAmount: Number(editedData.amount),
+    members,
+    payerId: editedData.payer_id,
+  })
+
+  // Split mutation for saving split configuration (Story 3.5)
+  const updateSplitMutation = useUpdateExpenseSplit()
 
   // Local state for tracking user interaction
   const [hasInteracted, setHasInteracted] = useState(false)
 
   // Start countdown on mount (if enabled)
   useEffect(() => {
-    if (autoConfirmEnabled && !hasInteracted) {
+    if (autoConfirmEnabled && !hasInteracted && !isComplexMode) {
       startCountdown()
     }
-  }, [autoConfirmEnabled, hasInteracted, startCountdown])
+  }, [autoConfirmEnabled, hasInteracted, isComplexMode, startCountdown])
 
   // Cancel countdown and mark interacted on any user action
   const handleUserInteraction = () => {
@@ -102,7 +130,9 @@ export function EditableExpensePreview({
 
   // Handle confirm action
   const handleConfirm = async () => {
-    if (!isValid) return
+    if (!isBasicValid) return
+    // In complex mode, also validate split
+    if (isComplexMode && !isSplitValid) return
 
     const expenseData: ExpenseCreate = {
       group_id: groupId,
@@ -111,7 +141,26 @@ export function EditableExpensePreview({
       payer_id: editedData.payer_id,
     }
 
-    await onConfirm(expenseData)
+    try {
+      // Create expense and get the expense ID
+      const expenseId = await onConfirm(expenseData)
+
+      // If in complex mode (split editing), save the split configuration
+      if (isComplexMode) {
+        await updateSplitMutation.mutateAsync({
+          expenseId,
+          data: {
+            type: "equal",
+            excluded_user_ids: Array.from(excludedMembers),
+          },
+        })
+        toast.success("Expense and split saved successfully!")
+      }
+    } catch (error) {
+      // Error is already handled by parent's toast
+      // Don't close modal on error
+      throw error
+    }
   }
 
   // Handle field change with user interaction tracking
@@ -125,6 +174,15 @@ export function EditableExpensePreview({
     handleUserInteraction()
     handleReset(field)
   }
+
+  // Toggle complex edit mode
+  const toggleComplexMode = () => {
+    handleUserInteraction()
+    setIsComplexMode((prev) => !prev)
+  }
+
+  // Overall validation (basic + split if in complex mode)
+  const isValid = isComplexMode ? isBasicValid && isSplitValid : isBasicValid
 
   return (
     <motion.div
@@ -144,11 +202,36 @@ export function EditableExpensePreview({
         <h3 className="text-sm font-medium text-text-secondary">
           Review Expense
         </h3>
-        {isEdited && (
-          <span className="text-xs text-text-tertiary">
-            Edited
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {isEdited && (
+            <span className="text-xs text-text-tertiary">
+              Edited
+            </span>
+          )}
+          {/* Edit Details button */}
+          <button
+            type="button"
+            onClick={toggleComplexMode}
+            className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded text-xs",
+              "text-text-secondary hover:text-text-primary",
+              "hover:bg-surface transition-colors"
+            )}
+          >
+            <Settings className="w-3 h-3" />
+            {isComplexMode ? (
+              <>
+                <span>Simple</span>
+                <ChevronUp className="w-3 h-3" />
+              </>
+            ) : (
+              <>
+                <span>Edit Details</span>
+                <ChevronDown className="w-3 h-3" />
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Amount field */}
@@ -265,6 +348,56 @@ export function EditableExpensePreview({
           </div>
         )}
       </div>
+
+      {/* Complex Edit Mode - Split Controls (Story 3.5) */}
+      <AnimatePresence>
+        {isComplexMode && (
+          <motion.div
+            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col gap-3 pt-3 border-t border-border"
+          >
+            {/* Split Type Picker */}
+            <SplitPicker
+              selectedType={splitType}
+              onSelectType={setSplitType}
+            />
+
+            {/* Member Chips */}
+            <MemberChips
+              members={members}
+              includedMembers={excludedMembers}
+              onToggleInclude={toggleMemberExclusion}
+            />
+
+            {/* Split Amounts Display */}
+            <SplitAmountsDisplay
+              totalAmount={Number(editedData.amount)}
+              splitAmounts={splitAmounts}
+              members={members}
+              includedMembers={excludedMembers}
+            />
+
+            {/* Split validation error */}
+            {splitValidationError && (
+              <p className="text-xs text-error">
+                {splitValidationError}
+              </p>
+            )}
+
+            {/* Done button (collapse complex mode) */}
+            <button
+              type="button"
+              onClick={toggleComplexMode}
+              className="w-full py-2 px-4 rounded-md text-sm font-medium border border-border text-text-secondary hover:bg-surface transition-colors"
+            >
+              Done
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Action buttons */}
       <div className="flex gap-2 mt-2">

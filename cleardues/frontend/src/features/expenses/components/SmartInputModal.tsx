@@ -171,17 +171,20 @@ export function SmartInputModal({
   }
 
   // Handle confirm action from editable preview
-  const handleConfirm = async (editedData: ExpenseCreate) => {
-    if (!groupId) return
+  const handleConfirm = async (editedData: ExpenseCreate): Promise<string> => {
+    if (!groupId) {
+      throw new Error("Group ID is required")
+    }
 
     try {
-      await createExpenseMutation.mutateAsync(editedData)
+      // Create expense and capture the result
+      const expense = await createExpenseMutation.mutateAsync(editedData)
 
       // Invalidate queries to refresh expense list and group balances
       queryClient.invalidateQueries({ queryKey: ["expenses", groupId] })
       queryClient.invalidateQueries({ queryKey: ["groups", groupId] })
 
-      // Show success toast
+      // Show success toast (split success toast is shown separately in EditableExpensePreview)
       toast.success("Expense added successfully!")
 
       // Close modal
@@ -191,10 +194,14 @@ export function SmartInputModal({
       setParsedData(null)
       setPreviewStatus("placeholder")
       setInputText("")
+
+      // Return the expense ID so EditableExpensePreview can call the split API
+      return expense.id
     } catch (error) {
       // Show error toast
       toast.error("Failed to add expense. Please try again.")
       console.error("Failed to create expense:", error)
+      throw error // Re-throw to allow EditableExpensePreview to handle it
     }
   }
 

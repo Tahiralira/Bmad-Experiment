@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-01-20 (Story 3.2 code reviewed and fixed - Natural Language Input Interface)
+**Last Updated:** 2026-02-03 (Story 3.5 completed - Split Logic Equal Split)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -12,13 +12,13 @@
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
-| Epic 3: Expenses | **IN-PROGRESS** | 2/8 (3.1 done, 3.2 done) |
+| Epic 3: Expenses | **IN-PROGRESS** | 5/8 (3.1-3.5 done) |
 | Epic 4-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 20 stories completed, 26 remaining
+**Current Progress:** 21 stories completed, 25 remaining
 
-> **IMPORTANT:** Story 3.2 (Natural Language Input Interface) completed! Code review fixed all issues. Next: Story 3.3 (AI Parsing Service Integration).
+> **IMPORTANT:** Story 3.5 (Equal Split) completed! Code review fixed 5 HIGH/MEDIUM issues including split mutation call, User model relationship, and error handling. Next: Story 3.6 (Unequal Custom Amounts).
 
 ---
 
@@ -114,16 +114,21 @@ cd cleardues/frontend && npm run build
 
 ## Next Up
 
-**Epic 2.5: UX Foundation & Design System** ✅ COMPLETE
-- Story 2.5.1: Design System Token Migration ← **DONE** ✓
-- Story 2.5.2: Agent Orb Component ← **DONE** ✓
-- Story 2.5.3: Orbital Navigation System ← **DONE** ✓
-- Story 2.5.4: Smart Input Modal Foundation ← **DONE** ✓
-- Story 2.5.5: Swipeable Card Base Component ← **DONE** ✓
-- Story 2.5.6: Balance Display Component ← **DONE** ✓
-- Story 2.5.7: Update Existing Screens ← **DONE** ✓
+**Epic 3: Smart Expense Entry** 🔄 IN-PROGRESS (5/8 done)
+- Story 3.1: Create Expense Model and Basic Entry ← **DONE** ✓
+- Story 3.2: Natural Language Input Interface ← **DONE** ✓
+- Story 3.3: AI Parsing Service Integration ← **DONE** ✓
+- Story 3.4: Manual Override of Parsed Data ← **DONE** ✓
+- Story 3.5: Split Logic - Equal Split ← **DONE** ✓
+- Story 3.6: Split Logic - Unequal Custom Amounts ← **NEXT**
+- Story 3.7: Split Logic - Percentage Split
+- Story 3.8: Exclude Members from Expense
 
-**Next:** Epic 3: Smart Expense Entry (8 stories, 3.1 done, 3.2 done, 3.3 next)
+**Key Pattern from Story 3.5 Code Review:**
+- Always call split mutation AFTER expense creation (needs expense ID from response)
+- Add `onError` toast notifications to all mutations
+- Add reverse relationships to User model for efficient queries
+- GroupMember type has both `id` (join table) and `user_id` (actual user) - use `user_id` consistently
 
 ---
 

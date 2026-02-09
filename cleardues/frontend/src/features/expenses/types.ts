@@ -57,3 +57,82 @@ export interface ExpenseEditState {
   /** Set of fields that have been edited */
   editedFields: Set<keyof ExpenseParseResponse>
 }
+
+// =============================================================================
+// Split Types (Story 3.5 - Equal Split)
+// =============================================================================
+
+export type SplitType = "equal" | "unequal" | "percentage" | "shares"
+
+export interface SplitTypeOption {
+  type: SplitType
+  label: string
+  icon: string // Lucide icon name
+  disabled?: boolean
+  disabledReason?: string
+}
+
+export const SPLIT_TYPE_OPTIONS: SplitTypeOption[] = [
+  {
+    type: "equal",
+    label: "Equal",
+    icon: "equal",
+  },
+  {
+    type: "unequal",
+    label: "Unequal",
+    icon: "bar-chart-2",
+    disabled: true,
+    disabledReason: "Coming in Story 3.6",
+  },
+  {
+    type: "percentage",
+    label: "Percentage",
+    icon: "percent",
+    disabled: true,
+    disabledReason: "Coming in Story 3.7",
+  },
+  {
+    type: "shares",
+    label: "Shares",
+    icon: "squares-3-by-3",
+    disabled: true,
+    disabledReason: "Coming in Story 3.8",
+  },
+]
+
+export interface SplitState {
+  type: SplitType
+  excludedMembers: Set<string>
+  amounts: Map<string, number> // user_id -> amount_owed
+}
+
+export interface SplitItem {
+  user_id: string
+  amount_owed: number
+}
+
+export interface EqualSplitRequest {
+  type: "equal"
+  excluded_user_ids: string[]
+}
+
+export interface ExpenseSplitResponse {
+  expense_id: string
+  split_type: string
+  splits: SplitItem[]
+}
+
+// Group member type for split functionality
+// NOTE: Matches backend GroupMemberPublic schema which has both fields:
+// - id: GroupMember table row ID (join table primary key)
+// - user_id: The actual user UUID - ALWAYS use this for user identification
+export interface GroupMember {
+  /** GroupMember table row ID (join table primary key) */
+  id: string
+  /** The actual user UUID - use this for user identification and split calculations */
+  user_id: string
+  full_name: string | null  // Backend returns null for members without names
+  email: string
+  avatar_url?: string
+}

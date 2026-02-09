@@ -89,7 +89,7 @@ development_status:
   3-2-natural-language-input-interface: done
   3-3-ai-parsing-service-integration: done
   3-4-manual-override-of-parsed-data: done
-  3-5-split-logic-equal-split: backlog
+  3-5-split-logic-equal-split: done
   3-6-split-logic-unequal-custom-amounts: backlog
   3-7-split-logic-percentage-split: backlog
   3-8-exclude-members-from-expense: backlog

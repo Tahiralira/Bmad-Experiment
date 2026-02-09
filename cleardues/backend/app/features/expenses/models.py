@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum as PyEnum
 
+import sqlalchemy as sa
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.features.auth.models import User, utc_now
@@ -60,6 +61,43 @@ class ExpensesPublic(SQLModel):
     count: int
 
 
+# === Split Request/Response Schemas ===
+
+
+class SplitItem(SQLModel):
+    """Individual split item in response."""
+
+    user_id: uuid.UUID
+    amount_owed: Decimal
+
+
+class EqualSplitRequest(SQLModel):
+    """Request schema for creating equal split."""
+
+    type: str = "equal"
+    excluded_user_ids: list[uuid.UUID] = []
+
+
+class ExpenseSplitPublic(SQLModel):
+    """Response schema for expense split."""
+
+    id: uuid.UUID
+    expense_id: uuid.UUID
+    user_id: uuid.UUID
+    amount_owed: Decimal
+    status: SplitStatus
+    confirmed_at: datetime | None
+    created_at: datetime
+
+
+class ExpenseSplitResponse(SQLModel):
+    """Response schema for split creation/update."""
+
+    expense_id: uuid.UUID
+    split_type: str
+    splits: list[SplitItem]
+
+
 # === Database Models ===
 
 
@@ -106,6 +144,8 @@ class ExpenseSplit(SQLModel, table=True):
 
     Created when expense is split (Stories 3.5-3.8).
     Each split represents what one user owes from the expense.
+
+    Unique constraint: One split per user per expense.
     """
 
     __tablename__ = "expense_split"
@@ -121,3 +161,10 @@ class ExpenseSplit(SQLModel, table=True):
     # Relationships
     expense: Expense = Relationship(back_populates="splits")
     user: User = Relationship()
+
+    # Table constraints
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "expense_id", "user_id", name="uq_expense_user_split"
+        ),
+    )

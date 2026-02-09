@@ -10,8 +10,8 @@ export interface ExpensePreviewCardProps {
   data: ExpenseParseResponse | null
   /** Current state of the preview card */
   status: "placeholder" | "loading" | "ready" | "error"
-  /** Called when expense is confirmed/saved */
-  onConfirm?: (editedData: ExpenseCreate) => Promise<void>
+  /** Called when expense is confirmed/saved - returns the created expense ID */
+  onConfirm?: (editedData: ExpenseCreate) => Promise<string>
   /** Called when user discards the expense */
   onDiscard?: () => void
   /** Group ID for fetching members */
