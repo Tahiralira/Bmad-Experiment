@@ -22,9 +22,15 @@ interface UseSplitStateReturn {
   excludedMembers: Set<string>
   /** Toggle member exclusion */
   toggleMemberExclusion: (memberId: string) => void
+  /** Custom amounts for unequal split (user_id -> amount) */
+  customAmounts: Map<string, number>
+  /** Set custom amount for a member (unequal split) */
+  setCustomAmount: (memberId: string, amount: number) => void
   /** Calculated split amounts (user_id -> amount) */
   splitAmounts: Map<string, number>
-  /** Whether the split configuration is valid (>= 2 members) */
+  /** Remaining amount to allocate (unequal split only) */
+  remainingAmount: number
+  /** Whether the split configuration is valid (>= 2 members, amounts match total for unequal) */
   isValid: boolean
   /** Validation error message */
   validationError: string | null
@@ -36,11 +42,12 @@ interface UseSplitStateReturn {
  * Manages state for expense splitting:
  * - Split type (equal, unequal, percentage, shares)
  * - Member exclusions
+ * - Custom amounts for unequal splits
  * - Split amount calculations
- * - Validation (min 2 members)
+ * - Validation (min 2 members, amounts match total for unequal)
  *
- * Only implements equal split calculation in Story 3.5.
- * Future stories will add other split type calculations.
+ * Implements equal split (Story 3.5) and unequal split (Story 3.6).
+ * Future stories will add percentage and shares split calculations.
  *
  * @example
  * ```tsx
@@ -49,7 +56,10 @@ interface UseSplitStateReturn {
  *   setSplitType,
  *   excludedMembers,
  *   toggleMemberExclusion,
+ *   customAmounts,
+ *   setCustomAmount,
  *   splitAmounts,
+ *   remainingAmount,
  *   isValid,
  *   validationError
  * } = useSplitState({
@@ -67,6 +77,18 @@ export function useSplitState({
 }: UseSplitStateProps): UseSplitStateReturn {
   const [splitType, setSplitType] = useState<SplitType>(initialType)
   const [excludedMembers, setExcludedMembers] = useState<Set<string>>(new Set())
+  const [customAmounts, setCustomAmounts] = useState<Map<string, number>>(new Map())
+
+  // Enhanced setSplitType that clears state when switching away from unequal split
+  const handleSetSplitType = useCallback((newType: SplitType) => {
+    setSplitType((prevType) => {
+      // If switching from unequal to anything else, clear custom amounts
+      if (prevType === "unequal" && newType !== "unequal") {
+        setCustomAmounts(new Map())
+      }
+      return newType
+    })
+  }, [])
 
   // Calculate split amounts based on type and exclusions
   const splitAmounts = useMemo(() => {
@@ -102,9 +124,41 @@ export function useSplitState({
       return amounts
     }
 
+    if (splitType === "unequal") {
+      // For unequal split, return the custom amounts directly
+      // The user will set these via setCustomAmount
+      return new Map(customAmounts)
+    }
+
     // Other split types will be implemented in future stories
     return new Map<string, number>()
-  }, [splitType, totalAmount, members, excludedMembers, payerId])
+  }, [splitType, totalAmount, members, excludedMembers, payerId, customAmounts])
+
+  // Calculate remaining amount for unequal split
+  const remainingAmount = useMemo(() => {
+    if (splitType !== "unequal") {
+      return 0
+    }
+
+    const allocated = Array.from(customAmounts.values()).reduce(
+      (sum, amount) => sum + amount,
+      0
+    )
+    return totalAmount - allocated
+  }, [splitType, customAmounts, totalAmount])
+
+  // Set custom amount for a member (unequal split)
+  const setCustomAmount = useCallback((memberId: string, amount: number) => {
+    setCustomAmounts((prev) => {
+      const newMap = new Map(prev)
+      if (amount > 0) {
+        newMap.set(memberId, amount)
+      } else {
+        newMap.delete(memberId)
+      }
+      return newMap
+    })
+  }, [])
 
   // Toggle member exclusion
   const toggleMemberExclusion = useCallback((memberId: string) => {
@@ -130,18 +184,41 @@ export function useSplitState({
       }
     }
 
+    // Additional validation for unequal split
+    if (splitType === "unequal") {
+      // All members must have amounts
+      if (customAmounts.size !== members.length) {
+        return {
+          isValid: false,
+          validationError: "All members must have an amount specified",
+        }
+      }
+
+      // Amounts must sum to total (matches backend error message format)
+      if (Math.abs(remainingAmount) >= 0.01) {
+        const currentTotal = totalAmount - remainingAmount
+        return {
+          isValid: false,
+          validationError: `Split amounts (Rs ${currentTotal.toFixed(2)}) must equal total expense amount (Rs ${totalAmount.toFixed(2)})`,
+        }
+      }
+    }
+
     return {
       isValid: true,
       validationError: null,
     }
-  }, [members.length, excludedMembers.size])
+  }, [members.length, excludedMembers.size, splitType, customAmounts.size, remainingAmount, totalAmount])
 
   return {
     splitType,
-    setSplitType,
+    setSplitType: handleSetSplitType,
     excludedMembers,
     toggleMemberExclusion,
+    customAmounts,
+    setCustomAmount,
     splitAmounts,
+    remainingAmount,
     isValid,
     validationError,
   }

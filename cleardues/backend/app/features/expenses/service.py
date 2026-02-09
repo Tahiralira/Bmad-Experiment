@@ -112,3 +112,55 @@ def calculate_equal_split(
         })
 
     return splits
+
+
+def calculate_unequal_split(
+    total_amount: Decimal,
+    splits: list[dict],
+) -> list[dict]:
+    """
+    Validate and prepare unequal split amounts.
+
+    Args:
+        total_amount: Total expense amount
+        splits: List of {user_id, amount} specified by user
+
+    Returns:
+        List of {user_id, amount_owed} validated
+
+    Raises:
+        ValueError: If amounts don't sum to total
+
+    Examples:
+        >>> calculate_unequal_split(
+        ...     Decimal("100.00"),
+        ...     [{"user_id": id1, "amount": 50.00}, {"user_id": id2, "amount": 50.00}]
+        ... )
+        [{'user_id': id1, 'amount_owed': Decimal('50.00')}, ...]
+    """
+    # Sum all provided amounts
+    provided_total = sum(Decimal(str(s["amount"])) for s in splits)
+
+    # Validate sum matches total (within 0.01 tolerance for floating point)
+    if abs(provided_total - total_amount) > Decimal("0.01"):
+        raise ValueError(
+            f"Split amounts (Rs {provided_total}) must equal "
+            f"total expense amount (Rs {total_amount})"
+        )
+
+    # Return validated splits with safe UUID conversion
+    validated_splits = []
+    for split_item in splits:
+        # Safe UUID conversion - handle both string and UUID objects
+        user_id_val = split_item["user_id"]
+        if isinstance(user_id_val, uuid.UUID):
+            user_id = user_id_val
+        else:
+            user_id = uuid.UUID(str(user_id_val))
+
+        validated_splits.append({
+            "user_id": user_id,
+            "amount_owed": Decimal(str(split_item["amount"]))
+        })
+
+    return validated_splits

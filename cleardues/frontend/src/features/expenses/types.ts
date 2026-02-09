@@ -82,8 +82,6 @@ export const SPLIT_TYPE_OPTIONS: SplitTypeOption[] = [
     type: "unequal",
     label: "Unequal",
     icon: "bar-chart-2",
-    disabled: true,
-    disabledReason: "Coming in Story 3.6",
   },
   {
     type: "percentage",
@@ -115,6 +113,16 @@ export interface SplitItem {
 export interface EqualSplitRequest {
   type: "equal"
   excluded_user_ids: string[]
+}
+
+export interface UnequalSplitItem {
+  user_id: string
+  amount: number
+}
+
+export interface UnequalSplitRequest {
+  type: "unequal"
+  splits: UnequalSplitItem[]
 }
 
 export interface ExpenseSplitResponse {

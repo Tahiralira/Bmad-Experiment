@@ -14,6 +14,7 @@ import { useUpdateExpenseSplit } from "../api/expenses"
 import { SplitPicker } from "./SplitPicker"
 import { MemberChips } from "./MemberChips"
 import { SplitAmountsDisplay } from "./SplitAmountsDisplay"
+import { UnequalSplitInputs } from "./UnequalSplitInputs"
 import type { ExpenseParseResponse, ExpenseCreate, GroupMember as GroupMemberType } from "../types"
 
 interface EditableExpensePreviewProps {
@@ -98,6 +99,8 @@ export function EditableExpensePreview({
     setSplitType,
     excludedMembers,
     toggleMemberExclusion,
+    customAmounts,
+    setCustomAmount,
     splitAmounts,
     isValid: isSplitValid,
     validationError: splitValidationError,
@@ -106,6 +109,17 @@ export function EditableExpensePreview({
     members,
     payerId: editedData.payer_id,
   })
+
+  // Pre-populate custom amounts when switching from equal to unequal split (Story 3.6)
+  useEffect(() => {
+    if (splitType === "unequal" && customAmounts.size === 0 && splitAmounts.size > 0) {
+      // User just switched to unequal split and no custom amounts are set yet
+      // Pre-populate with current equal split amounts
+      splitAmounts.forEach((amount, memberId) => {
+        setCustomAmount(memberId, amount)
+      })
+    }
+  }, [splitType, splitAmounts, customAmounts.size, setCustomAmount])
 
   // Split mutation for saving split configuration (Story 3.5)
   const updateSplitMutation = useUpdateExpenseSplit()
@@ -147,12 +161,33 @@ export function EditableExpensePreview({
 
       // If in complex mode (split editing), save the split configuration
       if (isComplexMode) {
-        await updateSplitMutation.mutateAsync({
-          expenseId,
-          data: {
+        // Prepare split data based on split type
+        let splitData:
+          | { type: "equal"; excluded_user_ids: string[] }
+          | { type: "unequal"; splits: Array<{ user_id: string; amount: number }> }
+
+        if (splitType === "equal") {
+          splitData = {
             type: "equal",
             excluded_user_ids: Array.from(excludedMembers),
-          },
+          }
+        } else if (splitType === "unequal") {
+          // Convert customAmounts Map to array format
+          splitData = {
+            type: "unequal",
+            splits: Array.from(customAmounts.entries()).map(([user_id, amount]) => ({
+              user_id,
+              amount,
+            })),
+          }
+        } else {
+          // Other split types not yet implemented
+          throw new Error(`Split type "${splitType}" not yet implemented`)
+        }
+
+        await updateSplitMutation.mutateAsync({
+          expenseId,
+          data: splitData,
         })
         toast.success("Expense and split saved successfully!")
       }
@@ -365,12 +400,24 @@ export function EditableExpensePreview({
               onSelectType={setSplitType}
             />
 
-            {/* Member Chips */}
-            <MemberChips
-              members={members}
-              includedMembers={excludedMembers}
-              onToggleInclude={toggleMemberExclusion}
-            />
+            {/* Unequal Split Amount Inputs (Story 3.6) */}
+            {splitType === "unequal" && (
+              <UnequalSplitInputs
+                members={members}
+                customAmounts={customAmounts}
+                totalAmount={Number(editedData.amount)}
+                onAmountChange={setCustomAmount}
+              />
+            )}
+
+            {/* Member Chips (only show for equal split) */}
+            {splitType === "equal" && (
+              <MemberChips
+                members={members}
+                includedMembers={excludedMembers}
+                onToggleInclude={toggleMemberExclusion}
+              />
+            )}
 
             {/* Split Amounts Display */}
             <SplitAmountsDisplay
@@ -420,7 +467,7 @@ export function EditableExpensePreview({
         <button
           type="button"
           onClick={handleConfirm}
-          disabled={!isValid}
+          disabled={!isValid || updateSplitMutation.isPending}
           className={cn(
             "flex-1 py-2.5 px-4 rounded-md text-sm font-medium",
             "bg-action text-white",
@@ -431,7 +478,9 @@ export function EditableExpensePreview({
             "relative overflow-hidden"
           )}
         >
-          {isCountingDown ? (
+          {updateSplitMutation.isPending ? (
+            <span>Saving...</span>
+          ) : isCountingDown ? (
             <span>Confirm ({countdown}s)</span>
           ) : (
             <span>Confirm</span>

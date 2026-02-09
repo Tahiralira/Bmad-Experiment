@@ -3,7 +3,7 @@ import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
 import { OpenAPI } from "@/shared/api"
-import type { Expense, ExpenseCreate, EqualSplitRequest, ExpenseSplitResponse } from "../types"
+import type { Expense, ExpenseCreate, EqualSplitRequest, UnequalSplitRequest, ExpenseSplitResponse } from "../types"
 
 async function createExpense(data: ExpenseCreate): Promise<Expense> {
   return __request(OpenAPI, {
@@ -34,7 +34,7 @@ export function useCreateExpense() {
 
 async function updateExpenseSplit(
   expenseId: string,
-  data: EqualSplitRequest
+  data: EqualSplitRequest | UnequalSplitRequest
 ): Promise<ExpenseSplitResponse> {
   return __request(OpenAPI, {
     method: "PUT",
@@ -51,7 +51,11 @@ async function updateExpenseSplit(
 export function useUpdateExpenseSplit() {
   const queryClient = useQueryClient()
 
-  return useMutation<ExpenseSplitResponse, Error, { expenseId: string; data: EqualSplitRequest }>({
+  return useMutation<
+    ExpenseSplitResponse,
+    Error,
+    { expenseId: string; data: EqualSplitRequest | UnequalSplitRequest }
+  >({
     mutationFn: ({ expenseId, data }) => updateExpenseSplit(expenseId, data),
     onSuccess: () => {
       // Invalidate dashboard to refresh balances

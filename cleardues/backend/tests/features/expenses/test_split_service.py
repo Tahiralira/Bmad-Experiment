@@ -5,7 +5,7 @@ import uuid
 import pytest
 from sqlmodel import Session
 
-from app.features.expenses.service import calculate_equal_split
+from app.features.expenses.service import calculate_equal_split, calculate_unequal_split
 from app.features.expenses.models import Expense, ExpenseSplit
 from app.features.groups.models import GroupMember
 
@@ -144,6 +144,128 @@ class TestCalculateEqualSplit:
         # 999999.99 / 3 = 333333.33 each, payer absorbs 0.01
         assert len(splits) == 3
         total = sum(s["amount_owed"] for s in splits)
+        assert total == Decimal("999999.99")
+
+
+class TestCalculateUnequalSplit:
+    """Test suite for calculate_unequal_split function"""
+
+    def test_unequal_split_exact_match(self):
+        """Test unequal split when amounts sum to total exactly"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+        user3 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "amount": 50.00},
+            {"user_id": user2, "amount": 30.00},
+            {"user_id": user3, "amount": 20.00}
+        ]
+
+        result = calculate_unequal_split(
+            total_amount=Decimal("100.00"),
+            splits=splits
+        )
+
+        assert len(result) == 3
+        assert result[0]["amount_owed"] == Decimal("50.00")
+        assert result[1]["amount_owed"] == Decimal("30.00")
+        assert result[2]["amount_owed"] == Decimal("20.00")
+
+    def test_unequal_split_under_allocated(self):
+        """Test that under-allocated splits raise error"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+        user3 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "amount": 40.00},
+            {"user_id": user2, "amount": 30.00},
+            {"user_id": user3, "amount": 20.00}
+        ]  # Total = 90, but expense is 100
+
+        with pytest.raises(ValueError, match="must equal total"):
+            calculate_unequal_split(
+                total_amount=Decimal("100.00"),
+                splits=splits
+            )
+
+    def test_unequal_split_over_allocated(self):
+        """Test that over-allocated splits raise error"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+        user3 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "amount": 60.00},
+            {"user_id": user2, "amount": 30.00},
+            {"user_id": user3, "amount": 20.00}
+        ]  # Total = 110, but expense is 100
+
+        with pytest.raises(ValueError, match="must equal total"):
+            calculate_unequal_split(
+                total_amount=Decimal("100.00"),
+                splits=splits
+            )
+
+    def test_unequal_split_tolerance(self):
+        """Test that small rounding differences are tolerated"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+        user3 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "amount": 33.33},
+            {"user_id": user2, "amount": 33.33},
+            {"user_id": user3, "amount": 33.34}
+        ]  # Total = 100.00 (with rounding)
+
+        result = calculate_unequal_split(
+            total_amount=Decimal("100.00"),
+            splits=splits
+        )
+
+        assert len(result) == 3
+        # Verify total sums correctly
+        total = sum(s["amount_owed"] for s in result)
+        assert total == Decimal("100.00")
+
+    def test_unequal_split_decimals(self):
+        """Test unequal split with decimal amounts"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "amount": 55.55},
+            {"user_id": user2, "amount": 44.45}
+        ]
+
+        result = calculate_unequal_split(
+            total_amount=Decimal("100.00"),
+            splits=splits
+        )
+
+        assert len(result) == 2
+        assert result[0]["amount_owed"] == Decimal("55.55")
+        assert result[1]["amount_owed"] == Decimal("44.45")
+
+    def test_unequal_split_large_amounts(self):
+        """Test unequal split with large amounts"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "amount": 600000.00},
+            {"user_id": user2, "amount": 399999.99}
+        ]
+
+        result = calculate_unequal_split(
+            total_amount=Decimal("999999.99"),
+            splits=splits
+        )
+
+        assert len(result) == 2
+        total = sum(s["amount_owed"] for s in result)
         assert total == Decimal("999999.99")
 
 

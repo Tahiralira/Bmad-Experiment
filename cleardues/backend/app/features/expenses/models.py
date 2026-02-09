@@ -78,6 +78,20 @@ class EqualSplitRequest(SQLModel):
     excluded_user_ids: list[uuid.UUID] = []
 
 
+class UnequalSplitItem(SQLModel):
+    """Individual split item for unequal split request."""
+
+    user_id: uuid.UUID
+    amount: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
+
+
+class UnequalSplitRequest(SQLModel):
+    """Request schema for creating unequal split."""
+
+    type: str = "unequal"
+    splits: list[UnequalSplitItem]
+
+
 class ExpenseSplitPublic(SQLModel):
     """Response schema for expense split."""
 
