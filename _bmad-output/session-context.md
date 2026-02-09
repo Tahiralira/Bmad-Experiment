@@ -12,13 +12,13 @@
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
-| Epic 3: Expenses | **IN-PROGRESS** | 5/8 (3.1-3.5 done) |
+| Epic 3: Expenses | **IN-PROGRESS** | 6/8 (3.1-3.6 done) |
 | Epic 4-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 21 stories completed, 25 remaining (Story 3.6 ready for development)
+**Current Progress:** 22 stories completed, 24 remaining (Story 3.7 next)
 
-> **IMPORTANT:** Story 3.6 (Unequal Custom Amounts) ready for development! This story enables users to specify custom amounts for each group member with real-time validation feedback. Builds on Story 3.5's split foundation.
+> **IMPORTANT:** Story 3.6 (Unequal Custom Amounts) COMPLETE! ✅ Users can now specify custom amounts for each group member with real-time validation feedback. Code review fixed 7 HIGH and 3 MEDIUM issues (UUID conversion, validation, NaN handling, loading states).
 
 ---
 
@@ -114,13 +114,13 @@ cd cleardues/frontend && npm run build
 
 ## Next Up
 
-**Epic 3: Smart Expense Entry** 🔄 IN-PROGRESS (5/8 done, 1 ready-for-dev)
+**Epic 3: Smart Expense Entry** 🔄 IN-PROGRESS (6/8 done, 2 remaining)
 - Story 3.1: Create Expense Model and Basic Entry ← **DONE** ✓
 - Story 3.2: Natural Language Input Interface ← **DONE** ✓
 - Story 3.3: AI Parsing Service Integration ← **DONE** ✓
 - Story 3.4: Manual Override of Parsed Data ← **DONE** ✓
 - Story 3.5: Split Logic - Equal Split ← **DONE** ✓
-- Story 3.6: Split Logic - Unequal Custom Amounts ← **READY FOR DEV**
+- Story 3.6: Split Logic - Unequal Custom Amounts ← **DONE** ✓
 - Story 3.7: Split Logic - Percentage Split ← **NEXT**
 - Story 3.8: Exclude Members from Expense
 
@@ -129,6 +129,13 @@ cd cleardues/frontend && npm run build
 - Add `onError` toast notifications to all mutations
 - Add reverse relationships to User model for efficient queries
 - GroupMember type has both `id` (join table) and `user_id` (actual user) - use `user_id` consistently
+
+**Key Pattern from Story 3.6 Code Review:**
+- Safe UUID conversion: Check `isinstance(user_id, UUID)` before converting (handles both string and UUID objects)
+- Frontend NaN handling: `parseFloat("")` returns `NaN`, validate with `!isNaN(value)` before using
+- Null safety: Use explicit null checks for optional fields (e.g., `member.full_name ? ... : ...`)
+- Loading states: Disable buttons during mutations with `isPending` flag and show "Saving..." text
+- State reset: Clear custom amounts when switching away from unequal split to avoid stale data
 
 ---
 
