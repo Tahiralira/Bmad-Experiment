@@ -92,6 +92,20 @@ class UnequalSplitRequest(SQLModel):
     splits: list[UnequalSplitItem]
 
 
+class PercentageSplitItem(SQLModel):
+    """Individual split item for percentage split request."""
+
+    user_id: uuid.UUID
+    percentage: Decimal = Field(ge=0, le=100, decimal_places=2)
+
+
+class PercentageSplitRequest(SQLModel):
+    """Request schema for creating percentage split."""
+
+    type: str = "percentage"
+    splits: list[PercentageSplitItem]
+
+
 class ExpenseSplitPublic(SQLModel):
     """Response schema for expense split."""
 

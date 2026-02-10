@@ -15,6 +15,7 @@ from app.features.expenses.models import (
     ExpenseSplitResponse,
     EqualSplitRequest,
     UnequalSplitRequest,
+    PercentageSplitRequest,
 )
 from app.features.groups.models import ExpenseGroup, GroupMember
 
@@ -73,8 +74,8 @@ def update_expense_split(
     """
     Update expense split configuration.
 
-    Supports equal split (Story 3.5) and unequal split (Story 3.6).
-    Future stories will add percentage and shares splits.
+    Supports equal split (Story 3.5), unequal split (Story 3.6), and percentage split (Story 3.7).
+    Future stories will add shares split.
 
     Only the expense creator can modify the split.
     Deletes existing splits and creates new ones based on the split configuration.
@@ -172,11 +173,69 @@ def update_expense_split(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    # Handle percentage split (Story 3.7)
+    elif split_type == "percentage":
+        # Validate splits provided
+        splits_data_raw = split_data.get("splits", [])
+        if not splits_data_raw:
+            raise HTTPException(
+                status_code=400,
+                detail="Percentage split requires 'splits' array with user_id and percentage"
+            )
+
+        # Validate each split item has required fields and valid percentages
+        for idx, split_item in enumerate(splits_data_raw):
+            if "user_id" not in split_item:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Split item at index {idx} missing 'user_id'"
+                )
+            if "percentage" not in split_item:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Split item at index {idx} missing 'percentage'"
+                )
+            # Validate percentage is in valid range [0, 100]
+            try:
+                percentage = Decimal(str(split_item["percentage"]))
+                if percentage < 0 or percentage > 100:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Percentage must be between 0 and 100 (got {percentage} at index {idx})"
+                    )
+            except (ValueError, TypeError) as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid percentage at index {idx}: {str(e)}"
+                )
+
+        # Validate all users in splits are group members
+        statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
+        group_members = session.exec(statement).all()
+        group_member_user_ids = {m.user_id for m in group_members}
+
+        for idx, split_item in enumerate(splits_data_raw):
+            user_id = uuid.UUID(str(split_item["user_id"]))
+            if user_id not in group_member_user_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"User at index {idx} is not a member of this group"
+                )
+
+        # Calculate and validate percentage split
+        try:
+            splits_data = expense_service.calculate_percentage_split(
+                total_amount=expense.amount,
+                splits=splits_data_raw
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     # Unimplemented split types
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Split type '{split_type}' not yet implemented. Use 'equal' or 'unequal'."
+            detail=f"Split type '{split_type}' not yet implemented. Use 'equal', 'unequal', or 'percentage'."
         )
 
     # Delete existing splits for this expense

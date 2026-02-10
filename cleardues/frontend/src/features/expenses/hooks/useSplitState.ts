@@ -26,11 +26,17 @@ interface UseSplitStateReturn {
   customAmounts: Map<string, number>
   /** Set custom amount for a member (unequal split) */
   setCustomAmount: (memberId: string, amount: number) => void
+  /** Percentages for percentage split (user_id -> percentage) */
+  percentages: Map<string, number>
+  /** Set percentage for a member (percentage split) */
+  setPercentage: (memberId: string, percentage: number) => void
+  /** Total percentage (for percentage split validation) */
+  totalPercentage: number
   /** Calculated split amounts (user_id -> amount) */
   splitAmounts: Map<string, number>
   /** Remaining amount to allocate (unequal split only) */
   remainingAmount: number
-  /** Whether the split configuration is valid (>= 2 members, amounts match total for unequal) */
+  /** Whether the split configuration is valid (>= 2 members, amounts match total for unequal/percentage) */
   isValid: boolean
   /** Validation error message */
   validationError: string | null
@@ -43,11 +49,12 @@ interface UseSplitStateReturn {
  * - Split type (equal, unequal, percentage, shares)
  * - Member exclusions
  * - Custom amounts for unequal splits
+ * - Percentages for percentage splits
  * - Split amount calculations
- * - Validation (min 2 members, amounts match total for unequal)
+ * - Validation (min 2 members, amounts match total for unequal/percentage)
  *
- * Implements equal split (Story 3.5) and unequal split (Story 3.6).
- * Future stories will add percentage and shares split calculations.
+ * Implements equal split (Story 3.5), unequal split (Story 3.6), and percentage split (Story 3.7).
+ * Future stories will add shares split calculation.
  *
  * @example
  * ```tsx
@@ -58,6 +65,9 @@ interface UseSplitStateReturn {
  *   toggleMemberExclusion,
  *   customAmounts,
  *   setCustomAmount,
+ *   percentages,
+ *   setPercentage,
+ *   totalPercentage,
  *   splitAmounts,
  *   remainingAmount,
  *   isValid,
@@ -78,13 +88,18 @@ export function useSplitState({
   const [splitType, setSplitType] = useState<SplitType>(initialType)
   const [excludedMembers, setExcludedMembers] = useState<Set<string>>(new Set())
   const [customAmounts, setCustomAmounts] = useState<Map<string, number>>(new Map())
+  const [percentages, setPercentages] = useState<Map<string, number>>(new Map())
 
-  // Enhanced setSplitType that clears state when switching away from unequal split
+  // Enhanced setSplitType that clears state when switching away from unequal/percentage split
   const handleSetSplitType = useCallback((newType: SplitType) => {
     setSplitType((prevType) => {
       // If switching from unequal to anything else, clear custom amounts
       if (prevType === "unequal" && newType !== "unequal") {
         setCustomAmounts(new Map())
+      }
+      // If switching from percentage to anything else, clear percentages
+      if (prevType === "percentage" && newType !== "percentage") {
+        setPercentages(new Map())
       }
       return newType
     })
@@ -130,9 +145,32 @@ export function useSplitState({
       return new Map(customAmounts)
     }
 
+    if (splitType === "percentage") {
+      // For percentage split, calculate amounts from percentages
+      const amounts = new Map<string, number>()
+      let runningTotal = 0
+
+      // Convert percentages Map to array and sort by user_id for consistent ordering
+      const percentageEntries = Array.from(percentages.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+
+      percentageEntries.forEach(([memberId, percentage], index) => {
+        let amount: number
+        if (index === percentageEntries.length - 1) {
+          // Last member gets remainder (to avoid rounding errors)
+          amount = Math.round((totalAmount - runningTotal) * 100) / 100
+        } else {
+          amount = Math.round((totalAmount * percentage / 100) * 100) / 100
+          runningTotal += amount
+        }
+        amounts.set(memberId, amount)
+      })
+
+      return amounts
+    }
+
     // Other split types will be implemented in future stories
     return new Map<string, number>()
-  }, [splitType, totalAmount, members, excludedMembers, payerId, customAmounts])
+  }, [splitType, totalAmount, members, excludedMembers, payerId, customAmounts, percentages])
 
   // Calculate remaining amount for unequal split
   const remainingAmount = useMemo(() => {
@@ -147,12 +185,33 @@ export function useSplitState({
     return totalAmount - allocated
   }, [splitType, customAmounts, totalAmount])
 
+  // Calculate total percentage for percentage split
+  const totalPercentage = useMemo(() => {
+    if (splitType !== "percentage") {
+      return 0
+    }
+
+    return Array.from(percentages.values()).reduce((sum, pct) => sum + pct, 0)
+  }, [splitType, percentages])
   // Set custom amount for a member (unequal split)
   const setCustomAmount = useCallback((memberId: string, amount: number) => {
     setCustomAmounts((prev) => {
       const newMap = new Map(prev)
       if (amount > 0) {
         newMap.set(memberId, amount)
+      } else {
+        newMap.delete(memberId)
+      }
+      return newMap
+    })
+  }, [])
+
+  // Set percentage for a member (percentage split)
+  const setPercentage = useCallback((memberId: string, percentage: number) => {
+    setPercentages((prev) => {
+      const newMap = new Map(prev)
+      if (percentage >= 0 && percentage <= 100) {
+        newMap.set(memberId, percentage)
       } else {
         newMap.delete(memberId)
       }
@@ -204,11 +263,30 @@ export function useSplitState({
       }
     }
 
+    // Additional validation for percentage split (Story 3.7)
+    if (splitType === "percentage") {
+      // All members must have percentages
+      if (percentages.size !== members.length) {
+        return {
+          isValid: false,
+          validationError: "All members must have a percentage specified",
+        }
+      }
+
+      // Percentages must sum to 100 (matches backend error message format)
+      if (Math.abs(totalPercentage - 100) >= 0.01) {
+        return {
+          isValid: false,
+          validationError: `Split percentages (${totalPercentage.toFixed(1)}%) must equal 100%`,
+        }
+      }
+    }
+
     return {
       isValid: true,
       validationError: null,
     }
-  }, [members.length, excludedMembers.size, splitType, customAmounts.size, remainingAmount, totalAmount])
+  }, [members.length, excludedMembers.size, splitType, customAmounts.size, remainingAmount, totalAmount, percentages.size, totalPercentage])
 
   return {
     splitType,
@@ -217,6 +295,9 @@ export function useSplitState({
     toggleMemberExclusion,
     customAmounts,
     setCustomAmount,
+    percentages,
+    setPercentage,
+    totalPercentage,
     splitAmounts,
     remainingAmount,
     isValid,

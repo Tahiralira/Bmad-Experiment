@@ -3,7 +3,7 @@ import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
 import { OpenAPI } from "@/shared/api"
-import type { Expense, ExpenseCreate, EqualSplitRequest, UnequalSplitRequest, ExpenseSplitResponse } from "../types"
+import type { Expense, ExpenseCreate, EqualSplitRequest, UnequalSplitRequest, PercentageSplitRequest, ExpenseSplitResponse } from "../types"
 
 async function createExpense(data: ExpenseCreate): Promise<Expense> {
   return __request(OpenAPI, {
@@ -34,7 +34,7 @@ export function useCreateExpense() {
 
 async function updateExpenseSplit(
   expenseId: string,
-  data: EqualSplitRequest | UnequalSplitRequest
+  data: EqualSplitRequest | UnequalSplitRequest | PercentageSplitRequest
 ): Promise<ExpenseSplitResponse> {
   return __request(OpenAPI, {
     method: "PUT",
@@ -54,7 +54,7 @@ export function useUpdateExpenseSplit() {
   return useMutation<
     ExpenseSplitResponse,
     Error,
-    { expenseId: string; data: EqualSplitRequest | UnequalSplitRequest }
+    { expenseId: string; data: EqualSplitRequest | UnequalSplitRequest | PercentageSplitRequest }
   >({
     mutationFn: ({ expenseId, data }) => updateExpenseSplit(expenseId, data),
     onSuccess: () => {

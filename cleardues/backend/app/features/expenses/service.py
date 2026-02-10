@@ -164,3 +164,66 @@ def calculate_unequal_split(
         })
 
     return validated_splits
+
+
+def calculate_percentage_split(
+    total_amount: Decimal,
+    splits: list[dict],
+) -> list[dict]:
+    """
+    Validate percentages and calculate split amounts.
+
+    Args:
+        total_amount: Total expense amount
+        splits: List of {user_id, percentage} specified by user
+
+    Returns:
+        List of {user_id, amount_owed} calculated
+
+    Raises:
+        ValueError: If percentages don't sum to 100
+
+    Examples:
+        >>> calculate_percentage_split(
+        ...     Decimal("100.00"),
+        ...     [{"user_id": id1, "percentage": 60.0}, {"user_id": id2, "percentage": 40.0}]
+        ... )
+        [{'user_id': id1, 'amount_owed': Decimal('60.00')}, ...]
+    """
+    # Sum all provided percentages
+    total_percentage = sum(Decimal(str(s["percentage"])) for s in splits)
+
+    # Validate sum equals 100 (within 0.01 tolerance)
+    if abs(total_percentage - Decimal("100")) > Decimal("0.01"):
+        raise ValueError(
+            f"Split percentages ({total_percentage}%) must equal 100%"
+        )
+
+    # Calculate amounts and handle rounding
+    calculated_splits = []
+    remaining_amount = total_amount
+
+    for i, split_item in enumerate(splits):
+        # Safe UUID conversion - handle both string and UUID objects
+        user_id_val = split_item["user_id"]
+        if isinstance(user_id_val, uuid.UUID):
+            user_id = user_id_val
+        else:
+            user_id = uuid.UUID(str(user_id_val))
+
+        percentage = Decimal(str(split_item["percentage"]))
+
+        # Calculate amount for this member
+        if i == len(splits) - 1:
+            # Last member gets remainder (to avoid rounding errors)
+            amount_owed = remaining_amount
+        else:
+            amount_owed = (total_amount * percentage / Decimal("100")).quantize(Decimal("0.01"))
+            remaining_amount -= amount_owed
+
+        calculated_splits.append({
+            "user_id": user_id,
+            "amount_owed": amount_owed
+        })
+
+    return calculated_splits

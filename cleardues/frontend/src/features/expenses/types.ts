@@ -87,8 +87,6 @@ export const SPLIT_TYPE_OPTIONS: SplitTypeOption[] = [
     type: "percentage",
     label: "Percentage",
     icon: "percent",
-    disabled: true,
-    disabledReason: "Coming in Story 3.7",
   },
   {
     type: "shares",
@@ -123,6 +121,16 @@ export interface UnequalSplitItem {
 export interface UnequalSplitRequest {
   type: "unequal"
   splits: UnequalSplitItem[]
+}
+
+export interface PercentageSplitItem {
+  user_id: string
+  percentage: number
+}
+
+export interface PercentageSplitRequest {
+  type: "percentage"
+  splits: PercentageSplitItem[]
 }
 
 export interface ExpenseSplitResponse {

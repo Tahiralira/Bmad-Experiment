@@ -15,6 +15,7 @@ import { SplitPicker } from "./SplitPicker"
 import { MemberChips } from "./MemberChips"
 import { SplitAmountsDisplay } from "./SplitAmountsDisplay"
 import { UnequalSplitInputs } from "./UnequalSplitInputs"
+import { PercentageSplitInputs } from "./PercentageSplitInputs"
 import type { ExpenseParseResponse, ExpenseCreate, GroupMember as GroupMemberType } from "../types"
 
 interface EditableExpensePreviewProps {
@@ -101,6 +102,8 @@ export function EditableExpensePreview({
     toggleMemberExclusion,
     customAmounts,
     setCustomAmount,
+    percentages,
+    setPercentage,
     splitAmounts,
     isValid: isSplitValid,
     validationError: splitValidationError,
@@ -120,6 +123,19 @@ export function EditableExpensePreview({
       })
     }
   }, [splitType, splitAmounts, customAmounts.size, setCustomAmount])
+
+  // Pre-populate percentages when switching from equal to percentage split (Story 3.7)
+  useEffect(() => {
+    if (splitType === "percentage" && percentages.size === 0 && members.length > 0) {
+      // User just switched to percentage split and no percentages are set yet
+      // Pre-populate with equal distribution: 100 / num_members
+      const equalPercentage = 100 / members.length
+      members.forEach((member) => {
+        const memberId = member.user_id || member.id
+        setPercentage(memberId, equalPercentage)
+      })
+    }
+  }, [splitType, percentages.size, members.length, members, setPercentage])
 
   // Split mutation for saving split configuration (Story 3.5)
   const updateSplitMutation = useUpdateExpenseSplit()
@@ -165,6 +181,7 @@ export function EditableExpensePreview({
         let splitData:
           | { type: "equal"; excluded_user_ids: string[] }
           | { type: "unequal"; splits: Array<{ user_id: string; amount: number }> }
+          | { type: "percentage"; splits: Array<{ user_id: string; percentage: number }> }
 
         if (splitType === "equal") {
           splitData = {
@@ -178,6 +195,15 @@ export function EditableExpensePreview({
             splits: Array.from(customAmounts.entries()).map(([user_id, amount]) => ({
               user_id,
               amount,
+            })),
+          }
+        } else if (splitType === "percentage") {
+          // Convert percentages Map to array format
+          splitData = {
+            type: "percentage",
+            splits: Array.from(percentages.entries()).map(([user_id, percentage]) => ({
+              user_id,
+              percentage,
             })),
           }
         } else {
@@ -407,6 +433,16 @@ export function EditableExpensePreview({
                 customAmounts={customAmounts}
                 totalAmount={Number(editedData.amount)}
                 onAmountChange={setCustomAmount}
+              />
+            )}
+
+            {/* Percentage Split Inputs (Story 3.7) */}
+            {splitType === "percentage" && (
+              <PercentageSplitInputs
+                members={members}
+                percentages={percentages}
+                totalAmount={Number(editedData.amount)}
+                onPercentageChange={setPercentage}
               />
             )}
 

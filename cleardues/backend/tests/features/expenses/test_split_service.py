@@ -5,7 +5,7 @@ import uuid
 import pytest
 from sqlmodel import Session
 
-from app.features.expenses.service import calculate_equal_split, calculate_unequal_split
+from app.features.expenses.service import calculate_equal_split, calculate_unequal_split, calculate_percentage_split
 from app.features.expenses.models import Expense, ExpenseSplit
 from app.features.groups.models import GroupMember
 
@@ -362,8 +362,8 @@ class TestExpenseSplitAPI:
         )
         expense = expense_response.json()
 
-        # Try unimplemented split type
-        split_data = {"type": "percentage", "excluded_user_ids": []}
+        # Try unimplemented split type (shares - not yet implemented)
+        split_data = {"type": "shares", "splits": []}
         split_response = client.put(
             f"{settings.API_V1_STR}/expenses/{expense['id']}/split",
             headers=normal_user_token_headers,
@@ -371,3 +371,167 @@ class TestExpenseSplitAPI:
         )
         assert split_response.status_code == 400
         assert "not yet implemented" in split_response.json()["detail"]
+
+
+class TestCalculatePercentageSplit:
+    """Test suite for calculate_percentage_split function (Story 3.7)"""
+
+    def test_percentage_split_exact_100(self):
+        """Test percentage split when percentages sum to 100 exactly"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "percentage": 60.0},
+            {"user_id": user2, "percentage": 40.0}
+        ]
+
+        result = calculate_percentage_split(
+            total_amount=Decimal("100.00"),
+            splits=splits
+        )
+
+        assert len(result) == 2
+        assert result[0]["amount_owed"] == Decimal("60.00")
+        assert result[1]["amount_owed"] == Decimal("40.00")
+
+    def test_percentage_split_three_way_split(self):
+        """Test three-way percentage split (33.33%, 33.33%, 33.34%)"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+        user3 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "percentage": 33.33},
+            {"user_id": user2, "percentage": 33.33},
+            {"user_id": user3, "percentage": 33.34}
+        ]
+
+        result = calculate_percentage_split(
+            total_amount=Decimal("100.00"),
+            splits=splits
+        )
+
+        assert len(result) == 3
+        # Verify amounts sum to total (last member gets rounding remainder)
+        total = sum(s["amount_owed"] for s in result)
+        assert total == Decimal("100.00")
+
+    def test_percentage_split_under_100(self):
+        """Test that percentages under 100 raise error"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "percentage": 50.0},
+            {"user_id": user2, "percentage": 30.0}
+        ]  # Total = 80, should be 100
+
+        with pytest.raises(ValueError, match="must equal 100%"):
+            calculate_percentage_split(
+                total_amount=Decimal("100.00"),
+                splits=splits
+            )
+
+    def test_percentage_split_over_100(self):
+        """Test that percentages over 100 raise error"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "percentage": 70.0},
+            {"user_id": user2, "percentage": 50.0}
+        ]  # Total = 120, should be 100
+
+        with pytest.raises(ValueError, match="must equal 100%"):
+            calculate_percentage_split(
+                total_amount=Decimal("100.00"),
+                splits=splits
+            )
+
+    def test_percentage_split_rounding(self):
+        """Test that rounding is handled correctly with last member getting remainder"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+        user3 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "percentage": 33.33},
+            {"user_id": user2, "percentage": 33.33},
+            {"user_id": user3, "percentage": 33.34}
+        ]  # Total = 100.00
+
+        result = calculate_percentage_split(
+            total_amount=Decimal("100.00"),
+            splits=splits
+        )
+
+        # Verify amounts sum to total (last member gets remainder)
+        total_calculated = sum(s["amount_owed"] for s in result)
+        assert total_calculated == Decimal("100.00")
+
+    def test_percentage_split_with_decimals(self):
+        """Test percentage split with decimal percentages"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "percentage": 66.67},
+            {"user_id": user2, "percentage": 33.33}
+        ]
+
+        result = calculate_percentage_split(
+            total_amount=Decimal("100.00"),
+            splits=splits
+        )
+
+        assert len(result) == 2
+        # Verify total sums correctly
+        total = sum(s["amount_owed"] for s in result)
+        assert total == Decimal("100.00")
+
+    def test_percentage_split_large_amounts(self):
+        """Test percentage split with large amounts"""
+        user1 = str(uuid.uuid4())
+        user2 = str(uuid.uuid4())
+
+        splits = [
+            {"user_id": user1, "percentage": 60.0},
+            {"user_id": user2, "percentage": 40.0}
+        ]
+
+        result = calculate_percentage_split(
+            total_amount=Decimal("999999.99"),
+            splits=splits
+        )
+
+        assert len(result) == 2
+        assert result[0]["amount_owed"] == Decimal("599999.99")
+        assert result[1]["amount_owed"] == Decimal("400000.00")
+
+        # Verify total
+        total = sum(s["amount_owed"] for s in result)
+        assert total == Decimal("999999.99")
+
+    def test_percentage_split_uuid_conversion(self):
+        """Test that function handles both string and UUID objects"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+
+        # Mix string and UUID objects
+        splits = [
+            {"user_id": str(user1), "percentage": 50.0},
+            {"user_id": user2, "percentage": 50.0}  # UUID object
+        ]
+
+        result = calculate_percentage_split(
+            total_amount=Decimal("100.00"),
+            splits=splits
+        )
+
+        assert len(result) == 2
+        # Both should be UUID objects in result
+        assert isinstance(result[0]["user_id"], uuid.UUID)
+        assert isinstance(result[1]["user_id"], uuid.UUID)
+        assert result[0]["user_id"] == user1
+        assert result[1]["user_id"] == user2
