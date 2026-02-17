@@ -1,6 +1,6 @@
 # Story 3.8: Exclude Members from Expense
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

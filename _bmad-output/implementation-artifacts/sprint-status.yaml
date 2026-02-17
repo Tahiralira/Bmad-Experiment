@@ -92,7 +92,7 @@ development_status:
   3-5-split-logic-equal-split: done
   3-6-split-logic-unequal-custom-amounts: done
   3-7-split-logic-percentage-split: done
-  3-8-exclude-members-from-expense: review
+  3-8-exclude-members-from-expense: done
   epic-3-retrospective: optional
 
   # Epic 4: Trust & Confirmation Workflow (5 stories)
