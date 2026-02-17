@@ -196,6 +196,7 @@ export function EditableExpensePreview({
               user_id,
               amount,
             })),
+            excluded_user_ids: Array.from(excludedMembers),
           }
         } else if (splitType === "percentage") {
           // Convert percentages Map to array format
@@ -205,6 +206,7 @@ export function EditableExpensePreview({
               user_id,
               percentage,
             })),
+            excluded_user_ids: Array.from(excludedMembers),
           }
         } else {
           // Other split types not yet implemented
@@ -426,34 +428,34 @@ export function EditableExpensePreview({
               onSelectType={setSplitType}
             />
 
-            {/* Unequal Split Amount Inputs (Story 3.6) */}
+            {/* Unequal Split Amount Inputs (Story 3.6 + 3.8 exclusions) */}
             {splitType === "unequal" && (
               <UnequalSplitInputs
                 members={members}
+                excludedMembers={excludedMembers}
                 customAmounts={customAmounts}
                 totalAmount={Number(editedData.amount)}
                 onAmountChange={setCustomAmount}
               />
             )}
 
-            {/* Percentage Split Inputs (Story 3.7) */}
+            {/* Percentage Split Inputs (Story 3.7 + 3.8 exclusions) */}
             {splitType === "percentage" && (
               <PercentageSplitInputs
                 members={members}
+                excludedMembers={excludedMembers}
                 percentages={percentages}
                 totalAmount={Number(editedData.amount)}
                 onPercentageChange={setPercentage}
               />
             )}
 
-            {/* Member Chips (only show for equal split) */}
-            {splitType === "equal" && (
-              <MemberChips
-                members={members}
-                includedMembers={excludedMembers}
-                onToggleInclude={toggleMemberExclusion}
-              />
-            )}
+            {/* Member Chips (shown for all split types) */}
+            <MemberChips
+              members={members}
+              includedMembers={excludedMembers}
+              onToggleInclude={toggleMemberExclusion}
+            />
 
             {/* Split Amounts Display */}
             <SplitAmountsDisplay

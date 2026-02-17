@@ -8,6 +8,8 @@ import type { GroupMember } from "../types"
 interface UnequalSplitInputsProps {
   /** Group members to allocate amounts to */
   members: GroupMember[]
+  /** Members excluded from the split (Story 3.8) */
+  excludedMembers: Set<string>
   /** Current custom amounts for each member (user_id -> amount) */
   customAmounts: Map<string, number>
   /** Total expense amount to allocate */
@@ -43,12 +45,16 @@ interface UnequalSplitInputsProps {
  */
 export function UnequalSplitInputs({
   members,
+  excludedMembers,
   customAmounts,
   totalAmount,
   onAmountChange,
 }: UnequalSplitInputsProps) {
-  // Calculate remaining amount
-  const remaining = members.reduce((sum, member) => {
+  // Filter out excluded members (Story 3.8)
+  const includedMembers = members.filter((m) => !excludedMembers.has(m.user_id))
+
+  // Calculate remaining amount (only for included members)
+  const remaining = includedMembers.reduce((sum, member) => {
     const amount = customAmounts.get(member.user_id) || 0
     return sum - amount
   }, totalAmount)
@@ -74,9 +80,9 @@ export function UnequalSplitInputs({
         />
       </div>
 
-      {/* Member amount inputs */}
+      {/* Member amount inputs (only included members shown) */}
       <div className="space-y-2">
-        {members.map((member) => {
+        {includedMembers.map((member) => {
           // Safe fallback: use email if full_name is null, fallback to "??"
           const initials = member.full_name
             ? member.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)

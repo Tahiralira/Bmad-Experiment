@@ -9,6 +9,8 @@ import type { GroupMember } from "../types"
 interface PercentageSplitInputsProps {
   /** Group members to allocate percentages to */
   members: GroupMember[]
+  /** Members excluded from the split (Story 3.8) */
+  excludedMembers: Set<string>
   /** Current percentages for each member (user_id -> percentage) */
   percentages: Map<string, number>
   /** Total expense amount for calculating amounts */
@@ -45,12 +47,18 @@ interface PercentageSplitInputsProps {
  */
 export function PercentageSplitInputs({
   members,
+  excludedMembers,
   percentages,
   totalAmount,
   onPercentageChange,
 }: PercentageSplitInputsProps) {
-  // Calculate total percentage
-  const totalPercentage = Array.from(percentages.values()).reduce((sum, pct) => sum + pct, 0)
+  // Filter out excluded members (Story 3.8)
+  const includedMembers = members.filter((m) => !excludedMembers.has(m.user_id))
+
+  // Calculate total percentage (only for included members)
+  const totalPercentage = Array.from(percentages.entries())
+    .filter(([memberId]) => !excludedMembers.has(memberId))
+    .reduce((sum, [, pct]) => sum + pct, 0)
 
   const isExactMatch = Math.abs(totalPercentage - 100) < 0.01
   const isOverAllocated = totalPercentage > 100
@@ -82,9 +90,9 @@ export function PercentageSplitInputs({
         />
       </div>
 
-      {/* Member percentage inputs */}
+      {/* Member percentage inputs (only included members shown) */}
       <div className="space-y-2">
-        {members.map((member) => {
+        {includedMembers.map((member) => {
           // Safe fallback: use email if full_name is null, fallback to "??"
           const initials = member.full_name
             ? member.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
