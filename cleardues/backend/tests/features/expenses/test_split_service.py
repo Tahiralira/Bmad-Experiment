@@ -268,6 +268,85 @@ class TestCalculateUnequalSplit:
         total = sum(s["amount_owed"] for s in result)
         assert total == Decimal("999999.99")
 
+    def test_unequal_split_with_excluded_members(self):
+        """Test unequal split with member exclusions"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+        user3 = uuid.uuid4()  # Will be excluded
+        user4 = uuid.uuid4()
+
+        member_ids = [user1, user2, user3, user4]
+
+        splits = [
+            {"user_id": str(user1), "amount": 50.00},
+            {"user_id": str(user2), "amount": 30.00},
+            {"user_id": str(user3), "amount": 10.00},  # This will be excluded
+            {"user_id": str(user4), "amount": 10.00}
+        ]
+
+        result = calculate_unequal_split(
+            total_amount=Decimal("100.00"),
+            splits=splits,
+            member_ids=member_ids,
+            excluded_user_ids=[user3]
+        )
+
+        # Only 3 members included (user3 excluded)
+        assert len(result) == 3
+        # Verify user3 is not in result
+        assert user3 not in [s["user_id"] for s in result]
+        # Verify amounts are correct for included members
+        assert result[0]["amount_owed"] == Decimal("50.00")
+        assert result[1]["amount_owed"] == Decimal("30.00")
+        assert result[2]["amount_owed"] == Decimal("20.00")  # user4 amount adjusted
+
+    def test_unequal_split_exclude_all_but_one_raises_error(self):
+        """Test that excluding all but one member raises error"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+        user3 = uuid.uuid4()
+
+        member_ids = [user1, user2, user3]
+
+        splits = [
+            {"user_id": str(user1), "amount": 100.00},
+            {"user_id": str(user2), "amount": 0.00},  # Will be excluded
+            {"user_id": str(user3), "amount": 0.00}   # Will be excluded
+        ]
+
+        with pytest.raises(ValueError, match="At least 2 members must be included"):
+            calculate_unequal_split(
+                total_amount=Decimal("100.00"),
+                splits=splits,
+                member_ids=member_ids,
+                excluded_user_ids=[user2, user3]
+            )
+
+    def test_unequal_split_with_string_uuids(self):
+        """Test unequal split handles string UUIDs correctly with exclusions"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+        user3 = uuid.uuid4()
+
+        member_ids = [user1, user2, user3]
+
+        splits = [
+            {"user_id": str(user1), "amount": 60.00},
+            {"user_id": str(user2), "amount": 40.00},
+            {"user_id": str(user3), "amount": 0.00}  # Excluded
+        ]
+
+        result = calculate_unequal_split(
+            total_amount=Decimal("100.00"),
+            splits=splits,
+            member_ids=member_ids,
+            excluded_user_ids=[user3]
+        )
+
+        assert len(result) == 2
+        # All user_ids should be UUID objects
+        assert all(isinstance(s["user_id"], uuid.UUID) for s in result)
+
 
 class TestExpenseSplitAPI:
     """Test suite for expense split API endpoint"""
@@ -535,3 +614,142 @@ class TestCalculatePercentageSplit:
         assert isinstance(result[1]["user_id"], uuid.UUID)
         assert result[0]["user_id"] == user1
         assert result[1]["user_id"] == user2
+
+    def test_percentage_split_with_excluded_members(self):
+        """Test percentage split with member exclusions"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+        user3 = uuid.uuid4()  # Will be excluded
+
+        member_ids = [user1, user2, user3]
+
+        splits = [
+            {"user_id": str(user1), "percentage": 60.0},
+            {"user_id": str(user2), "percentage": 40.0},
+            {"user_id": str(user3), "percentage": 0.0}  # Will be excluded
+        ]
+
+        result = calculate_percentage_split(
+            total_amount=Decimal("100.00"),
+            splits=splits,
+            member_ids=member_ids,
+            excluded_user_ids=[user3]
+        )
+
+        # Only 2 members included (user3 excluded)
+        assert len(result) == 2
+        # Verify user3 is not in result
+        assert user3 not in [s["user_id"] for s in result]
+        # Verify amounts are correct
+        assert result[0]["amount_owed"] == Decimal("60.00")
+        assert result[1]["amount_owed"] == Decimal("40.00")
+
+    def test_percentage_split_exclude_all_but_one_raises_error(self):
+        """Test that excluding all but one member raises error"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+        user3 = uuid.uuid4()
+
+        member_ids = [user1, user2, user3]
+
+        splits = [
+            {"user_id": str(user1), "percentage": 100.0},
+            {"user_id": str(user2), "percentage": 0.0},  # Excluded
+            {"user_id": str(user3), "percentage": 0.0}   # Excluded
+        ]
+
+        with pytest.raises(ValueError, match="At least 2 members must be included"):
+            calculate_percentage_split(
+                total_amount=Decimal("100.00"),
+                splits=splits,
+                member_ids=member_ids,
+                excluded_user_ids=[user2, user3]
+            )
+
+    def test_percentage_split_three_way_with_exclusion(self):
+        """Test three-way percentage split with one member excluded"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+        user3 = uuid.uuid4()
+        user4 = uuid.uuid4()  # Will be excluded
+
+        member_ids = [user1, user2, user3, user4]
+
+        splits = [
+            {"user_id": str(user1), "percentage": 50.0},
+            {"user_id": str(user2), "percentage": 30.0},
+            {"user_id": str(user3), "percentage": 20.0},
+            {"user_id": str(user4), "percentage": 0.0}  # Excluded
+        ]
+
+        result = calculate_percentage_split(
+            total_amount=Decimal("100.00"),
+            splits=splits,
+            member_ids=member_ids,
+            excluded_user_ids=[user4]
+        )
+
+        # Only 3 members included
+        assert len(result) == 3
+        # Verify user4 is not in result
+        assert user4 not in [s["user_id"] for s in result]
+        # Verify total sums to 100
+        total = sum(s["amount_owed"] for s in result)
+        assert total == Decimal("100.00")
+
+
+class TestFilterIncludedMembers:
+    """Test suite for filter_included_members helper function"""
+
+    def test_filter_no_exclusions(self):
+        """Test filtering with no exclusions returns all members"""
+        member_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
+
+        result = calculate_equal_split(
+            total_amount=Decimal("100.00"),
+            member_ids=member_ids,
+            excluded_user_ids=[]
+        )
+
+        assert len(result) == 3
+
+    def test_filter_with_exclusions(self):
+        """Test filtering excludes specified members"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+        user3 = uuid.uuid4()
+
+        result = calculate_equal_split(
+            total_amount=Decimal("100.00"),
+            member_ids=[user1, user2, user3],
+            excluded_user_ids=[user2]
+        )
+
+        assert len(result) == 2
+        assert user2 not in [s["user_id"] for s in result]
+
+    def test_filter_minimum_members_required(self):
+        """Test that filter requires at least 2 members"""
+        user1 = uuid.uuid4()
+        user2 = uuid.uuid4()
+        user3 = uuid.uuid4()
+
+        with pytest.raises(ValueError, match="At least 2 members must be included"):
+            calculate_equal_split(
+                total_amount=Decimal("100.00"),
+                member_ids=[user1, user2, user3],
+                excluded_user_ids=[user2, user3]  # Only user1 left
+            )
+
+    def test_filter_empty_exclusion_list(self):
+        """Test that empty exclusion list is handled correctly"""
+        member_ids = [uuid.uuid4(), uuid.uuid4()]
+
+        # None instead of empty list
+        result = calculate_equal_split(
+            total_amount=Decimal("100.00"),
+            member_ids=member_ids,
+            excluded_user_ids=None
+        )
+
+        assert len(result) == 2

@@ -140,18 +140,26 @@ export function useSplitState({
     }
 
     if (splitType === "unequal") {
-      // For unequal split, return the custom amounts directly
-      // The user will set these via setCustomAmount
-      return new Map(customAmounts)
+      // For unequal split, filter out excluded members from custom amounts
+      const amounts = new Map<string, number>()
+      customAmounts.forEach((amount, memberId) => {
+        // Only include amounts for non-excluded members
+        if (!excludedMembers.has(memberId)) {
+          amounts.set(memberId, amount)
+        }
+      })
+      return amounts
     }
 
     if (splitType === "percentage") {
-      // For percentage split, calculate amounts from percentages
+      // For percentage split, filter out excluded members from percentages
       const amounts = new Map<string, number>()
       let runningTotal = 0
 
-      // Convert percentages Map to array and sort by user_id for consistent ordering
-      const percentageEntries = Array.from(percentages.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+      // Convert percentages Map to array, filter excluded members, and sort by user_id
+      const percentageEntries = Array.from(percentages.entries())
+        .filter(([memberId]) => !excludedMembers.has(memberId))
+        .sort((a, b) => a[0].localeCompare(b[0]))
 
       percentageEntries.forEach(([memberId, percentage], index) => {
         let amount: number
@@ -172,27 +180,37 @@ export function useSplitState({
     return new Map<string, number>()
   }, [splitType, totalAmount, members, excludedMembers, payerId, customAmounts, percentages])
 
-  // Calculate remaining amount for unequal split
+  // Calculate remaining amount for unequal split (only counts included members)
   const remainingAmount = useMemo(() => {
     if (splitType !== "unequal") {
       return 0
     }
 
-    const allocated = Array.from(customAmounts.values()).reduce(
-      (sum, amount) => sum + amount,
-      0
-    )
+    // Sum amounts only for included (non-excluded) members
+    let allocated = 0
+    customAmounts.forEach((amount, memberId) => {
+      if (!excludedMembers.has(memberId)) {
+        allocated += amount
+      }
+    })
     return totalAmount - allocated
-  }, [splitType, customAmounts, totalAmount])
+  }, [splitType, customAmounts, totalAmount, excludedMembers])
 
-  // Calculate total percentage for percentage split
+  // Calculate total percentage for percentage split (only counts included members)
   const totalPercentage = useMemo(() => {
     if (splitType !== "percentage") {
       return 0
     }
 
-    return Array.from(percentages.values()).reduce((sum, pct) => sum + pct, 0)
-  }, [splitType, percentages])
+    // Sum percentages only for included (non-excluded) members
+    let total = 0
+    percentages.forEach((percentage, memberId) => {
+      if (!excludedMembers.has(memberId)) {
+        total += percentage
+      }
+    })
+    return total
+  }, [splitType, percentages, excludedMembers])
   // Set custom amount for a member (unequal split)
   const setCustomAmount = useCallback((memberId: string, amount: number) => {
     setCustomAmounts((prev) => {
@@ -245,11 +263,17 @@ export function useSplitState({
 
     // Additional validation for unequal split
     if (splitType === "unequal") {
-      // All members must have amounts
-      if (customAmounts.size !== members.length) {
+      // Count included members
+      const includedCount = members.filter(m => {
+        const memberId = m.user_id || m.id
+        return !excludedMembers.has(memberId)
+      }).length
+
+      // All included members must have amounts
+      if (customAmounts.size < includedCount) {
         return {
           isValid: false,
-          validationError: "All members must have an amount specified",
+          validationError: "All included members must have an amount specified",
         }
       }
 
@@ -265,11 +289,21 @@ export function useSplitState({
 
     // Additional validation for percentage split (Story 3.7)
     if (splitType === "percentage") {
-      // All members must have percentages
-      if (percentages.size !== members.length) {
+      // Count included members
+      const includedCount = members.filter(m => {
+        const memberId = m.user_id || m.id
+        return !excludedMembers.has(memberId)
+      }).length
+
+      // All included members must have percentages
+      const includedPercentageCount = Array.from(percentages.entries())
+        .filter(([memberId]) => !excludedMembers.has(memberId))
+        .length
+
+      if (includedPercentageCount !== includedCount) {
         return {
           isValid: false,
-          validationError: "All members must have a percentage specified",
+          validationError: "All included members must have a percentage specified",
         }
       }
 

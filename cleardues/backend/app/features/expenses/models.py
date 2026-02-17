@@ -90,6 +90,7 @@ class UnequalSplitRequest(SQLModel):
 
     type: str = "unequal"
     splits: list[UnequalSplitItem]
+    excluded_user_ids: list[uuid.UUID] = []
 
 
 class PercentageSplitItem(SQLModel):
@@ -104,6 +105,7 @@ class PercentageSplitRequest(SQLModel):
 
     type: str = "percentage"
     splits: list[PercentageSplitItem]
+    excluded_user_ids: list[uuid.UUID] = []
 
 
 class ExpenseSplitPublic(SQLModel):
@@ -124,6 +126,7 @@ class ExpenseSplitResponse(SQLModel):
     expense_id: uuid.UUID
     split_type: str
     splits: list[SplitItem]
+    excluded_user_ids: list[uuid.UUID] = []
 
 
 # === Database Models ===

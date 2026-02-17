@@ -1,6 +1,7 @@
 # Expenses feature service - CRUD operations for expenses
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
+from typing import List
 
 from sqlmodel import Session, select
 
@@ -16,6 +17,35 @@ def is_user_group_member(
         GroupMember.user_id == user_id, GroupMember.group_id == group_id
     )
     return session.exec(statement).first() is not None
+
+
+def filter_included_members(
+    member_ids: List[uuid.UUID],
+    excluded_user_ids: List[uuid.UUID] | None = None
+) -> List[uuid.UUID]:
+    """
+    Filter out excluded members from the member list.
+
+    Args:
+        member_ids: All group member IDs
+        excluded_user_ids: Members to exclude
+
+    Returns:
+        List of included member IDs
+
+    Raises:
+        ValueError: If fewer than 2 members remain after exclusion
+    """
+    excluded_set = set(excluded_user_ids) if excluded_user_ids else set()
+    included_members = [m for m in member_ids if m not in excluded_set]
+
+    if len(included_members) < 2:
+        raise ValueError(
+            "At least 2 members must be included in the split. "
+            f"Currently have {len(included_members)} member(s)."
+        )
+
+    return included_members
 
 
 def create_expense(
@@ -79,14 +109,8 @@ def calculate_equal_split(
         >>> calculate_equal_split(Decimal("100.00"), [id1, id2, id3])
         [{'user_id': id1, 'amount_owed': Decimal('33.34')}, ...]  # payer absorbs 0.01
     """
-    excluded_user_ids = excluded_user_ids or []
-
-    # Filter out excluded members
-    included_members = [m for m in member_ids if m not in excluded_user_ids]
-
-    # Validate minimum members
-    if len(included_members) < 2:
-        raise ValueError("At least 2 members required for split")
+    # Filter out excluded members and validate minimum
+    included_members = filter_included_members(member_ids, excluded_user_ids)
 
     # Calculate equal amount
     amount_per_person = total_amount / Decimal(len(included_members))
@@ -117,6 +141,8 @@ def calculate_equal_split(
 def calculate_unequal_split(
     total_amount: Decimal,
     splits: list[dict],
+    member_ids: list[uuid.UUID] | None = None,
+    excluded_user_ids: list[uuid.UUID] | None = None,
 ) -> list[dict]:
     """
     Validate and prepare unequal split amounts.
@@ -124,12 +150,14 @@ def calculate_unequal_split(
     Args:
         total_amount: Total expense amount
         splits: List of {user_id, amount} specified by user
+        member_ids: All group member IDs (for validation)
+        excluded_user_ids: Members to exclude from split (optional)
 
     Returns:
         List of {user_id, amount_owed} validated
 
     Raises:
-        ValueError: If amounts don't sum to total
+        ValueError: If amounts don't sum to total or fewer than 2 members after exclusion
 
     Examples:
         >>> calculate_unequal_split(
@@ -138,8 +166,23 @@ def calculate_unequal_split(
         ... )
         [{'user_id': id1, 'amount_owed': Decimal('50.00')}, ...]
     """
+    excluded_set = set(excluded_user_ids) if excluded_user_ids else set()
+
+    # Filter out excluded members from splits
+    included_splits = [
+        s for s in splits
+        if uuid.UUID(str(s["user_id"])) not in excluded_set
+    ]
+
+    # Validate minimum members
+    if len(included_splits) < 2:
+        raise ValueError(
+            f"At least 2 members must be included in the split. "
+            f"Currently have {len(included_splits)} member(s)."
+        )
+
     # Sum all provided amounts
-    provided_total = sum(Decimal(str(s["amount"])) for s in splits)
+    provided_total = sum(Decimal(str(s["amount"])) for s in included_splits)
 
     # Validate sum matches total (within 0.01 tolerance for floating point)
     if abs(provided_total - total_amount) > Decimal("0.01"):
@@ -150,7 +193,7 @@ def calculate_unequal_split(
 
     # Return validated splits with safe UUID conversion
     validated_splits = []
-    for split_item in splits:
+    for split_item in included_splits:
         # Safe UUID conversion - handle both string and UUID objects
         user_id_val = split_item["user_id"]
         if isinstance(user_id_val, uuid.UUID):
@@ -169,6 +212,8 @@ def calculate_unequal_split(
 def calculate_percentage_split(
     total_amount: Decimal,
     splits: list[dict],
+    member_ids: list[uuid.UUID] | None = None,
+    excluded_user_ids: list[uuid.UUID] | None = None,
 ) -> list[dict]:
     """
     Validate percentages and calculate split amounts.
@@ -176,12 +221,14 @@ def calculate_percentage_split(
     Args:
         total_amount: Total expense amount
         splits: List of {user_id, percentage} specified by user
+        member_ids: All group member IDs (for validation)
+        excluded_user_ids: Members to exclude from split (optional)
 
     Returns:
         List of {user_id, amount_owed} calculated
 
     Raises:
-        ValueError: If percentages don't sum to 100
+        ValueError: If percentages don't sum to 100 or fewer than 2 members after exclusion
 
     Examples:
         >>> calculate_percentage_split(
@@ -190,8 +237,23 @@ def calculate_percentage_split(
         ... )
         [{'user_id': id1, 'amount_owed': Decimal('60.00')}, ...]
     """
+    excluded_set = set(excluded_user_ids) if excluded_user_ids else set()
+
+    # Filter out excluded members from splits
+    included_splits = [
+        s for s in splits
+        if uuid.UUID(str(s["user_id"])) not in excluded_set
+    ]
+
+    # Validate minimum members
+    if len(included_splits) < 2:
+        raise ValueError(
+            f"At least 2 members must be included in the split. "
+            f"Currently have {len(included_splits)} member(s)."
+        )
+
     # Sum all provided percentages
-    total_percentage = sum(Decimal(str(s["percentage"])) for s in splits)
+    total_percentage = sum(Decimal(str(s["percentage"])) for s in included_splits)
 
     # Validate sum equals 100 (within 0.01 tolerance)
     if abs(total_percentage - Decimal("100")) > Decimal("0.01"):
@@ -203,7 +265,7 @@ def calculate_percentage_split(
     calculated_splits = []
     remaining_amount = total_amount
 
-    for i, split_item in enumerate(splits):
+    for i, split_item in enumerate(included_splits):
         # Safe UUID conversion - handle both string and UUID objects
         user_id_val = split_item["user_id"]
         if isinstance(user_id_val, uuid.UUID):
@@ -214,7 +276,7 @@ def calculate_percentage_split(
         percentage = Decimal(str(split_item["percentage"]))
 
         # Calculate amount for this member
-        if i == len(splits) - 1:
+        if i == len(included_splits) - 1:
             # Last member gets remainder (to avoid rounding errors)
             amount_owed = remaining_amount
         else:

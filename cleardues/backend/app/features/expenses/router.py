@@ -117,6 +117,23 @@ def update_expense_split(
 
     # Handle unequal split
     elif split_type == "unequal":
+        # Get excluded user IDs
+        excluded_user_ids = split_data.get("excluded_user_ids", [])
+
+        # Validate excluded members are group members
+        if excluded_user_ids:
+            statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
+            group_members = session.exec(statement).all()
+            group_member_user_ids = {m.user_id for m in group_members}
+
+            for excluded_id in excluded_user_ids:
+                excluded_uuid = uuid.UUID(str(excluded_id))
+                if excluded_uuid not in group_member_user_ids:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Excluded user {excluded_id} is not a member of this group"
+                    )
+
         # Validate splits provided
         splits_data_raw = split_data.get("splits", [])
         if not splits_data_raw:
@@ -151,9 +168,12 @@ def update_expense_split(
                     detail=f"Invalid amount at index {idx}: {str(e)}"
                 )
 
-        # Validate all users in splits are group members
+        # Get group members for validation and calculation
         statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
         group_members = session.exec(statement).all()
+        member_ids = [m.user_id for m in group_members]
+
+        # Validate all users in splits are group members
         group_member_user_ids = {m.user_id for m in group_members}
 
         for idx, split_item in enumerate(splits_data_raw):
@@ -168,13 +188,32 @@ def update_expense_split(
         try:
             splits_data = expense_service.calculate_unequal_split(
                 total_amount=expense.amount,
-                splits=splits_data_raw
+                splits=splits_data_raw,
+                member_ids=member_ids,
+                excluded_user_ids=excluded_user_ids
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
     # Handle percentage split (Story 3.7)
     elif split_type == "percentage":
+        # Get excluded user IDs
+        excluded_user_ids = split_data.get("excluded_user_ids", [])
+
+        # Validate excluded members are group members
+        if excluded_user_ids:
+            statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
+            group_members = session.exec(statement).all()
+            group_member_user_ids = {m.user_id for m in group_members}
+
+            for excluded_id in excluded_user_ids:
+                excluded_uuid = uuid.UUID(str(excluded_id))
+                if excluded_uuid not in group_member_user_ids:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Excluded user {excluded_id} is not a member of this group"
+                    )
+
         # Validate splits provided
         splits_data_raw = split_data.get("splits", [])
         if not splits_data_raw:
@@ -209,9 +248,12 @@ def update_expense_split(
                     detail=f"Invalid percentage at index {idx}: {str(e)}"
                 )
 
-        # Validate all users in splits are group members
+        # Get group members for validation and calculation
         statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
         group_members = session.exec(statement).all()
+        member_ids = [m.user_id for m in group_members]
+
+        # Validate all users in splits are group members
         group_member_user_ids = {m.user_id for m in group_members}
 
         for idx, split_item in enumerate(splits_data_raw):
@@ -226,7 +268,9 @@ def update_expense_split(
         try:
             splits_data = expense_service.calculate_percentage_split(
                 total_amount=expense.amount,
-                splits=splits_data_raw
+                splits=splits_data_raw,
+                member_ids=member_ids,
+                excluded_user_ids=excluded_user_ids
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -254,11 +298,15 @@ def update_expense_split(
 
     session.commit()
 
+    # Get excluded_user_ids from request for all split types
+    excluded_user_ids = split_data.get("excluded_user_ids", [])
+
     return ExpenseSplitResponse(
         expense_id=expense_id,
         split_type=split_type,
         splits=[{
             "user_id": s["user_id"],
             "amount_owed": s["amount_owed"],
-        } for s in splits_data]
+        } for s in splits_data],
+        excluded_user_ids=excluded_user_ids
     )

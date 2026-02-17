@@ -121,6 +121,7 @@ export interface UnequalSplitItem {
 export interface UnequalSplitRequest {
   type: "unequal"
   splits: UnequalSplitItem[]
+  excluded_user_ids: string[]
 }
 
 export interface PercentageSplitItem {
@@ -131,12 +132,14 @@ export interface PercentageSplitItem {
 export interface PercentageSplitRequest {
   type: "percentage"
   splits: PercentageSplitItem[]
+  excluded_user_ids: string[]
 }
 
 export interface ExpenseSplitResponse {
   expense_id: string
   split_type: string
   splits: SplitItem[]
+  excluded_user_ids: string[]
 }
 
 // Group member type for split functionality
