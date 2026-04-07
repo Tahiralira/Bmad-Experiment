@@ -5,7 +5,7 @@ from typing import List
 
 from sqlmodel import Session, select
 
-from app.features.expenses.models import Expense, ExpenseCreate, ExpenseStatus
+from app.features.expenses.models import Expense, ExpenseCreate, ExpenseStatus, ExpenseUpdate
 from app.features.groups.models import GroupMember
 
 
@@ -75,6 +75,29 @@ def create_expense(
         created_by=current_user_id,
         status=ExpenseStatus.DRAFT,
     )
+    session.add(expense)
+    session.commit()
+    session.refresh(expense)
+    return expense
+
+
+def update_expense(
+    session: Session, expense: Expense, update_data: ExpenseUpdate
+) -> Expense:
+    """
+    Update expense fields. Only updates provided (non-None) fields.
+
+    Args:
+        session: Database session
+        expense: Existing Expense object to update
+        update_data: ExpenseUpdate with optional fields
+
+    Returns:
+        Updated Expense object
+    """
+    update_dict = update_data.model_dump(exclude_unset=True)
+    for field, value in update_dict.items():
+        setattr(expense, field, value)
     session.add(expense)
     session.commit()
     session.refresh(expense)

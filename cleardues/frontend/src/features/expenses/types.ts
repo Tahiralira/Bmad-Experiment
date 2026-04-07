@@ -23,6 +23,12 @@ export interface ExpenseCreate {
   payer_id?: string // Defaults to current user if not provided
 }
 
+export interface ExpenseUpdate {
+  amount?: number
+  description?: string
+  payer_id?: string
+}
+
 export interface ExpensesResponse {
   data: Expense[]
   count: number

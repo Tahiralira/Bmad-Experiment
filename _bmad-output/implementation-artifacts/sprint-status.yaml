@@ -75,16 +75,27 @@ development_status:
   epic-2-5-retrospective: done
 
   # Epic 3: Smart Expense Entry (8 stories) - UX-Enhanced
-  # NOTE: Epic 3 is PAUSED - Story 3.1 done, but waiting for Epic 2.5 to complete.
-  # Resume Epic 3 after Epic 2.5 is done (UX foundation required for remaining stories).
-  #
+  # ✅ Epic 3 COMPLETE! All 8 stories done.
   # ⚠️ BEFORE PRODUCTION: Must complete Epic 2.5 retrospective action items:
   #   - Remove console.log placeholders (RETRO-2.5-H1) - 1 hour
   #   - Fix group detail navigation (RETRO-2.5-H2) - 3-4 hours
   #   - Add automated testing infrastructure (RETRO-2.5-H3) - 4-6 hours setup
   # See: technical-debt-log.yaml > retrospective_actions > epic_2_5_retrospective
+  # ⚠️ BEFORE PRODUCTION: Must complete Epic 3 retrospective action items (see epic-3-retro-2026-02-17.md):
+  #   - Complete Story 3.8 implementation (2-3 hours)
+  #   - Resolve Story 3.6 status inconsistency (30 minutes)
+  #   - Remove console.log placeholders (1 hour)
+  #   - Fix group detail navigation (3-4 hours)
+  #   - Add Security to AC Checklist from Epic 1 (2 hours)
+  #   - Define "Minimum Viable Story" Standard from Epic 2 (2-3 hours)
+  #   - Clarify Code Review Scoping from Epic 2 (1 hour)
+  #   - Document Docker Volume Workaround from Epic 1 (30 minutes)
+  #   - Setup Automated Testing Infrastructure (4-6 hours) - BLOCKER for Epic 4
+  #   - Document Story Status Workflow (this week)
+  #   - Create Deferred Task Tracking Standard (this week)
+  # Total prep effort: ~15-17 hours before Epic 4 can start
   #
-  epic-3: in-progress
+  epic-3: done
   3-1-create-expense-model-and-basic-entry: done
   3-2-natural-language-input-interface: done
   3-3-ai-parsing-service-integration: done
@@ -93,11 +104,14 @@ development_status:
   3-6-split-logic-unequal-custom-amounts: done
   3-7-split-logic-percentage-split: done
   3-8-exclude-members-from-expense: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # Epic 4: Trust & Confirmation Workflow (5 stories)
-  epic-4: backlog
-  4-1-creator-only-edit-restriction: backlog
+  # Epic 3 retrospective action items completed. Epic 4 started.
+  # See: epic-4-preparation-action-items.md for preparation status
+  #
+  epic-4: in-progress
+  4-1-creator-only-edit-restriction: done
   4-2-expense-confirmation-workflow: backlog
   4-3-finalize-expense-after-all-confirmations: backlog
   4-4-immutable-audit-log-for-all-actions: backlog

@@ -278,8 +278,7 @@ export function SmartInputModal({
   const handleSubmit = React.useCallback(() => {
     if (inputValue.trim()) {
       // Placeholder for Epic 3: submit expense to AI parsing
-      // For now, just clear the input and show console log
-      console.log("Expense input:", inputValue)
+      // For now, just clear the input
       setInputValue("")
     }
   }, [inputValue])

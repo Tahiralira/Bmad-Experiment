@@ -13,9 +13,8 @@ from app.features.expenses.models import (
     ExpensePublic,
     ExpenseSplit,
     ExpenseSplitResponse,
-    EqualSplitRequest,
-    UnequalSplitRequest,
-    PercentageSplitRequest,
+    ExpenseStatus,
+    ExpenseUpdate,
 )
 from app.features.groups.models import ExpenseGroup, GroupMember
 
@@ -63,6 +62,50 @@ def create_expense(
     return ExpensePublic.model_validate(expense)
 
 
+@router.patch("/{expense_id}", response_model=ExpensePublic)
+def edit_expense(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    expense_id: uuid.UUID,
+    expense_in: ExpenseUpdate,
+) -> ExpensePublic:
+    """
+    Edit expense details. Only the creator can edit.
+    Only DRAFT and PENDING_CONFIRMATION expenses can be edited.
+    """
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Authorization: Only creator can edit
+    if expense.created_by != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the expense creator can edit this expense",
+        )
+
+    # Status guard: Confirmed/settled expenses are immutable
+    if expense.status in (ExpenseStatus.CONFIRMED, ExpenseStatus.SETTLED):
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot edit a confirmed or settled expense",
+        )
+
+    # If payer_id changed, verify new payer is group member
+    if expense_in.payer_id is not None and expense_in.payer_id != expense.payer_id:
+        if not expense_service.is_user_group_member(
+            session, expense_in.payer_id, expense.group_id
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Payer must be a member of the group",
+            )
+
+    expense = expense_service.update_expense(session, expense, expense_in)
+    return ExpensePublic.model_validate(expense)
+
+
 @router.put("/{expense_id}/split", response_model=ExpenseSplitResponse)
 def update_expense_split(
     *,
@@ -75,10 +118,8 @@ def update_expense_split(
     Update expense split configuration.
 
     Supports equal split (Story 3.5), unequal split (Story 3.6), and percentage split (Story 3.7).
-    Future stories will add shares split.
-
     Only the expense creator can modify the split.
-    Deletes existing splits and creates new ones based on the split configuration.
+    Confirmed/settled expenses cannot have splits modified.
     """
     # Get expense
     expense = session.get(Expense, expense_id)
@@ -87,11 +128,18 @@ def update_expense_split(
             status_code=404, detail="Expense not found"
         )
 
+    # Status guard: Cannot modify splits on confirmed/settled expenses (Story 4.1)
+    if expense.status in (ExpenseStatus.CONFIRMED, ExpenseStatus.SETTLED):
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot modify splits on a confirmed or settled expense",
+        )
+
     # Verify user is expense creator
     if expense.created_by != current_user.id:
         raise HTTPException(
             status_code=403,
-            detail="Only expense creator can modify split"
+            detail="Only expense creator can modify split",
         )
 
     # Get split type
@@ -131,7 +179,7 @@ def update_expense_split(
                 if excluded_uuid not in group_member_user_ids:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Excluded user {excluded_id} is not a member of this group"
+                        detail=f"Excluded user {excluded_id} is not a member of this group",
                     )
 
         # Validate splits provided
@@ -139,7 +187,7 @@ def update_expense_split(
         if not splits_data_raw:
             raise HTTPException(
                 status_code=400,
-                detail="Unequal split requires 'splits' array with user_id and amount"
+                detail="Unequal split requires 'splits' array with user_id and amount",
             )
 
         # Validate each split item has required fields and valid amounts
@@ -147,12 +195,12 @@ def update_expense_split(
             if "user_id" not in split_item:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Split item at index {idx} missing 'user_id'"
+                    detail=f"Split item at index {idx} missing 'user_id'",
                 )
             if "amount" not in split_item:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Split item at index {idx} missing 'amount'"
+                    detail=f"Split item at index {idx} missing 'amount'",
                 )
             # Validate amount is positive
             try:
@@ -160,12 +208,12 @@ def update_expense_split(
                 if amount <= 0:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Split amount must be greater than 0 (got {amount} at index {idx})"
+                        detail=f"Split amount must be greater than 0 (got {amount} at index {idx})",
                     )
             except (ValueError, TypeError) as e:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid amount at index {idx}: {str(e)}"
+                    detail=f"Invalid amount at index {idx}: {str(e)}",
                 )
 
         # Get group members for validation and calculation
@@ -181,7 +229,7 @@ def update_expense_split(
             if user_id not in group_member_user_ids:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"User at index {idx} is not a member of this group"
+                    detail=f"User at index {idx} is not a member of this group",
                 )
 
         # Calculate and validate unequal split
@@ -190,7 +238,7 @@ def update_expense_split(
                 total_amount=expense.amount,
                 splits=splits_data_raw,
                 member_ids=member_ids,
-                excluded_user_ids=excluded_user_ids
+                excluded_user_ids=excluded_user_ids,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -211,7 +259,7 @@ def update_expense_split(
                 if excluded_uuid not in group_member_user_ids:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Excluded user {excluded_id} is not a member of this group"
+                        detail=f"Excluded user {excluded_id} is not a member of this group",
                     )
 
         # Validate splits provided
@@ -219,7 +267,7 @@ def update_expense_split(
         if not splits_data_raw:
             raise HTTPException(
                 status_code=400,
-                detail="Percentage split requires 'splits' array with user_id and percentage"
+                detail="Percentage split requires 'splits' array with user_id and percentage",
             )
 
         # Validate each split item has required fields and valid percentages
@@ -227,12 +275,12 @@ def update_expense_split(
             if "user_id" not in split_item:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Split item at index {idx} missing 'user_id'"
+                    detail=f"Split item at index {idx} missing 'user_id'",
                 )
             if "percentage" not in split_item:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Split item at index {idx} missing 'percentage'"
+                    detail=f"Split item at index {idx} missing 'percentage'",
                 )
             # Validate percentage is in valid range [0, 100]
             try:
@@ -240,12 +288,12 @@ def update_expense_split(
                 if percentage < 0 or percentage > 100:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Percentage must be between 0 and 100 (got {percentage} at index {idx})"
+                        detail=f"Percentage must be between 0 and 100 (got {percentage} at index {idx})",
                     )
             except (ValueError, TypeError) as e:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid percentage at index {idx}: {str(e)}"
+                    detail=f"Invalid percentage at index {idx}: {str(e)}",
                 )
 
         # Get group members for validation and calculation
@@ -261,7 +309,7 @@ def update_expense_split(
             if user_id not in group_member_user_ids:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"User at index {idx} is not a member of this group"
+                    detail=f"User at index {idx} is not a member of this group",
                 )
 
         # Calculate and validate percentage split
@@ -270,7 +318,7 @@ def update_expense_split(
                 total_amount=expense.amount,
                 splits=splits_data_raw,
                 member_ids=member_ids,
-                excluded_user_ids=excluded_user_ids
+                excluded_user_ids=excluded_user_ids,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -279,7 +327,7 @@ def update_expense_split(
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Split type '{split_type}' not yet implemented. Use 'equal', 'unequal', or 'percentage'."
+            detail=f"Split type '{split_type}' not yet implemented. Use 'equal', 'unequal', or 'percentage'.",
         )
 
     # Delete existing splits for this expense
@@ -308,5 +356,5 @@ def update_expense_split(
             "user_id": s["user_id"],
             "amount_owed": s["amount_owed"],
         } for s in splits_data],
-        excluded_user_ids=excluded_user_ids
+        excluded_user_ids=excluded_user_ids,
     )

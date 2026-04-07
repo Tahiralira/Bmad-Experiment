@@ -40,6 +40,14 @@ class ExpenseCreate(SQLModel):
     payer_id: uuid.UUID | None = None  # Defaults to current user if not provided
 
 
+class ExpenseUpdate(SQLModel):
+    """Request schema for updating an expense. All fields optional (partial update)."""
+
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
+    description: str | None = Field(default=None, min_length=1, max_length=500)
+    payer_id: uuid.UUID | None = None
+
+
 class ExpensePublic(SQLModel):
     """Response schema for an expense."""
 

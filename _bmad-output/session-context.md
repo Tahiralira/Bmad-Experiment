@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-02-09 (Story 3.6 ready-for-dev - Split Logic Unequal Custom Amounts)
+**Last Updated:** 2026-04-07 (Story 4.1 done - Creator-Only Edit Restriction)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -12,13 +12,14 @@
 | Epic 1: Auth | DONE | 6/6 |
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
-| Epic 3: Expenses | **IN-PROGRESS** | 6/8 (3.1-3.6 done) |
-| Epic 4-7 | BACKLOG | 0/18 |
+| Epic 3: Expenses | **DONE** | 8/8 ✅ |
+| **Epic 4: Trust & Confirmation** | **IN-PROGRESS** | 1/5 (4.1 done) |
+| Epic 5-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 22 stories completed, 24 remaining (Story 3.7 next)
+**Current Progress:** 26 stories completed, 19 remaining (Story 4.2 next)
 
-> **IMPORTANT:** Story 3.6 (Unequal Custom Amounts) COMPLETE! ✅ Users can now specify custom amounts for each group member with real-time validation feedback. Code review fixed 7 HIGH and 3 MEDIUM issues (UUID conversion, validation, NaN handling, loading states).
+> **IMPORTANT:** Story 4.1 (Creator-Only Edit Restriction) COMPLETE! ✅ Only expense creators can edit expenses; confirmed/settled expenses are immutable. Backend authorization + frontend UI restrictions implemented.
 
 ---
 
@@ -114,15 +115,18 @@ cd cleardues/frontend && npm run build
 
 ## Next Up
 
-**Epic 3: Smart Expense Entry** 🔄 IN-PROGRESS (6/8 done, 2 remaining)
-- Story 3.1: Create Expense Model and Basic Entry ← **DONE** ✓
-- Story 3.2: Natural Language Input Interface ← **DONE** ✓
-- Story 3.3: AI Parsing Service Integration ← **DONE** ✓
-- Story 3.4: Manual Override of Parsed Data ← **DONE** ✓
-- Story 3.5: Split Logic - Equal Split ← **DONE** ✓
-- Story 3.6: Split Logic - Unequal Custom Amounts ← **DONE** ✓
-- Story 3.7: Split Logic - Percentage Split ← **NEXT**
-- Story 3.8: Exclude Members from Expense
+**Epic 4: Trust & Confirmation Workflow** 🔄 IN-PROGRESS (1/5 done, 4 remaining)
+- Story 4.1: Creator-Only Edit Restriction ← **DONE** ✓
+- Story 4.2: Expense Confirmation Workflow ← **NEXT**
+- Story 4.3: Finalize Expense After All Confirmations
+- Story 4.4: Immutable Audit Log for All Actions
+- Story 4.5: Activity Feed Display
+
+**Key Pattern from Story 4.1 Code Review:**
+- Dev Agent Record must MUST be filled (agent model, completion notes, file list)
+- Auto-confirm countdown should check `canEdit` before starting
+- Testing Evidence section should document manual verification
+- Story file should be committed to git (not left untracked)
 
 **Key Pattern from Story 3.5 Code Review:**
 - Always call split mutation AFTER expense creation (needs expense ID from response)

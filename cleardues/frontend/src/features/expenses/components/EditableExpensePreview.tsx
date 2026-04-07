@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import * as SelectPrimitive from "@radix-ui/react-select"
-import { Check, ChevronDown, ChevronUp, Settings } from "lucide-react"
+import * as TooltipPrimitive from "@radix-ui/react-tooltip"
+import { Check, ChevronDown, ChevronUp, Settings, Lock } from "lucide-react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
@@ -16,10 +17,10 @@ import { MemberChips } from "./MemberChips"
 import { SplitAmountsDisplay } from "./SplitAmountsDisplay"
 import { UnequalSplitInputs } from "./UnequalSplitInputs"
 import { PercentageSplitInputs } from "./PercentageSplitInputs"
-import type { ExpenseParseResponse, ExpenseCreate, GroupMember as GroupMemberType } from "../types"
+import type { ExpenseParseResponse, ExpenseCreate, Expense, GroupMember as GroupMemberType } from "../types"
 
 interface EditableExpensePreviewProps {
-  /** Parsed expense data from AI */
+  /** Parsed expense data from AI (for new expenses) */
   parsedData: ExpenseParseResponse
   /** Called when expense is confirmed/saved - returns the created expense ID */
   onConfirm: (editedData: ExpenseCreate) => Promise<string>
@@ -31,6 +32,10 @@ interface EditableExpensePreviewProps {
   autoConfirmEnabled?: boolean
   /** Additional className */
   className?: string
+  /** Story 4.1: Current user ID for creator check (optional - for editing existing expenses) */
+  currentUserId?: string
+  /** Story 4.1: Existing expense being edited (optional - enables creator check) */
+  expense?: Expense
 }
 
 /**
@@ -65,8 +70,28 @@ export function EditableExpensePreview({
   groupId,
   autoConfirmEnabled = false,
   className,
+  currentUserId,
+  expense,
 }: EditableExpensePreviewProps) {
   const shouldReduceMotion = useReducedMotion()
+
+  // Fetch group members for payer selection and split
+  const { data: membersData, isLoading: isLoadingMembers } = useGroupMembers(groupId)
+  const members: GroupMemberType[] = membersData?.members || []
+
+  // Story 4.1: Creator check for editing existing expenses
+  // If expense is provided, check if current user is the creator
+  const isCreator = expense && currentUserId ? expense.created_by === currentUserId : true
+  const isEditableStatus = expense
+    ? !["confirmed", "settled"].includes(expense.status)
+    : true
+  const canEdit = isCreator && isEditableStatus
+
+  // Get creator name for tooltip
+  const creatorMember = expense
+    ? members.find((m) => m.user_id === expense.created_by)
+    : null
+  const creatorName = creatorMember?.full_name || creatorMember?.email || "the creator"
 
   // Edit state management
   const {
@@ -86,10 +111,6 @@ export function EditableExpensePreview({
       duration: 3000,
       onCountdownComplete: () => handleConfirm(),
     })
-
-  // Fetch group members for payer selection and split
-  const { data: membersData, isLoading: isLoadingMembers } = useGroupMembers(groupId)
-  const members: GroupMemberType[] = membersData?.members || []
 
   // Complex edit mode state
   const [isComplexMode, setIsComplexMode] = useState(false)
@@ -143,12 +164,13 @@ export function EditableExpensePreview({
   // Local state for tracking user interaction
   const [hasInteracted, setHasInteracted] = useState(false)
 
-  // Start countdown on mount (if enabled)
+  // Start countdown on mount (if enabled and user can edit)
+  // Story 4.1: Don't auto-confirm if user is not creator or expense is locked
   useEffect(() => {
-    if (autoConfirmEnabled && !hasInteracted && !isComplexMode) {
+    if (autoConfirmEnabled && !hasInteracted && !isComplexMode && canEdit) {
       startCountdown()
     }
-  }, [autoConfirmEnabled, hasInteracted, isComplexMode, startCountdown])
+  }, [autoConfirmEnabled, hasInteracted, isComplexMode, startCountdown, canEdit])
 
   // Cancel countdown and mark interacted on any user action
   const handleUserInteraction = () => {
@@ -180,8 +202,8 @@ export function EditableExpensePreview({
         // Prepare split data based on split type
         let splitData:
           | { type: "equal"; excluded_user_ids: string[] }
-          | { type: "unequal"; splits: Array<{ user_id: string; amount: number }> }
-          | { type: "percentage"; splits: Array<{ user_id: string; percentage: number }> }
+          | { type: "unequal"; splits: Array<{ user_id: string; amount: number }>; excluded_user_ids: string[] }
+          | { type: "percentage"; splits: Array<{ user_id: string; percentage: number }>; excluded_user_ids: string[] }
 
         if (splitType === "equal") {
           splitData = {
@@ -484,6 +506,18 @@ export function EditableExpensePreview({
         )}
       </AnimatePresence>
 
+      {/* Story 4.1: Non-creator restriction notice */}
+      {!canEdit && expense && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-warning-subtle border border-warning">
+          <Lock className="w-4 h-4 text-warning" />
+          <p className="text-xs text-warning">
+            {!isCreator
+              ? `Only ${creatorName} can edit this expense`
+              : `This expense cannot be edited (status: ${expense.status})`}
+          </p>
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex gap-2 mt-2">
         <button
@@ -502,28 +536,44 @@ export function EditableExpensePreview({
           Discard
         </button>
 
-        <button
-          type="button"
-          onClick={handleConfirm}
-          disabled={!isValid || updateSplitMutation.isPending}
-          className={cn(
-            "flex-1 py-2.5 px-4 rounded-md text-sm font-medium",
-            "bg-action text-white",
-            "hover:bg-action-hover",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action",
-            "transition-colors duration-150",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-            "relative overflow-hidden"
-          )}
-        >
-          {updateSplitMutation.isPending ? (
-            <span>Saving...</span>
-          ) : isCountingDown ? (
-            <span>Confirm ({countdown}s)</span>
-          ) : (
-            <span>Confirm</span>
-          )}
-        </button>
+        <TooltipPrimitive.Provider>
+          <TooltipPrimitive.Root delayDuration={0}>
+            <TooltipPrimitive.Trigger asChild>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={!canEdit || !isValid || updateSplitMutation.isPending}
+                className={cn(
+                  "flex-1 py-2.5 px-4 rounded-md text-sm font-medium",
+                  "bg-action text-white",
+                  "hover:bg-action-hover",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action",
+                  "transition-colors duration-150",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "relative overflow-hidden"
+                )}
+              >
+                {updateSplitMutation.isPending ? (
+                  <span>Saving...</span>
+                ) : isCountingDown ? (
+                  <span>Confirm ({countdown}s)</span>
+                ) : (
+                  <span>Confirm</span>
+                )}
+              </button>
+            </TooltipPrimitive.Trigger>
+            {!canEdit && (
+              <TooltipPrimitive.Content
+                side="top"
+                className="px-2 py-1 text-xs bg-surface-elevated border border-border rounded shadow-md z-50"
+              >
+                {!isCreator
+                  ? `Only ${creatorName} can edit this expense`
+                  : `This expense cannot be edited (status: ${expense?.status})`}
+              </TooltipPrimitive.Content>
+            )}
+          </TooltipPrimitive.Root>
+        </TooltipPrimitive.Provider>
       </div>
     </motion.div>
   )

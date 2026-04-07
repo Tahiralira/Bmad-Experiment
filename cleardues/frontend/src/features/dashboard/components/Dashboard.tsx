@@ -100,8 +100,6 @@ function GroupCard({ group }: GroupCardProps) {
         label: "Edit group",
         onTrigger: () => {
           // TODO: Implement edit group functionality (Epic 3)
-          // NOTE: console.log should be removed before production deployment
-          console.log("Edit group:", group.group_id)
         },
       }}
       rightAction={{
@@ -109,8 +107,6 @@ function GroupCard({ group }: GroupCardProps) {
         label: "Settle up",
         onTrigger: () => {
           // TODO: Implement settle up functionality (Epic 3)
-          // NOTE: console.log should be removed before production deployment
-          console.log("Settle group:", group.group_id)
         },
       }}
       ariaLabel={`Group ${group.group_name}`}

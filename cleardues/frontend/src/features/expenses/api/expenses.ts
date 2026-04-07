@@ -3,7 +3,47 @@ import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
 import { OpenAPI } from "@/shared/api"
-import type { Expense, ExpenseCreate, EqualSplitRequest, UnequalSplitRequest, PercentageSplitRequest, ExpenseSplitResponse } from "../types"
+import type { Expense, ExpenseCreate, ExpenseUpdate, EqualSplitRequest, UnequalSplitRequest, PercentageSplitRequest, ExpenseSplitResponse } from "../types"
+
+
+// =============================================================================
+// Story 4.1: Update Expense API
+// =============================================================================
+
+async function updateExpense(
+  expenseId: string,
+  data: ExpenseUpdate
+): Promise<Expense> {
+  return __request(OpenAPI, {
+    method: "PATCH",
+    url: `/api/v1/expenses/${expenseId}`,
+    body: data,
+    errors: {
+      401: "Unauthorized",
+      403: "Only the expense creator can edit this expense",
+      404: "Expense not found",
+    },
+  })
+}
+
+export function useUpdateExpense() {
+  const queryClient = useQueryClient()
+
+  return useMutation<Expense, Error, { expenseId: string; data: ExpenseUpdate }>({
+    mutationFn: ({ expenseId, data }) => updateExpense(expenseId, data),
+    onSuccess: (_, variables) => {
+      // Invalidate the specific expense query
+      queryClient.invalidateQueries({ queryKey: ["expenses", variables.expenseId] })
+      // Invalidate expense lists
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      // Invalidate dashboard (balances might change)
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+    },
+    onError: (error) => {
+      toast.error(`Failed to update expense: ${error.message}`)
+    },
+  })
+}
 
 async function createExpense(data: ExpenseCreate): Promise<Expense> {
   return __request(OpenAPI, {
