@@ -137,6 +137,35 @@ class ExpenseSplitResponse(SQLModel):
     excluded_user_ids: list[uuid.UUID] = []
 
 
+# === Confirmation Request/Response Schemas (Story 4.2) ===
+
+
+class ExpenseConfirmRequest(SQLModel):
+    """Request schema for confirming an expense split."""
+
+    pass  # No fields needed - expense_id comes from URL path
+
+
+class ExpenseRejectRequest(SQLModel):
+    """Request schema for rejecting an expense split."""
+
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class PendingConfirmationPublic(SQLModel):
+    """Response schema for pending confirmation with expense and split details."""
+
+    expense: ExpensePublic
+    split: "ExpenseSplitPublic"
+
+
+class ExpenseRejectResponse(SQLModel):
+    """Response schema for expense rejection."""
+
+    message: str
+    remaining_splits: int
+
+
 # === Database Models ===
 
 

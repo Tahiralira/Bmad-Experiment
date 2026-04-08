@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-04-07 (Story 4.1 done - Creator-Only Edit Restriction)
+**Last Updated:** 2026-04-08 (Story 4.2 done - Expense Confirmation Workflow)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -13,11 +13,11 @@
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
 | Epic 3: Expenses | **DONE** | 8/8 ✅ |
-| **Epic 4: Trust & Confirmation** | **IN-PROGRESS** | 1/5 (4.1 done) |
+| **Epic 4: Trust & Confirmation** | **IN-PROGRESS** | 2/5 (4.1, 4.2 done) |
 | Epic 5-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 26 stories completed, 19 remaining (Story 4.2 next)
+**Current Progress:** 27 stories completed, 18 remaining (Story 4.3 next)
 
 > **IMPORTANT:** Story 4.1 (Creator-Only Edit Restriction) COMPLETE! ✅ Only expense creators can edit expenses; confirmed/settled expenses are immutable. Backend authorization + frontend UI restrictions implemented.
 

@@ -157,7 +157,41 @@ export interface GroupMember {
   id: string
   /** The actual user UUID - use this for user identification and split calculations */
   user_id: string
-  full_name: string | null  // Backend returns null for members without names
+  full_name: string | null // Backend returns null for members without names
   email: string
   avatar_url?: string
+}
+
+// =============================================================================
+// Confirmation Types (Story 4.2 - Expense Confirmation Workflow)
+// =============================================================================
+
+export type SplitStatus = "pending" | "confirmed" | "settled"
+
+export interface ExpenseSplit {
+  id: string
+  expense_id: string
+  user_id: string
+  amount_owed: number
+  status: SplitStatus
+  confirmed_at: string | null
+  created_at: string
+}
+
+export interface ExpenseConfirmRequest {
+  // No fields needed - expense_id comes from URL
+}
+
+export interface ExpenseRejectRequest {
+  reason?: string // Optional reason for rejection
+}
+
+export interface ExpenseRejectResponse {
+  message: string
+  remaining_splits: number
+}
+
+export interface PendingConfirmation {
+  expense: Expense
+  split: ExpenseSplit
 }

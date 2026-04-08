@@ -1,6 +1,6 @@
 import * as React from "react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
-import { Bell, Home, User, Users, type LucideIcon } from "lucide-react"
+import { Bell, CheckCircle, Home, User, Users, type LucideIcon } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 
 import { cn } from "@/lib/utils"
@@ -39,6 +39,7 @@ export interface OrbitalNavProps {
 const defaultNavigationItems: NavItem[] = [
   { icon: Home, label: "Home", path: "/", ariaLabel: "Dashboard" },
   { icon: Users, label: "Groups", path: "/groups", ariaLabel: "Expense groups" },
+  { icon: CheckCircle, label: "Pending", path: "/pending", ariaLabel: "Pending confirmations" },
   { icon: Bell, label: "Activity", path: "/activity", ariaLabel: "Activity feed" },
   { icon: User, label: "Profile", path: "/settings", ariaLabel: "User settings" },
 ]

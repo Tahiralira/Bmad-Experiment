@@ -20,6 +20,7 @@ import { Route as VerifyTokenRouteImport } from './routes/verify.$token'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
+import { Route as LayoutPendingRouteImport } from './routes/_layout/pending'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutGroupsRouteImport } from './routes/_layout/groups'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
@@ -80,6 +81,11 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutPendingRoute = LayoutPendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutItemsRoute = LayoutItemsRouteImport.update({
   id: '/items',
   path: '/items',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof LayoutAdminRoute
   '/groups': typeof LayoutGroupsRoute
   '/items': typeof LayoutItemsRoute
+  '/pending': typeof LayoutPendingRoute
   '/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/admin': typeof LayoutAdminRoute
   '/groups': typeof LayoutGroupsRoute
   '/items': typeof LayoutItemsRoute
+  '/pending': typeof LayoutPendingRoute
   '/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/groups': typeof LayoutGroupsRoute
   '/_layout/items': typeof LayoutItemsRoute
+  '/_layout/pending': typeof LayoutPendingRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/groups'
     | '/items'
+    | '/pending'
     | '/settings'
     | '/auth/callback'
     | '/invite/$token'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/groups'
     | '/items'
+    | '/pending'
     | '/settings'
     | '/auth/callback'
     | '/invite/$token'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/_layout/admin'
     | '/_layout/groups'
     | '/_layout/items'
+    | '/_layout/pending'
     | '/_layout/settings'
     | '/auth/callback'
     | '/invite/$token'
@@ -305,6 +317,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSettingsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/pending': {
+      id: '/_layout/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof LayoutPendingRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/items': {
       id: '/_layout/items'
       path: '/items'
@@ -348,6 +367,7 @@ interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutGroupsRoute: typeof LayoutGroupsRoute
   LayoutItemsRoute: typeof LayoutItemsRoute
+  LayoutPendingRoute: typeof LayoutPendingRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
@@ -357,6 +377,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutGroupsRoute: LayoutGroupsRoute,
   LayoutItemsRoute: LayoutItemsRoute,
+  LayoutPendingRoute: LayoutPendingRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }

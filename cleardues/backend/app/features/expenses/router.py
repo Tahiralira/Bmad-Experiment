@@ -12,9 +12,14 @@ from app.features.expenses.models import (
     ExpenseCreate,
     ExpensePublic,
     ExpenseSplit,
+    ExpenseSplitPublic,
     ExpenseSplitResponse,
     ExpenseStatus,
     ExpenseUpdate,
+    ExpenseConfirmRequest,
+    ExpenseRejectRequest,
+    ExpenseRejectResponse,
+    PendingConfirmationPublic,
 )
 from app.features.groups.models import ExpenseGroup, GroupMember
 
@@ -358,3 +363,118 @@ def update_expense_split(
         } for s in splits_data],
         excluded_user_ids=excluded_user_ids,
     )
+
+
+# =============================================================================
+# Story 4.2: Expense Confirmation Workflow
+# =============================================================================
+
+
+@router.post("/{expense_id}/confirm", response_model=ExpenseSplitPublic)
+def confirm_expense_split_endpoint(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    expense_id: uuid.UUID,
+) -> ExpenseSplitPublic:
+    """
+    Confirm an expense split.
+
+    User must have a split in this expense to confirm.
+    Only pending_confirmation expenses can be confirmed.
+
+    Returns the updated split with status 'confirmed'.
+    """
+    # Get expense
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Status guard: Only pending_confirmation expenses can be confirmed
+    if expense.status != ExpenseStatus.PENDING_CONFIRMATION:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot confirm a finalized expense"
+        )
+
+    # Use service layer for business logic
+    split = expense_service.confirm_expense_split(session, expense_id, current_user.id)
+
+    if not split:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not involved in this expense"
+        )
+
+    return ExpenseSplitPublic.model_validate(split)
+
+
+@router.post("/{expense_id}/reject", response_model=ExpenseRejectResponse)
+def reject_expense_split_endpoint(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    expense_id: uuid.UUID,
+    reject_data: ExpenseRejectRequest | None = None,
+) -> ExpenseRejectResponse:
+    """
+    Reject an expense split.
+
+    User must have a split in this expense to reject.
+    Only pending_confirmation expenses can be rejected.
+    Rejecting removes the user's split and recalculates remaining splits.
+
+    Returns success message with remaining split count.
+    """
+    # Get expense
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Status guard
+    if expense.status != ExpenseStatus.PENDING_CONFIRMATION:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot reject a finalized expense"
+        )
+
+    # Use service layer for business logic
+    result = expense_service.reject_expense_split(session, expense_id, current_user.id)
+
+    if not result:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not involved in this expense"
+        )
+
+    return ExpenseRejectResponse(
+        message=result["message"],
+        remaining_splits=result["remaining_splits"]
+    )
+
+
+@router.get("/pending-confirmations", response_model=list[PendingConfirmationPublic])
+def get_pending_confirmations(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> list[PendingConfirmationPublic]:
+    """
+    Get all expenses pending confirmation for the current user.
+
+    Returns expenses where user has a split with status 'pending'
+    and expense status is 'pending_confirmation'.
+    """
+    # Use service layer for data retrieval
+    pending_data = expense_service.get_pending_confirmations_for_user(
+        session, current_user.id
+    )
+
+    result = []
+    for item in pending_data:
+        result.append(PendingConfirmationPublic(
+            expense=ExpensePublic.model_validate(item["expense"]),
+            split=ExpenseSplitPublic.model_validate(item["split"])
+        ))
+
+    return result

@@ -1,11 +1,19 @@
 # Expenses feature service - CRUD operations for expenses
 import uuid
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 
 from sqlmodel import Session, select
 
-from app.features.expenses.models import Expense, ExpenseCreate, ExpenseStatus, ExpenseUpdate
+from app.features.expenses.models import (
+    Expense,
+    ExpenseCreate,
+    ExpenseSplit,
+    ExpenseStatus,
+    ExpenseUpdate,
+    SplitStatus,
+)
 from app.features.groups.models import GroupMember
 
 
@@ -312,3 +320,130 @@ def calculate_percentage_split(
         })
 
     return calculated_splits
+
+
+# =============================================================================
+# Story 4.2: Expense Confirmation Workflow - Service Layer
+# =============================================================================
+
+
+def confirm_expense_split(
+    session: Session, expense_id: uuid.UUID, user_id: uuid.UUID
+) -> ExpenseSplit | None:
+    """
+    Confirm a user's expense split.
+
+    Args:
+        session: Database session
+        expense_id: Expense ID
+        user_id: User ID
+
+    Returns:
+        Updated ExpenseSplit with status confirmed
+    """
+    # Find and update the split
+    split = session.exec(
+        select(ExpenseSplit)
+        .where(ExpenseSplit.expense_id == expense_id)
+        .where(ExpenseSplit.user_id == user_id)
+    ).first()
+    )
+
+    if not split:
+        return None
+
+    # Update split status
+    split.status = SplitStatus.CONFIRMED
+    split.confirmed_at = datetime.utcnow()
+
+    session.add(split)
+    session.commit()
+    session.refresh(split)
+
+    return split
+
+
+def reject_expense_split(
+    session: Session, expense_id: uuid.UUID, user_id: uuid.UUID
+) -> dict | None:
+    """
+    Reject a user's expense split and recalculate remaining splits.
+
+    Args:
+        session: Database session
+        expense_id: Expense ID
+        user_id: User ID
+
+    Returns:
+        Dictionary with message and remaining split count
+    """
+    # Find and delete the split
+    split = session.exec(
+        select(ExpenseSplit)
+        .where(ExpenseSplit.expense_id == expense_id)
+        .where(ExpenseSplit.user_id == user_id)
+    ).first()
+    )
+
+    if not split:
+        return None
+
+    # Delete the split
+    session.delete(split)
+
+    # Get remaining splits before commit
+    remaining_statement = select(ExpenseSplit).where(
+        ExpenseSplit.expense_id == expense_id
+    )
+    remaining_splits = session.exec(remaining_statement).all()
+
+    # Recalculate remaining splits if any remain
+    if remaining_splits:
+        # Get expense to redistribute amount
+        expense = session.get(Expense, expense_id)
+        if expense:
+            # Redistribute amount equally among remaining members
+            per_person = expense.amount / len(remaining_splits)
+            for s in remaining_splits:
+                s.amount_owed = per_person
+                session.add(s)
+
+    session.commit()
+
+    return {
+        "message": "Expense rejected",
+        "remaining_splits": len(remaining_splits) if remaining_splits else 0,
+    }
+
+
+def get_pending_confirmations_for_user(
+    session: Session, user_id: uuid.UUID
+) -> list[dict]:
+    """
+    Get all expenses pending confirmation for a user.
+
+    Args:
+        session: Database session
+        user_id: User ID
+
+    Returns:
+        List of dictionaries with expense and split details
+    """
+    # Find all pending splits for user
+    splits = session.exec(
+        select(ExpenseSplit)
+        .where(ExpenseSplit.user_id == user_id)
+        .where(ExpenseSplit.status == SplitStatus.PENDING)
+    ).all()
+    )
+
+    result = []
+    for split in splits:
+        expense = session.get(Expense, split.expense_id)
+        if expense and expense.status == ExpenseStatus.PENDING_CONFIRMATION:
+            result.append({
+                "expense": expense,
+                "split": split,
+            })
+
+    return result

@@ -1,9 +1,20 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
 import { OpenAPI } from "@/shared/api"
-import type { Expense, ExpenseCreate, ExpenseUpdate, EqualSplitRequest, UnequalSplitRequest, PercentageSplitRequest, ExpenseSplitResponse } from "../types"
+import type {
+  Expense,
+  ExpenseCreate,
+  ExpenseUpdate,
+  EqualSplitRequest,
+  UnequalSplitRequest,
+  PercentageSplitRequest,
+  ExpenseSplitResponse,
+  ExpenseSplit,
+  ExpenseRejectResponse,
+  PendingConfirmation,
+} from "../types"
 
 
 // =============================================================================
@@ -109,5 +120,88 @@ export function useUpdateExpenseSplit() {
       // Show error toast to user
       toast.error(`Failed to save split: ${error.message}`)
     },
+  })
+}
+
+// =============================================================================
+// Story 4.2: Expense Confirmation Workflow
+// =============================================================================
+
+async function confirmExpense(expenseId: string): Promise<ExpenseSplit> {
+  return __request(OpenAPI, {
+    method: "POST",
+    url: `/api/v1/expenses/${expenseId}/confirm`,
+    errors: {
+      401: "Unauthorized",
+      403: "Cannot confirm this expense",
+      404: "Expense not found",
+    },
+  })
+}
+
+export function useConfirmExpense() {
+  const queryClient = useQueryClient()
+
+  return useMutation<ExpenseSplit, Error, string>({
+    mutationFn: (expenseId) => confirmExpense(expenseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pending-confirmations"] })
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      toast.success("Expense confirmed")
+    },
+    onError: (error) => {
+      toast.error(`Failed to confirm expense: ${error.message}`)
+    },
+  })
+}
+
+async function rejectExpense(
+  expenseId: string,
+  reason?: string
+): Promise<ExpenseRejectResponse> {
+  return __request(OpenAPI, {
+    method: "POST",
+    url: `/api/v1/expenses/${expenseId}/reject`,
+    body: { reason },
+    errors: {
+      401: "Unauthorized",
+      403: "Cannot reject this expense",
+      404: "Expense not found",
+    },
+  })
+}
+
+export function useRejectExpense() {
+  const queryClient = useQueryClient()
+
+  return useMutation<ExpenseRejectResponse, Error, { expenseId: string; reason?: string }>({
+    mutationFn: ({ expenseId, reason }) => rejectExpense(expenseId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pending-confirmations"] })
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      toast.success("Expense rejected")
+    },
+    onError: (error) => {
+      toast.error(`Failed to reject expense: ${error.message}`)
+    },
+  })
+}
+
+async function getPendingConfirmations(): Promise<PendingConfirmation[]> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: "/api/v1/expenses/pending-confirmations",
+    errors: {
+      401: "Unauthorized",
+    },
+  })
+}
+
+export function usePendingConfirmations() {
+  return useQuery<PendingConfirmation[], Error>({
+    queryKey: ["pending-confirmations"],
+    queryFn: getPendingConfirmations,
   })
 }
