@@ -112,7 +112,7 @@ development_status:
   #
   epic-4: in-progress
   4-1-creator-only-edit-restriction: done
-  4-2-expense-confirmation-workflow: backlog
+  4-2-expense-confirmation-workflow: done
   4-3-finalize-expense-after-all-confirmations: backlog
   4-4-immutable-audit-log-for-all-actions: backlog
   4-5-activity-feed-display: backlog
