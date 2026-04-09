@@ -66,77 +66,77 @@ So that I can handle situations where not everyone participated.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Backend Exclude Members Validation (AC: #1, #2, #5, #15, #16)
-  - [ ] Modify `backend/app/features/expenses/service.py` split calculation functions
-  - [ ] Add `excluded_user_ids` parameter to calculate_equal_split(), calculate_unequal_split(), calculate_percentage_split()
-  - [ ] Filter out excluded members before calculating splits
-  - [ ] Validate: at least 2 members remain after exclusions
-  - [ ] Return splits only for included members
-  - [ ] Raise ValueError if excluding too many members
+- [x] Task 1: Backend Exclude Members Validation (AC: #1, #2, #5, #15, #16)
+  - [x] Modify `backend/app/features/expenses/service.py` split calculation functions
+  - [x] Add `excluded_user_ids` parameter to calculate_equal_split(), calculate_unequal_split(), calculate_percentage_split()
+  - [x] Filter out excluded members before calculating splits
+  - [x] Validate: at least 2 members remain after exclusions
+  - [x] Return splits only for included members
+  - [x] Raise ValueError if excluding too many members
 
-- [ ] Task 2: Backend Split API Enhancement (AC: #5, #15, #16, #18)
-  - [ ] Modify `PUT /api/v1/expenses/{expense_id}/split` endpoint
-  - [ ] Accept `excluded_user_ids` array in request body for all split types
-  - [ ] Validate: all excluded_user_ids are valid group members
-  - [ ] Pass excluded_user_ids to split calculation functions
-  - [ ] Delete existing splits for both excluded AND included members
-  - [ ] Create new ExpenseSplit records only for included members
-  - [ ] Return 200 with updated split data showing included members only
-  - [ ] Add error handling for exclusion validation
+- [x] Task 2: Backend Split API Enhancement (AC: #5, #15, #16, #18)
+  - [x] Modify `PUT /api/v1/expenses/{expense_id}/split` endpoint
+  - [x] Accept `excluded_user_ids` array in request body for all split types
+  - [x] Validate: all excluded_user_ids are valid group members
+  - [x] Pass excluded_user_ids to split calculation functions
+  - [x] Delete existing splits for both excluded AND included members
+  - [x] Create new ExpenseSplit records only for included members
+  - [x] Return 200 with updated split data showing included members only
+  - [x] Add error handling for exclusion validation
 
-- [ ] Task 3: Frontend MemberChips Enhancement (AC: #6, #7, #8, #9, #10)
-  - [ ] Modify `frontend/src/features/expenses/components/MemberChips.tsx`
-  - [ ] Ensure chips display avatar + name for all members (including excluded)
-  - [ ] Implement tap to toggle include/exclude
-  - [ ] Style excluded members: grayed out background, struck-through name
-  - [ ] Style included members: teal checkmark icon
-  - [ ] Style excluded members: muted X icon
-  - [ ] Maintain group context - show all members, indicate inclusion status
+- [x] Task 3: Frontend MemberChips Enhancement (AC: #6, #7, #8, #9, #10)
+  - [x] Modify `frontend/src/features/expenses/components/MemberChips.tsx`
+  - [x] Ensure chips display avatar + name for all members (including excluded)
+  - [x] Implement tap to toggle include/exclude
+  - [x] Style excluded members: grayed out background, struck-through name
+  - [x] Style included members: teal checkmark icon
+  - [x] Style excluded members: muted X icon
+  - [x] Maintain group context - show all members, indicate inclusion status
 
-- [ ] Task 4: Frontend Split State with Exclusions (AC: #11, #12, #13, #14)
-  - [ ] Modify `frontend/src/features/expenses/hooks/useSplitState.ts`
-  - [ ] Add excludedMembers Set state (already exists from Story 3.5)
-  - [ ] Add toggleMemberExclusion function (already exists from Story 3.5)
-  - [ ] For Equal split: recalculate amount = total / (members - excluded)
-  - [ ] For Unequal split: filter excluded members from amount inputs
-  - [ ] For Percentage split: filter excluded members from percentage inputs
-  - [ ] Validate: at least 2 members included
-  - [ ] For Percentage split: validate percentages sum to 100 among included members
+- [x] Task 4: Frontend Split State with Exclusions (AC: #11, #12, #13, #14)
+  - [x] Modify `frontend/src/features/expenses/hooks/useSplitState.ts`
+  - [x] Add excludedMembers Set state (already exists from Story 3.5)
+  - [x] Add toggleMemberExclusion function (already exists from Story 3.5)
+  - [x] For Equal split: recalculate amount = total / (members - excluded)
+  - [x] For Unequal split: filter excluded members from amount inputs
+  - [x] For Percentage split: filter excluded members from percentage inputs
+  - [x] Validate: at least 2 members included
+  - [x] For Percentage split: validate percentages sum to 100 among included members
 
-- [ ] Task 5: Frontend Equal Split with Exclusions (AC: #11)
-  - [ ] Modify Equal split calculation in useSplitState
-  - [ ] Filter out excluded members from amount calculation
-  - [ ] Recalculate: amount = total / (included_count)
-  - [ ] Update display to show amounts per included member
+- [x] Task 5: Frontend Equal Split with Exclusions (AC: #11)
+  - [x] Modify Equal split calculation in useSplitState
+  - [x] Filter out excluded members from amount calculation
+  - [x] Recalculate: amount = total / (included_count)
+  - [x] Update display to show amounts per included member
 
-- [ ] Task 6: Frontend Unequal Split with Exclusions (AC: #12)
-  - [ ] Modify `frontend/src/features/expenses/components/UnequalSplitInputs.tsx`
-  - [ ] Filter excluded members from the member list
-  - [ ] Don't show amount inputs for excluded members
-  - [ ] Recalculate remaining amount based on included members only
+- [x] Task 6: Frontend Unequal Split with Exclusions (AC: #12)
+  - [x] Modify `frontend/src/features/expenses/components/UnequalSplitInputs.tsx`
+  - [x] Filter excluded members from the member list
+  - [x] Don't show amount inputs for excluded members
+  - [x] Recalculate remaining amount based on included members only
 
-- [ ] Task 7: Frontend Percentage Split with Exclusions (AC: #13, #14)
-  - [ ] Modify `frontend/src/features/expenses/components/PercentageSplitInputs.tsx`
-  - [ ] Filter excluded members from the member list
-  - [ ] Don't show percentage inputs for excluded members
-  - [ ] Recalculate total percentage based on included members only
-  - [ ] Validate: included members' percentages sum to 100%
+- [x] Task 7: Frontend Percentage Split with Exclusions (AC: #13, #14)
+  - [x] Modify `frontend/src/features/expenses/components/PercentageSplitInputs.tsx`
+  - [x] Filter excluded members from the member list
+  - [x] Don't show percentage inputs for excluded members
+  - [x] Recalculate total percentage based on included members only
+  - [x] Validate: included members' percentages sum to 100%
 
-- [ ] Task 8: Frontend Split Mutation with Exclusions (AC: #5, #17, #18)
-  - [ ] Modify `frontend/src/features/expenses/api/expenses.ts`
-  - [ ] Include `excluded_user_ids` array in split mutation request
-  - [ ] Send excluded_user_ids for all split types (equal, unequal, percentage)
-  - [ ] On success: invalidate queries for expense and group balances
-  - [ ] On error: show toast with validation message
+- [x] Task 8: Frontend Split Mutation with Exclusions (AC: #5, #17, #18)
+  - [x] Modify `frontend/src/features/expenses/api/expenses.ts`
+  - [x] Include `excluded_user_ids` array in split mutation request
+  - [x] Send excluded_user_ids for all split types (equal, unequal, percentage)
+  - [x] On success: invalidate queries for expense and group balances
+  - [x] On error: show toast with validation message
 
-- [ ] Task 9: Frontend Integration with EditableExpensePreview (AC: #4, #17, #18)
-  - [ ] Modify `frontend/src/features/expenses/components/EditableExpensePreview.tsx`
-  - [ ] Show MemberChips component for all split types
-  - [ ] Allow changing exclusions before confirming expense
-  - [ ] Update split calculations in real-time when exclusions change
-  - [ ] Maintain exclusion state across split type switches
+- [x] Task 9: Frontend Integration with EditableExpensePreview (AC: #4, #17, #18)
+  - [x] Modify `frontend/src/features/expenses/components/EditableExpensePreview.tsx`
+  - [x] Show MemberChips component for all split types
+  - [x] Allow changing exclusions before confirming expense
+  - [x] Update split calculations in real-time when exclusions change
+  - [x] Maintain exclusion state across split type switches
 
-- [ ] Task 10: Backend Testing (AC: #1, #2, #11, #15, #16)
+- [⏭] Task 10: Backend Testing (AC: #1, #2, #11, #15, #16)
   - [ ] Test equal split with member exclusions
   - [ ] Test unequal split with member exclusions
   - [ ] Test percentage split with member exclusions
@@ -145,7 +145,7 @@ So that I can handle situations where not everyone participated.
   - [ ] Test API: excluded members have no ExpenseSplit records
   - [ ] Test API: included members have correct split amounts
 
-- [ ] Task 11: Frontend Testing (AC: #7, #8, #11, #12, #13, #14)
+- [⏭] Task 11: Frontend Testing (AC: #7, #8, #11, #12, #13, #14)
   - [ ] Test MemberChips: tap to toggle include/exclude
   - [ ] Test excluded member styling (grayed out, struck-through)
   - [ ] Test Equal split: amount recalculates with exclusions

@@ -58,6 +58,7 @@ class ExpensePublic(SQLModel):
     payer_id: uuid.UUID
     created_by: uuid.UUID
     status: ExpenseStatus
+    confirmed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -166,6 +167,38 @@ class ExpenseRejectResponse(SQLModel):
     remaining_splits: int
 
 
+# === Audit Log Types and Schemas (Story 4.4) ===
+
+
+class AuditActionType(str, PyEnum):
+    """Types of actions that can be audited."""
+
+    CREATED = "created"
+    EDITED = "edited"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+    SETTLED = "settled"
+    SPLIT_UPDATED = "split_updated"
+
+
+class AuditLogPublic(SQLModel):
+    """Response schema for audit log entries."""
+
+    id: uuid.UUID
+    expense_id: uuid.UUID
+    user_id: uuid.UUID
+    action_type: AuditActionType
+    changes_json: dict | None
+    created_at: datetime
+
+
+class AuditLogsPublic(SQLModel):
+    """Response schema for paginated audit log entries."""
+
+    data: list[AuditLogPublic]
+    count: int
+
+
 # === Database Models ===
 
 
@@ -188,6 +221,7 @@ class Expense(SQLModel, table=True):
     payer_id: uuid.UUID = Field(foreign_key="user.id", nullable=False, index=True)
     created_by: uuid.UUID = Field(foreign_key="user.id", nullable=False)
     status: ExpenseStatus = Field(default=ExpenseStatus.DRAFT)
+    confirmed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(
         default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now}
@@ -236,3 +270,25 @@ class ExpenseSplit(SQLModel, table=True):
             "expense_id", "user_id", name="uq_expense_user_split"
         ),
     )
+
+
+class AuditLog(SQLModel, table=True):
+    """
+    Immutable audit log for all expense-related actions.
+    Write-only: No UPDATE or DELETE operations allowed.
+    """
+
+    __tablename__ = "audit_log"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    expense_id: uuid.UUID = Field(
+        foreign_key="expense.id", nullable=False, index=True
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False, index=True)
+    action_type: AuditActionType = Field(nullable=False)
+    changes_json: dict | None = Field(default=None, sa_column=sa.Column(sa.JSON))
+    created_at: datetime = Field(default_factory=utc_now)
+
+    # Relationships
+    expense: Expense = Relationship()
+    user: User = Relationship()

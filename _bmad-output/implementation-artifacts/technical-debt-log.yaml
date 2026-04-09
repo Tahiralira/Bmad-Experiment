@@ -12,8 +12,8 @@
 metadata:
   version: "1.0"
   created_at: "2026-01-12"
-  last_review: "Epic 2.5 Retrospective"
-  total_items: 30  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM
+  last_review: "Story 4.3 Code Review"
+  total_items: 33  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM + 3 Epic 4
   status_legend:
     open: "Not yet addressed"
     in_progress: "Currently being worked on"
@@ -402,13 +402,13 @@ summary:
     user-experience: 1  # +1 from retrospective (group nav)
 
   by_status:
-    open: 26  # +5 from Epic 2.5 retrospective (3 HIGH + 2 MEDIUM)
+    open: 29  # +5 from Epic 2.5 retrospective (3 HIGH + 2 MEDIUM) + 3 from Epic 4
     resolved: 4
     in_progress: 0
     wont_fix: 0
 
   by_effort:
-    small: 22  # +1 from retrospective (console.log)
+    small: 25  # +1 from retrospective (console.log) + 3 from Epic 4
     medium: 8  # +4 from retrospective (group nav, dark mode, Storybook)
     large: 0
 
@@ -443,3 +443,40 @@ prioritization:
     - "2.3-L1"  # Pagination - performance at scale
     - "RETRO-2.5-M1"  # Storybook documentation - developer onboarding
     - "RETRO-2.5-M2"  # Dark mode OS testing - production validation
+
+# =============================================================================
+# EPIC 4: Trust & Confirmation Workflow
+# =============================================================================
+
+epic_4:
+  story_4_3:
+    title: "Finalize Expense After All Confirmations"
+    reviewed: true
+    review_date: "2026-04-09"
+    items:
+      - id: "4.3-L1"
+        type: "git"
+        severity: "LOW"
+        status: "open"
+        file: "_bmad-output/implementation-artifacts/4-3-finalize-expense-after-all-confirmations.md"
+        description: "Story file untracked in git - needs to be committed"
+        suggested_fix: "git add and commit the story file"
+        effort: "small"
+      - id: "4.3-L2"
+        type: "code-quality"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/backend/app/features/expenses/service.py"
+        lines: "449"
+        description: "notify_group_of_finalized_expense() uses _ = members to suppress lint - query runs but results unused"
+        suggested_fix: "Remove the query entirely until Epic 6, or add a TODO comment"
+        effort: "small"
+      - id: "4.3-L3"
+        type: "ux"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/frontend/src/features/expenses/components/PendingConfirmationsList.tsx"
+        lines: "141"
+        description: "Confirmed timestamp uses toLocaleDateString - loses time precision"
+        suggested_fix: "Use toLocaleString or format with time for more precision"
+        effort: "small"

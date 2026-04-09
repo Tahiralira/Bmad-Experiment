@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-04-08 (Story 4.2 done - Expense Confirmation Workflow)
+**Last Updated:** 2026-04-09 (Story 4.4 done - Immutable Audit Log for All Actions)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -13,13 +13,13 @@
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
 | Epic 3: Expenses | **DONE** | 8/8 ✅ |
-| **Epic 4: Trust & Confirmation** | **IN-PROGRESS** | 2/5 (4.1, 4.2 done) |
+| **Epic 4: Trust & Confirmation** | **IN-PROGRESS** | 4/5 (4.1-4.4 done, 4.5 next) |
 | Epic 5-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 27 stories completed, 18 remaining (Story 4.3 next)
+**Current Progress:** 29 stories completed, 16 remaining (Story 4.5 next)
 
-> **IMPORTANT:** Story 4.1 (Creator-Only Edit Restriction) COMPLETE! ✅ Only expense creators can edit expenses; confirmed/settled expenses are immutable. Backend authorization + frontend UI restrictions implemented.
+> **IMPORTANT:** Story 4.4 (Immutable Audit Log) COMPLETE! ✅ AuditLog model, record_audit() helper, integrated into all 6 mutation points, retrieval endpoints with pagination, AuditLogList frontend component, 7 tests pass.
 
 ---
 
@@ -115,18 +115,19 @@ cd cleardues/frontend && npm run build
 
 ## Next Up
 
-**Epic 4: Trust & Confirmation Workflow** 🔄 IN-PROGRESS (1/5 done, 4 remaining)
+**Epic 4: Trust & Confirmation Workflow** 🔄 IN-PROGRESS (4/5 done, 1 remaining)
 - Story 4.1: Creator-Only Edit Restriction ← **DONE** ✓
-- Story 4.2: Expense Confirmation Workflow ← **NEXT**
-- Story 4.3: Finalize Expense After All Confirmations
-- Story 4.4: Immutable Audit Log for All Actions
-- Story 4.5: Activity Feed Display
+- Story 4.2: Expense Confirmation Workflow ← **DONE** ✓
+- Story 4.3: Finalize Expense After All Confirmations ← **DONE** ✓
+- Story 4.4: Immutable Audit Log for All Actions ← **DONE** ✓
+- Story 4.5: Activity Feed Display ← **NEXT**
 
-**Key Pattern from Story 4.1 Code Review:**
-- Dev Agent Record must MUST be filled (agent model, completion notes, file list)
-- Auto-confirm countdown should check `canEdit` before starting
-- Testing Evidence section should document manual verification
-- Story file should be committed to git (not left untracked)
+**Key Pattern from Story 4.3 Code Review:**
+- Use `datetime.now(timezone.utc)` not deprecated `datetime.utcnow()`
+- Use aggregated SQL (CASE expressions) instead of N+1 loops for balance calculations
+- Redis clients should be module-level singletons, not created per function call
+- Hide UI action buttons when entity status prevents action (e.g., confirmed expenses)
+- Add REDIS_HOST/REDIS_PORT to config instead of reusing unrelated settings
 
 **Key Pattern from Story 3.5 Code Review:**
 - Always call split mutation AFTER expense creation (needs expense ID from response)

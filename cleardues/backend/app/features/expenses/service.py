@@ -1,12 +1,15 @@
 # Expenses feature service - CRUD operations for expenses
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 
+import sqlalchemy as sa
 from sqlmodel import Session, select
 
 from app.features.expenses.models import (
+    AuditActionType,
+    AuditLog,
     Expense,
     ExpenseCreate,
     ExpenseSplit,
@@ -15,6 +18,44 @@ from app.features.expenses.models import (
     SplitStatus,
 )
 from app.features.groups.models import GroupMember
+
+
+# =============================================================================
+# Story 4.4: Audit Logging - Service Layer
+# =============================================================================
+
+
+def record_audit(
+    session: Session,
+    *,
+    expense_id: uuid.UUID,
+    user_id: uuid.UUID,
+    action_type: AuditActionType,
+    before_data: dict | None = None,
+    after_data: dict | None = None,
+) -> None:
+    """
+    Create an immutable audit log entry.
+
+    Non-blocking: logs errors but does not fail the parent operation.
+    Does NOT commit — lets the parent operation's commit handle it for atomicity.
+    """
+    import logging
+
+    try:
+        changes = None
+        if before_data is not None or after_data is not None:
+            changes = {"before": before_data, "after": after_data}
+
+        audit_entry = AuditLog(
+            expense_id=expense_id,
+            user_id=user_id,
+            action_type=action_type,
+            changes_json=changes,
+        )
+        session.add(audit_entry)
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Failed to record audit log: {e}")
 
 
 def is_user_group_member(
@@ -86,6 +127,17 @@ def create_expense(
     session.add(expense)
     session.commit()
     session.refresh(expense)
+
+    # Audit log for expense creation
+    record_audit(
+        session,
+        expense_id=expense.id,
+        user_id=current_user_id,
+        action_type=AuditActionType.CREATED,
+        after_data={"amount": str(expense.amount), "description": expense.description},
+    )
+    session.commit()
+
     return expense
 
 
@@ -104,11 +156,34 @@ def update_expense(
         Updated Expense object
     """
     update_dict = update_data.model_dump(exclude_unset=True)
+
+    # Capture BEFORE state for changed fields only
+    before_data = {}
+    for field in update_dict:
+        before_data[field] = str(getattr(expense, field))
+
     for field, value in update_dict.items():
         setattr(expense, field, value)
     session.add(expense)
     session.commit()
     session.refresh(expense)
+
+    # Capture AFTER state for changed fields only
+    after_data = {}
+    for field in update_dict:
+        after_data[field] = str(getattr(expense, field))
+
+    # Audit log for expense edit
+    record_audit(
+        session,
+        expense_id=expense.id,
+        user_id=expense.created_by,
+        action_type=AuditActionType.EDITED,
+        before_data=before_data,
+        after_data=after_data,
+    )
+    session.commit()
+
     return expense
 
 
@@ -327,6 +402,144 @@ def calculate_percentage_split(
 # =============================================================================
 
 
+# =============================================================================
+# Story 4.3: Expense Finalization - Service Layer
+# =============================================================================
+
+
+def check_all_splits_confirmed(session: Session, expense_id: uuid.UUID) -> bool:
+    """
+    Check if all splits for an expense are confirmed.
+
+    Args:
+        session: Database session
+        expense_id: Expense ID
+
+    Returns:
+        True if all splits have status CONFIRMED, False otherwise
+    """
+    splits = session.exec(
+        select(ExpenseSplit).where(ExpenseSplit.expense_id == expense_id)
+    ).all()
+
+    if not splits:
+        return False
+
+    return all(split.status == SplitStatus.CONFIRMED for split in splits)
+
+
+def finalize_expense(session: Session, expense_id: uuid.UUID) -> Expense | None:
+    """
+    Finalize an expense when all splits are confirmed.
+
+    Sets expense status to CONFIRMED and records confirmed_at timestamp.
+    Publishes Redis event and creates notification records.
+
+    Args:
+        session: Database session
+        expense_id: Expense ID
+
+    Returns:
+        Finalized Expense with status CONFIRMED, or None if not all splits confirmed
+    """
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        return None
+
+    # Check all splits are confirmed
+    if not check_all_splits_confirmed(session, expense_id):
+        return None
+
+    # Finalize the expense
+    expense.status = ExpenseStatus.CONFIRMED
+    expense.confirmed_at = datetime.now(timezone.utc)
+
+    session.add(expense)
+    session.commit()
+    session.refresh(expense)
+
+    # Publish Redis event for notifications
+    publish_expense_confirmed_event(expense)
+
+    # Create notification records for group members
+    notify_group_of_finalized_expense(session, expense)
+
+    # Audit log for expense finalization
+    record_audit(
+        session,
+        expense_id=expense_id,
+        user_id=expense.created_by,
+        action_type=AuditActionType.CONFIRMED,
+        after_data={"status": "confirmed"},
+    )
+    session.commit()
+
+    return expense
+
+
+def publish_expense_confirmed_event(expense: Expense) -> None:
+    """
+    Publish expense confirmed event to Redis Pub/Sub.
+
+    Uses a module-level Redis client for connection reuse.
+
+    Args:
+        expense: The finalized expense
+    """
+    import json
+    import logging
+
+    try:
+        import redis
+        from app.core.config import settings
+
+        # Module-level singleton to avoid creating connections per call
+        if not hasattr(publish_expense_confirmed_event, "_redis_client"):
+            publish_expense_confirmed_event._redis_client = redis.Redis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                decode_responses=True,
+            )
+
+        redis_client = publish_expense_confirmed_event._redis_client
+        event_data = {
+            "event_type": "billing.expense.confirmed",
+            "expense_id": str(expense.id),
+            "group_id": str(expense.group_id),
+            "amount": float(expense.amount),
+            "confirmed_at": expense.confirmed_at.isoformat() if expense.confirmed_at else None,
+        }
+        redis_client.publish("billing.expense.confirmed", json.dumps(event_data))
+    except Exception as e:
+        # Non-blocking: log but don't fail the finalization if Redis is unavailable
+        logging.getLogger(__name__).warning(
+            f"Failed to publish expense confirmed event: {e}"
+        )
+
+
+def notify_group_of_finalized_expense(session: Session, expense: Expense) -> None:
+    """
+    Create notification records for all group members about finalized expense.
+
+    Note: Actual notification delivery is handled by Epic 6 (Background Jobs).
+    This function prepares the notification data.
+
+    Args:
+        session: Database session
+        expense: The finalized expense
+    """
+    # Get all group members - using existing service function
+    from app.features.groups.models import GroupMember
+
+    members = session.exec(
+        select(GroupMember).where(GroupMember.group_id == expense.group_id)
+    ).all()
+
+    # Placeholder for notification creation
+    # Full implementation in Epic 6 when notification model is created
+    _ = members  # Will be used in Epic 6
+
+
 def confirm_expense_split(
     session: Session, expense_id: uuid.UUID, user_id: uuid.UUID
 ) -> ExpenseSplit | None:
@@ -347,18 +560,36 @@ def confirm_expense_split(
         .where(ExpenseSplit.expense_id == expense_id)
         .where(ExpenseSplit.user_id == user_id)
     ).first()
-    )
 
     if not split:
         return None
 
     # Update split status
     split.status = SplitStatus.CONFIRMED
-    split.confirmed_at = datetime.utcnow()
+    split.confirmed_at = datetime.now(timezone.utc)
 
     session.add(split)
     session.commit()
     session.refresh(split)
+
+    # Audit log for split confirmation
+    record_audit(
+        session,
+        expense_id=expense_id,
+        user_id=user_id,
+        action_type=AuditActionType.CONFIRMED,
+    )
+    session.commit()
+
+    # After confirming, check if any splits remain pending — if not, finalize
+    pending_count = session.exec(
+        select(ExpenseSplit)
+        .where(ExpenseSplit.expense_id == expense_id)
+        .where(ExpenseSplit.status != SplitStatus.CONFIRMED)
+    ).first()
+
+    if pending_count is None:
+        finalize_expense(session, expense_id)
 
     return split
 
@@ -383,7 +614,6 @@ def reject_expense_split(
         .where(ExpenseSplit.expense_id == expense_id)
         .where(ExpenseSplit.user_id == user_id)
     ).first()
-    )
 
     if not split:
         return None
@@ -408,6 +638,15 @@ def reject_expense_split(
                 s.amount_owed = per_person
                 session.add(s)
 
+    session.commit()
+
+    # Audit log for split rejection
+    record_audit(
+        session,
+        expense_id=expense_id,
+        user_id=user_id,
+        action_type=AuditActionType.REJECTED,
+    )
     session.commit()
 
     return {
@@ -435,7 +674,6 @@ def get_pending_confirmations_for_user(
         .where(ExpenseSplit.user_id == user_id)
         .where(ExpenseSplit.status == SplitStatus.PENDING)
     ).all()
-    )
 
     result = []
     for split in splits:
@@ -447,3 +685,87 @@ def get_pending_confirmations_for_user(
             })
 
     return result
+
+
+# =============================================================================
+# Story 4.4: Audit Log Retrieval
+# =============================================================================
+
+
+def get_expense_audit_logs(
+    session: Session, expense_id: uuid.UUID, limit: int = 50, offset: int = 0
+) -> tuple[list[AuditLog], int]:
+    """
+    Get audit logs for a specific expense.
+
+    Args:
+        session: Database session
+        expense_id: Expense ID
+        limit: Maximum number of entries to return
+        offset: Number of entries to skip
+
+    Returns:
+        Tuple of (audit_logs, total_count)
+    """
+    # Count total
+    count_statement = (
+        select(sa.func.count())
+        .select_from(AuditLog)
+        .where(AuditLog.expense_id == expense_id)
+    )
+    count = session.exec(count_statement).one()
+
+    # Get paginated results
+    statement = (
+        select(AuditLog)
+        .where(AuditLog.expense_id == expense_id)
+        .order_by(AuditLog.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    logs = session.exec(statement).all()
+
+    return logs, count
+
+
+def get_group_audit_logs(
+    session: Session, group_id: uuid.UUID, limit: int = 50, offset: int = 0
+) -> tuple[list[AuditLog], int]:
+    """
+    Get audit logs for all expenses in a group.
+
+    Args:
+        session: Database session
+        group_id: Group ID
+        limit: Maximum number of entries to return
+        offset: Number of entries to skip
+
+    Returns:
+        Tuple of (audit_logs, total_count)
+    """
+    # Get all expense IDs for the group
+    expense_ids_statement = select(Expense.id).where(Expense.group_id == group_id)
+    expense_ids = session.exec(expense_ids_statement).all()
+
+    if not expense_ids:
+        return [], 0
+
+    # Count total
+    count_statement = (
+        select(sa.func.count())
+        .select_from(AuditLog)
+        .where(AuditLog.expense_id.in_(expense_ids))
+    )
+    count = session.exec(count_statement).one()
+
+    # Get paginated results
+    statement = (
+        select(AuditLog)
+        .where(AuditLog.expense_id.in_(expense_ids))
+        .order_by(AuditLog.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    logs = session.exec(statement).all()
+
+    return logs, count

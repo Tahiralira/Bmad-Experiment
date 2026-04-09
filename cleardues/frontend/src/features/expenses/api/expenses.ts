@@ -14,6 +14,7 @@ import type {
   ExpenseSplit,
   ExpenseRejectResponse,
   PendingConfirmation,
+  AuditLogsResponse,
 } from "../types"
 
 
@@ -148,6 +149,7 @@ export function useConfirmExpense() {
       queryClient.invalidateQueries({ queryKey: ["pending-confirmations"] })
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["group-balances"] })
       toast.success("Expense confirmed")
     },
     onError: (error) => {
@@ -203,5 +205,67 @@ export function usePendingConfirmations() {
   return useQuery<PendingConfirmation[], Error>({
     queryKey: ["pending-confirmations"],
     queryFn: getPendingConfirmations,
+  })
+}
+
+// =============================================================================
+// Story 4.4: Audit Log API
+// =============================================================================
+
+async function getExpenseAuditLog(
+  expenseId: string,
+  limit = 50,
+  offset = 0
+): Promise<AuditLogsResponse> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expenses/${expenseId}/audit-log`,
+    query: { limit, offset },
+    errors: {
+      401: "Unauthorized",
+      403: "Not a member of this group",
+      404: "Expense not found",
+    },
+  })
+}
+
+export function useExpenseAuditLog(
+  expenseId: string | undefined,
+  limit = 50,
+  offset = 0
+) {
+  return useQuery<AuditLogsResponse, Error>({
+    queryKey: ["audit-log", expenseId, limit, offset],
+    queryFn: () => getExpenseAuditLog(expenseId!, limit, offset),
+    enabled: !!expenseId,
+  })
+}
+
+async function getGroupAuditLog(
+  groupId: string,
+  limit = 50,
+  offset = 0
+): Promise<AuditLogsResponse> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expense-groups/${groupId}/audit-log`,
+    query: { limit, offset },
+    errors: {
+      401: "Unauthorized",
+      403: "Not a member of this group",
+      404: "Group not found",
+    },
+  })
+}
+
+export function useGroupAuditLog(
+  groupId: string | undefined,
+  limit = 50,
+  offset = 0
+) {
+  return useQuery<AuditLogsResponse, Error>({
+    queryKey: ["group-audit-log", groupId, limit, offset],
+    queryFn: () => getGroupAuditLog(groupId!, limit, offset),
+    enabled: !!groupId,
   })
 }

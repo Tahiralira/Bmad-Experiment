@@ -1,6 +1,6 @@
 # Story 3.6: Split Logic - Unequal Custom Amounts
 
-Status: review
+Status: done
 
 ## Story
 

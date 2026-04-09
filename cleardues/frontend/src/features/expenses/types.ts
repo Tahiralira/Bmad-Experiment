@@ -12,6 +12,7 @@ export interface Expense {
   payer_id: string
   created_by: string
   status: ExpenseStatus
+  confirmed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -194,4 +195,33 @@ export interface ExpenseRejectResponse {
 export interface PendingConfirmation {
   expense: Expense
   split: ExpenseSplit
+}
+
+// =============================================================================
+// Audit Log Types (Story 4.4 - Immutable Audit Log)
+// =============================================================================
+
+export type AuditActionType =
+  | "created"
+  | "edited"
+  | "confirmed"
+  | "rejected"
+  | "settled"
+  | "split_updated"
+
+export interface AuditLog {
+  id: string
+  expense_id: string
+  user_id: string
+  action_type: AuditActionType
+  changes_json: {
+    before?: Record<string, unknown>
+    after?: Record<string, unknown>
+  } | null
+  created_at: string
+}
+
+export interface AuditLogsResponse {
+  data: AuditLog[]
+  count: number
 }

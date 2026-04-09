@@ -3,11 +3,14 @@ import uuid
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Body
-from sqlmodel import Session, select
+from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.features.expenses import service as expense_service
 from app.features.expenses.models import (
+    AuditActionType,
+    AuditLogPublic,
+    AuditLogsPublic,
     Expense,
     ExpenseCreate,
     ExpensePublic,
@@ -114,7 +117,7 @@ def edit_expense(
 @router.put("/{expense_id}/split", response_model=ExpenseSplitResponse)
 def update_expense_split(
     *,
-    session: Session,
+    session: SessionDep,
     expense_id: uuid.UUID,
     split_data: dict = Body(...),
     current_user: CurrentUser,
@@ -351,6 +354,22 @@ def update_expense_split(
 
     session.commit()
 
+    # Transition expense to PENDING_CONFIRMATION when splits are assigned
+    if expense.status == ExpenseStatus.DRAFT:
+        expense.status = ExpenseStatus.PENDING_CONFIRMATION
+        session.add(expense)
+        session.commit()
+
+    # Audit log for split update
+    expense_service.record_audit(
+        session,
+        expense_id=expense_id,
+        user_id=current_user.id,
+        action_type=AuditActionType.SPLIT_UPDATED,
+        after_data={"type": split_type, "members": len(splits_data)},
+    )
+    session.commit()
+
     # Get excluded_user_ids from request for all split types
     excluded_user_ids = split_data.get("excluded_user_ids", [])
 
@@ -478,3 +497,47 @@ def get_pending_confirmations(
         ))
 
     return result
+
+
+# =============================================================================
+# Story 4.4: Audit Log Retrieval
+# =============================================================================
+
+
+@router.get("/{expense_id}/audit-log", response_model=AuditLogsPublic)
+def get_expense_audit_log(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    expense_id: uuid.UUID,
+    limit: int = 50,
+    offset: int = 0,
+) -> AuditLogsPublic:
+    """
+    Get audit logs for a specific expense.
+
+    User must be a member of the expense's group to view audit logs.
+    Returns entries sorted by timestamp descending with pagination.
+    """
+    # Get expense
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Verify user is member of the expense's group
+    if not expense_service.is_user_group_member(
+        session, current_user.id, expense.group_id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of the group to view audit logs",
+        )
+
+    logs, count = expense_service.get_expense_audit_logs(
+        session, expense_id, limit=limit, offset=offset
+    )
+
+    return AuditLogsPublic(
+        data=[AuditLogPublic.model_validate(log) for log in logs],
+        count=count,
+    )

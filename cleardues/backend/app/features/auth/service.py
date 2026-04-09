@@ -253,8 +253,11 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
     """
     Get dashboard data for a user showing all groups with net balances.
 
-    Currently returns 0 for all net_balances as expenses are not yet implemented.
-    When expenses are added in Epic 3, this function will calculate actual balances.
+    Net balance is calculated from confirmed expenses:
+    - Positive = user is owed money (paid more than their share)
+    - Negative = user owes money (paid less than their share)
+
+    Uses a single aggregated SQL query to avoid N+1 issues.
 
     Args:
         session: Database session
@@ -290,13 +293,59 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
 
     results = session.exec(statement).all()
 
-    return [
+    if not results:
+        return []
+
+    # Calculate net balances from confirmed expenses using a single aggregated query
+    # Net balance = (sum of splits where user is payer) - (sum of user's own splits)
+    from sqlalchemy import case, literal
+
+    from app.features.expenses.models import Expense, ExpenseSplit, ExpenseStatus, SplitStatus
+
+    group_ids = [row.id for row in results]
+
+    # Single query: for each group, compute what user owes vs what they're owed
+    # - user_owes: negative sum of user's confirmed splits (what they owe others)
+    # - owed_to_user: sum of ALL confirmed splits on expenses where user is the payer
+    all_balances = session.exec(
+        select(
+            Expense.group_id,
+            func.sum(
+                case(
+                    (ExpenseSplit.user_id == user_id, -ExpenseSplit.amount_owed),
+                    else_=literal(0),
+                )
+            ).label("user_owes"),
+            func.sum(
+                case(
+                    (Expense.payer_id == user_id, ExpenseSplit.amount_owed),
+                    else_=literal(0),
+                )
+            ).label("owed_to_user"),
+        )
+        .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
+        .where(
+            Expense.status == ExpenseStatus.CONFIRMED,
+            ExpenseSplit.status == SplitStatus.CONFIRMED,
+            Expense.group_id.in_(group_ids),
+        )
+        .group_by(Expense.group_id)
+    ).all()
+
+    balance_map = {
+        row.group_id: float((row.owed_to_user or 0) + (row.user_owes or 0))
+        for row in all_balances
+    }
+
+    summaries = [
         GroupBalanceSummary(
             group_id=row.id,
             group_name=row.name,
-            net_balance=0.0,  # Placeholder until expenses implemented (Epic 3)
+            net_balance=round(balance_map.get(row.id, 0.0), 2),
             last_activity=row.updated_at,
             member_count=row.member_count,
         )
         for row in results
     ]
+
+    return summaries

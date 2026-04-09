@@ -124,12 +124,26 @@ function PendingConfirmationCard({
 
         {/* Status badge */}
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-            Pending your confirmation
-          </span>
+          {expense.status === "confirmed" ? (
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-200">
+              Confirmed
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+              Pending your confirmation
+            </span>
+          )}
         </div>
 
-        {/* Action buttons */}
+        {/* Confirmed timestamp */}
+        {expense.confirmed_at && (
+          <p className="text-xs text-muted-foreground">
+            Confirmed {new Date(expense.confirmed_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+          </p>
+        )}
+
+        {/* Action buttons - only show when expense still needs confirmation */}
+        {expense.status !== "confirmed" && (
         <div className="flex gap-2">
           <Button
             variant="default"
@@ -150,6 +164,7 @@ function PendingConfirmationCard({
             {isRejecting ? "Rejecting..." : "Reject"}
           </Button>
         </div>
+        )}
       </CardContent>
     </Card>
   )

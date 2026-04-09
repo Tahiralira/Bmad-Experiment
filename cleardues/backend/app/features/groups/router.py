@@ -188,3 +188,50 @@ def accept_invite(
         ),
         message=message,
     )
+
+
+# =============================================================================
+# Story 4.4: Group Audit Log
+# =============================================================================
+
+
+@router.get("/{group_id}/audit-log")
+def get_group_audit_log(
+    group_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """
+    Get audit logs for all expenses in a group.
+
+    User must be a member of the group to view audit logs.
+    Returns entries sorted by timestamp descending with pagination.
+    """
+    from app.features.expenses.models import AuditLogPublic, AuditLogsPublic
+    from app.features.expenses import service as expense_service
+
+    # Verify group exists
+    group = service.get_group_by_id(session, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    # Verify user is a member
+    if not service.is_group_member(session, group_id, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this group",
+        )
+
+    logs, count = expense_service.get_group_audit_logs(
+        session, group_id, limit=limit, offset=offset
+    )
+
+    return AuditLogsPublic(
+        data=[AuditLogPublic.model_validate(log) for log in logs],
+        count=count,
+    ).model_dump()
