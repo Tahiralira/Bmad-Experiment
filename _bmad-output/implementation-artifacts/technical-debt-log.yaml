@@ -12,7 +12,7 @@
 metadata:
   version: "1.0"
   created_at: "2026-01-12"
-  last_review: "Story 4.3 Code Review"
+  last_review: "Story 4.4 Code Review"
   total_items: 33  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM + 3 Epic 4
   status_legend:
     open: "Not yet addressed"

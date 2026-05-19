@@ -5,11 +5,12 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 
 import sqlalchemy as sa
-from sqlmodel import Session, select
+from sqlmodel import Session, delete, select
 
 from app.features.expenses.models import (
     AuditActionType,
     AuditLog,
+    AuditLogPublic,
     Expense,
     ExpenseCreate,
     ExpenseSplit,
@@ -17,6 +18,7 @@ from app.features.expenses.models import (
     ExpenseUpdate,
     SplitStatus,
 )
+from app.features.auth.models import User
 from app.features.groups.models import GroupMember
 
 
@@ -55,7 +57,12 @@ def record_audit(
         )
         session.add(audit_entry)
     except Exception as e:
-        logging.getLogger(__name__).error(f"Failed to record audit log: {e}")
+        logger = logging.getLogger(__name__)
+        logger.error(
+            "Failed to record audit log: expense_id=%s action=%s error=%s",
+            expense_id, action_type.value, e,
+            exc_info=True,
+        )
 
 
 def is_user_group_member(
@@ -142,7 +149,7 @@ def create_expense(
 
 
 def update_expense(
-    session: Session, expense: Expense, update_data: ExpenseUpdate
+    session: Session, expense: Expense, update_data: ExpenseUpdate, current_user_id: uuid.UUID | None = None
 ) -> Expense:
     """
     Update expense fields. Only updates provided (non-None) fields.
@@ -177,7 +184,7 @@ def update_expense(
     record_audit(
         session,
         expense_id=expense.id,
-        user_id=expense.created_by,
+        user_id=current_user_id or expense.created_by,
         action_type=AuditActionType.EDITED,
         before_data=before_data,
         after_data=after_data,
@@ -692,9 +699,38 @@ def get_pending_confirmations_for_user(
 # =============================================================================
 
 
+def _build_audit_log_public(logs: list[AuditLog], session: Session) -> list[AuditLogPublic]:
+    """
+    Build AuditLogPublic schemas with user names populated.
+
+    Batch-loads user names to avoid N+1 queries.
+    """
+    if not logs:
+        return []
+
+    user_ids = {log.user_id for log in logs}
+    users = session.exec(
+        select(User).where(User.id.in_(user_ids))
+    ).all()
+    user_map = {u.id: u.full_name or u.email for u in users}
+
+    return [
+        AuditLogPublic(
+            id=log.id,
+            expense_id=log.expense_id,
+            user_id=log.user_id,
+            action_type=log.action_type,
+            changes_json=log.changes_json,
+            created_at=log.created_at,
+            user_name=user_map.get(log.user_id),
+        )
+        for log in logs
+    ]
+
+
 def get_expense_audit_logs(
     session: Session, expense_id: uuid.UUID, limit: int = 50, offset: int = 0
-) -> tuple[list[AuditLog], int]:
+) -> tuple[list[AuditLogPublic], int]:
     """
     Get audit logs for a specific expense.
 
@@ -705,7 +741,7 @@ def get_expense_audit_logs(
         offset: Number of entries to skip
 
     Returns:
-        Tuple of (audit_logs, total_count)
+        Tuple of (audit_log_public_entries, total_count)
     """
     # Count total
     count_statement = (
@@ -714,6 +750,9 @@ def get_expense_audit_logs(
         .where(AuditLog.expense_id == expense_id)
     )
     count = session.exec(count_statement).one()
+
+    if count == 0:
+        return [], 0
 
     # Get paginated results
     statement = (
@@ -724,13 +763,14 @@ def get_expense_audit_logs(
         .offset(offset)
     )
     logs = session.exec(statement).all()
+    enriched = _build_audit_log_public(logs, session)
 
-    return logs, count
+    return enriched, count
 
 
 def get_group_audit_logs(
     session: Session, group_id: uuid.UUID, limit: int = 50, offset: int = 0
-) -> tuple[list[AuditLog], int]:
+) -> tuple[list[AuditLogPublic], int]:
     """
     Get audit logs for all expenses in a group.
 
@@ -741,31 +781,30 @@ def get_group_audit_logs(
         offset: Number of entries to skip
 
     Returns:
-        Tuple of (audit_logs, total_count)
+        Tuple of (audit_log_public_entries, total_count)
     """
-    # Get all expense IDs for the group
-    expense_ids_statement = select(Expense.id).where(Expense.group_id == group_id)
-    expense_ids = session.exec(expense_ids_statement).all()
-
-    if not expense_ids:
-        return [], 0
-
-    # Count total
+    # Use JOIN instead of subquery for better performance
     count_statement = (
         select(sa.func.count())
         .select_from(AuditLog)
-        .where(AuditLog.expense_id.in_(expense_ids))
+        .join(Expense, AuditLog.expense_id == Expense.id)
+        .where(Expense.group_id == group_id)
     )
     count = session.exec(count_statement).one()
+
+    if count == 0:
+        return [], 0
 
     # Get paginated results
     statement = (
         select(AuditLog)
-        .where(AuditLog.expense_id.in_(expense_ids))
+        .join(Expense, AuditLog.expense_id == Expense.id)
+        .where(Expense.group_id == group_id)
         .order_by(AuditLog.created_at.desc())
         .limit(limit)
         .offset(offset)
     )
     logs = session.exec(statement).all()
+    enriched = _build_audit_log_public(logs, session)
 
-    return logs, count
+    return enriched, count

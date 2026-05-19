@@ -3,7 +3,7 @@ import uuid
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Body
-from sqlmodel import select
+from sqlmodel import delete, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.features.expenses import service as expense_service
@@ -110,7 +110,7 @@ def edit_expense(
                 detail="Payer must be a member of the group",
             )
 
-    expense = expense_service.update_expense(session, expense, expense_in)
+    expense = expense_service.update_expense(session, expense, expense_in, current_user.id)
     return ExpensePublic.model_validate(expense)
 
 
@@ -339,9 +339,9 @@ def update_expense_split(
         )
 
     # Delete existing splits for this expense
-    session.query(ExpenseSplit).filter(
-        ExpenseSplit.expense_id == expense_id
-    ).delete()
+    session.exec(
+        delete(ExpenseSplit).where(ExpenseSplit.expense_id == expense_id)
+    )
 
     # Create new splits
     for split in splits_data:
@@ -538,6 +538,6 @@ def get_expense_audit_log(
     )
 
     return AuditLogsPublic(
-        data=[AuditLogPublic.model_validate(log) for log in logs],
+        data=logs,
         count=count,
     )

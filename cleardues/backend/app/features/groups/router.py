@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
+from app.features.expenses.models import AuditLogsPublic
 from app.features.groups import service
 from app.features.groups.models import (
     ExpenseGroup,
@@ -195,21 +196,20 @@ def accept_invite(
 # =============================================================================
 
 
-@router.get("/{group_id}/audit-log")
+@router.get("/{group_id}/audit-log", response_model=AuditLogsPublic)
 def get_group_audit_log(
     group_id: uuid.UUID,
     session: SessionDep,
     current_user: CurrentUser,
     limit: int = 50,
     offset: int = 0,
-) -> dict:
+) -> AuditLogsPublic:
     """
     Get audit logs for all expenses in a group.
 
     User must be a member of the group to view audit logs.
     Returns entries sorted by timestamp descending with pagination.
     """
-    from app.features.expenses.models import AuditLogPublic, AuditLogsPublic
     from app.features.expenses import service as expense_service
 
     # Verify group exists
@@ -232,6 +232,6 @@ def get_group_audit_log(
     )
 
     return AuditLogsPublic(
-        data=[AuditLogPublic.model_validate(log) for log in logs],
+        data=logs,
         count=count,
-    ).model_dump()
+    )

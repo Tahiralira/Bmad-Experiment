@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-04-09 (Story 4.4 done - Immutable Audit Log for All Actions)
+**Last Updated:** 2026-04-09 (Story 4.4 code review complete - marked done)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -13,13 +13,13 @@
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
 | Epic 3: Expenses | **DONE** | 8/8 ✅ |
-| **Epic 4: Trust & Confirmation** | **IN-PROGRESS** | 4/5 (4.1-4.4 done, 4.5 next) |
+| **Epic 4: Trust & Confirmation** | **IN-PROGRESS** | 4/5 ✅ (4.1-4.4 done+reviewed, 4.5 next) |
 | Epic 5-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
 **Current Progress:** 29 stories completed, 16 remaining (Story 4.5 next)
 
-> **IMPORTANT:** Story 4.4 (Immutable Audit Log) COMPLETE! ✅ AuditLog model, record_audit() helper, integrated into all 6 mutation points, retrieval endpoints with pagination, AuditLogList frontend component, 7 tests pass.
+> **IMPORTANT:** Story 4.4 (Immutable Audit Log) CODE REVIEW COMPLETE! ✅ 9 issues found and fixed (4 MEDIUM, 5 LOW). Key fixes: user_name in API responses, deprecated API replaced, audit query invalidation in all mutations, JOIN-based group audit queries. 125 tests pass.
 
 ---
 
@@ -110,6 +110,9 @@ cd cleardues/frontend && npm run build
 6. **Don't let story File List drift from git reality** - Update File List after EVERY commit to match actual changes
 7. **Don't claim testing without documentation** - Add testing evidence section (browsers, breakpoints tested, accessibility checks)
 8. **Don't leave unused variables** - Fix TypeScript "declared but never used" errors immediately
+9. **Don't use deprecated session.query()** - Use `session.exec(delete(...))` or `session.exec(select(...))` in SQLModel
+10. **Don't return `dict` from FastAPI endpoints** - Use proper response_model for OpenAPI schema generation
+11. **Don't forget to invalidate all related queries** - After mutations, invalidate audit-log queries too
 
 ---
 

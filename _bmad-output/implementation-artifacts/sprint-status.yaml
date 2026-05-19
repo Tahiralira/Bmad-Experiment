@@ -114,7 +114,7 @@ development_status:
   4-1-creator-only-edit-restriction: done
   4-2-expense-confirmation-workflow: done
   4-3-finalize-expense-after-all-confirmations: done
-  4-4-immutable-audit-log-for-all-actions: review
+  4-4-immutable-audit-log-for-all-actions: done
   4-5-activity-feed-display: backlog
   epic-4-retrospective: optional
 

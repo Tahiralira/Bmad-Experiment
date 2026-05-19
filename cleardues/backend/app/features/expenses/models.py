@@ -190,6 +190,7 @@ class AuditLogPublic(SQLModel):
     action_type: AuditActionType
     changes_json: dict | None
     created_at: datetime
+    user_name: str | None = None
 
 
 class AuditLogsPublic(SQLModel):

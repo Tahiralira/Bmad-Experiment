@@ -151,7 +151,9 @@ def test_audit_entry_created_on_confirm(
         AuditLog.action_type == AuditActionType.CONFIRMED,
     )
     audit_entries = db.exec(statement).all()
-    assert len(audit_entries) >= 1
+    # Exactly 1 confirmed entry: the second user's split confirmation
+    # (finalize only triggers when ALL splits are confirmed, so creator's split is still pending)
+    assert len(audit_entries) == 1
 
 
 def test_audit_entry_created_on_reject(

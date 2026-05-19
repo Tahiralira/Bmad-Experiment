@@ -219,6 +219,7 @@ export interface AuditLog {
     after?: Record<string, unknown>
   } | null
   created_at: string
+  user_name: string | null
 }
 
 export interface AuditLogsResponse {

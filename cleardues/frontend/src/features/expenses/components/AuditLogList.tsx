@@ -64,6 +64,9 @@ export function AuditLogList({
           <div className="min-w-0 flex-1">
             <p className="text-sm">
               <span className="font-medium text-foreground">
+                {log.user_name || "Unknown user"}
+              </span>{" "}
+              <span className="text-muted-foreground">
                 {ACTION_LABELS[log.action_type]}
               </span>{" "}
               <span className="text-muted-foreground">

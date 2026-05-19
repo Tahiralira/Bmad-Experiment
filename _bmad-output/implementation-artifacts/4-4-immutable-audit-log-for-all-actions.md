@@ -1,6 +1,6 @@
 # Story 4.4: Immutable Audit Log for All Actions
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -487,15 +487,30 @@ Claude (glm-5.1)
 - `cleardues/backend/tests/api/routes/test_audit_log.py`
 
 **Modified Files:**
-- `cleardues/backend/app/features/expenses/models.py` — Added AuditLog model, AuditActionType enum, AuditLogPublic/AuditLogsPublic schemas
-- `cleardues/backend/app/features/expenses/service.py` — Added record_audit(), get_expense_audit_logs(), get_group_audit_logs(); integrated audit calls into create/update/confirm/reject/finalize
-- `cleardues/backend/app/features/expenses/router.py` — Added audit-log endpoint; added split_updated audit call; fixed Session→SessionDep; added DRAFT→PENDING_CONFIRMATION transition
-- `cleardues/backend/app/features/groups/router.py` — Added group-level audit-log endpoint
-- `cleardues/frontend/src/features/expenses/types.ts` — Added AuditActionType, AuditLog, AuditLogsResponse types
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Added useExpenseAuditLog(), useGroupAuditLog() hooks
+- `cleardues/backend/app/features/expenses/models.py` — Added AuditLog model, AuditActionType enum, AuditLogPublic/AuditLogsPublic schemas (with user_name field)
+- `cleardues/backend/app/features/expenses/service.py` — Added record_audit(), _build_audit_log_public(), get_expense_audit_logs(), get_group_audit_logs(); integrated audit calls into create/update/confirm/reject/finalize; update_expense now accepts current_user_id
+- `cleardues/backend/app/features/expenses/router.py` — Added audit-log endpoint; added split_updated audit call; fixed Session→SessionDep; added DRAFT→PENDING_CONFIRMATION transition; replaced deprecated session.query() with session.exec(delete())
+- `cleardues/backend/app/features/groups/router.py` — Added group-level audit-log endpoint with proper AuditLogsPublic response model
+- `cleardues/frontend/src/features/expenses/types.ts` — Added AuditActionType, AuditLog (with user_name), AuditLogsResponse types
+- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Added useExpenseAuditLog(), useGroupAuditLog() hooks; added audit-log query invalidation to all mutation hooks
+- `cleardues/frontend/src/features/expenses/components/AuditLogList.tsx` — Display user name alongside action
 - `cleardues/backend/tests/conftest.py` — Added AuditLog cleanup in teardown
+- `cleardues/backend/tests/api/routes/test_audit_log.py` — Fixed weak assertion (>= 1 → == 1)
 - `cleardues/backend/app/alembic/versions/f1a2b3c4d5e6_add_expense_split_unique_constraint.py` — Fixed down_revision fork
+- `cleardues/backend/app/alembic/versions/f2a3b4c5d6e7_add_confirmed_at_to_expense.py` — Added confirmed_at column (from Story 4.3 scope)
+- `cleardues/backend/app/core/config.py` — Added REDIS_HOST/REDIS_PORT settings (from Story 4.3 scope)
+- `cleardues/frontend/src/features/expenses/components/PendingConfirmationsList.tsx` — Minor updates for confirmed_at display
 
 ### Change Log
 
 - 2026-04-09: Story 4.4 implementation complete - Immutable audit log for all actions
+- 2026-04-09: Code review fixes applied — 4 MEDIUM + 5 LOW issues resolved:
+  - MEDIUM-001: Updated File List to include all git-committed files
+  - MEDIUM-002: Replaced deprecated session.query() with session.exec(delete()) in router.py
+  - MEDIUM-003: Fixed group audit-log endpoint to return AuditLogsPublic response model
+  - MEDIUM-004: Improved record_audit() structured logging with exc_info=True
+  - LOW-001: Added user_name to AuditLogPublic schema and AuditLogList component
+  - LOW-002: Added audit-log query invalidation to all mutation hooks
+  - LOW-003: update_expense() now accepts current_user_id for correct edit attribution
+  - LOW-004: get_group_audit_logs() uses JOIN instead of subquery
+  - LOW-005: Fixed test assertion from >= 1 to == 1

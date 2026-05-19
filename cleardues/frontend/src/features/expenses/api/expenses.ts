@@ -50,6 +50,9 @@ export function useUpdateExpense() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       // Invalidate dashboard (balances might change)
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      // Invalidate audit logs (edits create audit entries)
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
     },
     onError: (error) => {
       toast.error(`Failed to update expense: ${error.message}`)
@@ -80,6 +83,9 @@ export function useCreateExpense() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       // Invalidate any expense lists for this group
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      // Invalidate audit logs (creation creates audit entries)
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
     },
   })
 }
@@ -116,6 +122,9 @@ export function useUpdateExpenseSplit() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       // Invalidate group balances
       queryClient.invalidateQueries({ queryKey: ["group-balances"] })
+      // Invalidate audit logs (split updates create audit entries)
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
     },
     onError: (error) => {
       // Show error toast to user
@@ -150,6 +159,8 @@ export function useConfirmExpense() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["group-balances"] })
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
       toast.success("Expense confirmed")
     },
     onError: (error) => {
@@ -183,6 +194,8 @@ export function useRejectExpense() {
       queryClient.invalidateQueries({ queryKey: ["pending-confirmations"] })
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
       toast.success("Expense rejected")
     },
     onError: (error) => {
