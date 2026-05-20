@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-04-09 (Story 4.4 code review complete - marked done)
+**Last Updated:** 2026-05-19 (Story 4.5 code review complete - Epic 4 DONE!)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -13,13 +13,13 @@
 | Epic 2: Groups & Dashboard | DONE | 4/4 |
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
 | Epic 3: Expenses | **DONE** | 8/8 ✅ |
-| **Epic 4: Trust & Confirmation** | **IN-PROGRESS** | 4/5 ✅ (4.1-4.4 done+reviewed, 4.5 next) |
+| **Epic 4: Trust & Confirmation** | **DONE** | 5/5 ✅ |
 | Epic 5-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 29 stories completed, 16 remaining (Story 4.5 next)
+**Current Progress:** 30 stories completed, 15 remaining (Epic 5 next)
 
-> **IMPORTANT:** Story 4.4 (Immutable Audit Log) CODE REVIEW COMPLETE! ✅ 9 issues found and fixed (4 MEDIUM, 5 LOW). Key fixes: user_name in API responses, deprecated API replaced, audit query invalidation in all mutations, JOIN-based group audit queries. 125 tests pass.
+> **IMPORTANT:** Story 4.5 (Activity Feed Display) CODE REVIEW COMPLETE! ✅ 10 issues found, 7 fixed (3 HIGH, 4 MEDIUM). Key fixes: useCallback-in-JSX anti-pattern, broken loading state, duplicate log entries, missing pagination on all-groups view, dead code removed, shared utility refactored.
 
 ---
 
@@ -113,17 +113,23 @@ cd cleardues/frontend && npm run build
 9. **Don't use deprecated session.query()** - Use `session.exec(delete(...))` or `session.exec(select(...))` in SQLModel
 10. **Don't return `dict` from FastAPI endpoints** - Use proper response_model for OpenAPI schema generation
 11. **Don't forget to invalidate all related queries** - After mutations, invalidate audit-log queries too
+12. **Don't call useCallback inside JSX** - It's a rules-of-hooks violation; lift callbacks to the component level
+13. **Don't duplicate utility functions** - Extract to shared utils and import from one place
+14. **Don't forget pagination on aggregated views** - If one view has Load More, the combined view needs it too
 
 ---
 
 ## Next Up
 
-**Epic 4: Trust & Confirmation Workflow** 🔄 IN-PROGRESS (4/5 done, 1 remaining)
+**Epic 4: Trust & Confirmation Workflow** ✅ COMPLETE! (5/5 done)
 - Story 4.1: Creator-Only Edit Restriction ← **DONE** ✓
 - Story 4.2: Expense Confirmation Workflow ← **DONE** ✓
 - Story 4.3: Finalize Expense After All Confirmations ← **DONE** ✓
 - Story 4.4: Immutable Audit Log for All Actions ← **DONE** ✓
-- Story 4.5: Activity Feed Display ← **NEXT**
+- Story 4.5: Activity Feed Display ← **DONE** ✓
+
+**Epic 5: Settlement & Payment Tracking** ← **NEXT**
+- Story 5.1: Mark Debt as Settled / Claim Payment
 
 **Key Pattern from Story 4.3 Code Review:**
 - Use `datetime.now(timezone.utc)` not deprecated `datetime.utcnow()`
