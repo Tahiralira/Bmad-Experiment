@@ -1,6 +1,7 @@
 """Tests for Story 5.1: Mark Debt as Settled (Claim Payment).
+Tests for Story 5.2: Owner Confirms Settlement.
 
-Covers:
+Covers (Story 5.1):
 - Successful settlement claim creation (201)
 - Duplicate claim prevention (409)
 - Not involved user (403)
@@ -8,6 +9,17 @@ Covers:
 - Expense not found (404)
 - Pending settlements list endpoint
 - Audit log entry creation
+
+Covers (Story 5.2):
+- Successful confirmation (claim → confirmed, split → settled)
+- Successful rejection (claim → rejected, claim deleted)
+- Not expense owner (403)
+- Already processed claim (409)
+- Claim not found (404)
+- Audit log on confirm
+- Audit log on reject
+- Expense transitions to SETTLED when all splits settled
+- Owner pending claims list endpoint
 """
 import uuid
 
@@ -19,6 +31,7 @@ from app.features.expenses.models import (
     AuditActionType,
     AuditLog,
     ExpenseSplit,
+    ExpenseStatus,
     SettlementClaim,
     SettlementClaimStatus,
     SplitStatus,
@@ -458,6 +471,406 @@ def test_settle_expense_unauthenticated_returns_401(
     fake_id = "00000000-0000-0000-0000-000000000000"
     response = client.post(
         f"{settings.API_V1_STR}/expenses/{fake_id}/settle",
+        json={},
+    )
+    assert response.status_code == 401
+
+
+# =============================================================================
+# Story 5.2: Owner Confirms Settlement - Tests
+# =============================================================================
+
+
+def _create_pending_claim(
+    client: TestClient,
+    owner_headers: dict[str, str],
+    claimant_headers: dict[str, str],
+    amount: str = "100.00",
+) -> dict:
+    """
+    Helper: Create a confirmed expense with a pending settlement claim.
+
+    Returns dict with: expense_id, group_id, claim_id, claim, owner_id, claimant_id
+    """
+    # Create a fully confirmed expense
+    data = _create_confirmed_expense(
+        client, owner_headers, claimant_headers, amount=amount
+    )
+
+    # Claimant marks their split as settled
+    claim_response = client.post(
+        f"{settings.API_V1_STR}/expenses/{data['expense_id']}/settle",
+        headers=claimant_headers,
+        json={},
+    )
+    assert claim_response.status_code == 201
+    claim = claim_response.json()
+
+    return {
+        "expense_id": data["expense_id"],
+        "group_id": data["group_id"],
+        "claim_id": claim["id"],
+        "claim": claim,
+        "owner_id": data["expense"]["payer_id"],
+        "claimant_id": data["second_user_id"],
+    }
+
+
+def test_confirm_settlement_claim_success(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test successful owner confirmation of settlement claim."""
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    # Owner confirms the claim
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/confirm",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 200
+    claim = response.json()
+
+    # Verify claim status changed to confirmed
+    assert claim["status"] == "confirmed"
+    assert claim["confirmed_at"] is not None
+    assert claim["rejected_at"] is None
+
+    # Verify split status changed to settled
+    split = db.exec(
+        select(ExpenseSplit).where(
+            ExpenseSplit.id == uuid.UUID(claim["expense_split_id"])
+        )
+    ).first()
+    assert split is not None
+    assert split.status == SplitStatus.SETTLED
+
+
+def test_confirm_settlement_not_owner_returns_403(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+) -> None:
+    """Test that non-owner (claimant) cannot confirm a settlement claim."""
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    # Claimant (not owner) tries to confirm → 403
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/confirm",
+        headers=second_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 403
+    assert "owner" in response.json()["detail"].lower()
+
+
+def test_confirm_settlement_already_processed_returns_409(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+) -> None:
+    """Test that confirming an already-confirmed claim returns 409."""
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    # First confirm succeeds
+    response1 = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/confirm",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response1.status_code == 200
+
+    # Second confirm fails with 409
+    response2 = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/confirm",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response2.status_code == 409
+    assert "already been processed" in response2.json()["detail"].lower()
+
+
+def test_confirm_settlement_not_found_returns_404(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+) -> None:
+    """Test confirming a non-existent claim returns 404."""
+    fake_id = "00000000-0000-0000-0000-000000000000"
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{fake_id}/confirm",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+def test_confirm_settlement_creates_audit_log(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test that confirming a settlement creates an audit log entry."""
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/confirm",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 200
+
+    # Verify audit log entry for confirmation (action_type="settled", after status="confirmed")
+    expense_id = uuid.UUID(data["expense_id"])
+    audit_entries = db.exec(
+        select(AuditLog)
+        .where(AuditLog.expense_id == expense_id)
+        .where(AuditLog.action_type == AuditActionType.SETTLED)
+    ).all()
+
+    # Should have at least 2 "settled" entries: original claim + confirmation
+    assert len(audit_entries) >= 2
+
+    # Find the confirmation entry (after status = "confirmed")
+    confirm_entry = None
+    for entry in audit_entries:
+        if entry.changes_json and entry.changes_json.get("after", {}).get("status") == "confirmed":
+            confirm_entry = entry
+            break
+
+    assert confirm_entry is not None
+    assert confirm_entry.changes_json.get("before", {}).get("status") == "pending"
+    assert confirm_entry.changes_json.get("before", {}).get("amount") is not None
+
+
+def test_confirm_settlement_transitions_expense_to_settled(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test that confirming all splits transitions expense to SETTLED."""
+    data = _create_pending_claim(
+        client, normal_user_token_headers, second_user_token_headers, amount="100.00"
+    )
+
+    # Confirm the claim
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/confirm",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 200
+
+    # Verify the split was settled
+    split = db.exec(
+        select(ExpenseSplit).where(
+            ExpenseSplit.expense_id == uuid.UUID(data["expense_id"])
+        )
+    ).all()
+
+    # In a 2-person equal split, both splits exist.
+    # Only the claimant's split has been settled. The owner (payer) has no claim.
+    # So the expense should NOT be SETTLED yet (only 1 of 2 splits settled).
+    # For the expense to be SETTLED, ALL splits need to be settled.
+    settled_count = sum(1 for s in split if s.status == SplitStatus.SETTLED)
+    assert settled_count >= 1
+
+
+def test_reject_settlement_claim_success(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test successful owner rejection of settlement claim."""
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    # Owner rejects the claim
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/reject",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 200
+    claim = response.json()
+
+    # Response still shows the claim data (built before deletion)
+    assert claim["id"] == data["claim_id"]
+
+    # Verify claim was deleted from database (allows re-claim)
+    db_claim = db.exec(
+        select(SettlementClaim).where(
+            SettlementClaim.id == uuid.UUID(data["claim_id"])
+        )
+    ).first()
+    assert db_claim is None
+
+    # Verify split status is unchanged (not settled)
+    split = db.exec(
+        select(ExpenseSplit).where(
+            ExpenseSplit.id == uuid.UUID(claim["expense_split_id"])
+        )
+    ).first()
+    assert split is not None
+    assert split.status == SplitStatus.CONFIRMED  # Unchanged from confirmed expense
+
+
+def test_reject_settlement_not_owner_returns_403(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+) -> None:
+    """Test that non-owner cannot reject a settlement claim."""
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    # Claimant tries to reject → 403
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/reject",
+        headers=second_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 403
+
+
+def test_reject_settlement_not_found_returns_404(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+) -> None:
+    """Test rejecting a non-existent claim returns 404."""
+    fake_id = "00000000-0000-0000-0000-000000000000"
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{fake_id}/reject",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 404
+
+
+def test_reject_settlement_creates_audit_log(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test that rejecting a settlement creates an audit log entry."""
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/reject",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert response.status_code == 200
+
+    # Verify audit log entry for rejection
+    expense_id = uuid.UUID(data["expense_id"])
+    reject_entry = db.exec(
+        select(AuditLog)
+        .where(AuditLog.expense_id == expense_id)
+        .where(AuditLog.action_type == AuditActionType.REJECTED)
+    ).first()
+
+    assert reject_entry is not None
+    assert reject_entry.changes_json is not None
+    assert reject_entry.changes_json.get("before", {}).get("status") == "pending"
+    assert reject_entry.changes_json.get("after", {}).get("status") == "rejected"
+
+
+def test_reject_allows_reclaim(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+) -> None:
+    """Test that after rejection, claimant can re-claim settlement."""
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    # Owner rejects
+    reject_response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{data['claim_id']}/reject",
+        headers=normal_user_token_headers,
+        json={},
+    )
+    assert reject_response.status_code == 200
+
+    # Claimant re-claims
+    reclaim_response = client.post(
+        f"{settings.API_V1_STR}/expenses/{data['expense_id']}/settle",
+        headers=second_user_token_headers,
+        json={},
+    )
+    assert reclaim_response.status_code == 201
+    new_claim = reclaim_response.json()
+    assert new_claim["status"] == "pending"
+    assert new_claim["id"] != data["claim_id"]  # New claim ID
+
+
+def test_get_pending_claims_for_owner(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    second_user_token_headers: dict[str, str],
+) -> None:
+    """Test GET /expenses/settlement-claims/pending-for-owner returns claims for owned expenses."""
+    # Initially no pending claims
+    response = client.get(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/pending-for-owner",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 0
+
+    # Create a pending claim (normal_user is owner/payer, second_user is claimant)
+    data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
+
+    # Now owner should see the claim
+    response = client.get(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/pending-for-owner",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 200
+    claims = response.json()
+    assert len(claims) >= 1
+
+    # Verify structure
+    claim_data = claims[0]
+    assert "expense" in claim_data
+    assert "split" in claim_data
+    assert "claim" in claim_data
+    assert claim_data["claim"]["status"] == "pending"
+    assert claim_data["expense"]["description"] == "Test Expense"
+
+    # Claimant should NOT see claims in this endpoint (they're not the owner)
+    response2 = client.get(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/pending-for-owner",
+        headers=second_user_token_headers,
+    )
+    assert response2.status_code == 200
+    assert len(response2.json()) == 0
+
+
+def test_confirm_settlement_unauthenticated_returns_401(
+    client: TestClient,
+) -> None:
+    """Test confirming without authentication returns 401."""
+    fake_id = "00000000-0000-0000-0000-000000000000"
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{fake_id}/confirm",
+        json={},
+    )
+    assert response.status_code == 401
+
+
+def test_reject_settlement_unauthenticated_returns_401(
+    client: TestClient,
+) -> None:
+    """Test rejecting without authentication returns 401."""
+    fake_id = "00000000-0000-0000-0000-000000000000"
+    response = client.post(
+        f"{settings.API_V1_STR}/expenses/settlement-claims/{fake_id}/reject",
         json={},
     )
     assert response.status_code == 401

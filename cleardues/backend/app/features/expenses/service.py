@@ -908,6 +908,203 @@ def settle_expense_split(
     return _build_claim_public(claim, session)
 
 
+def check_all_splits_settled(session: Session, expense_id: uuid.UUID) -> bool:
+    """
+    Check if all splits for an expense are settled.
+
+    Args:
+        session: Database session
+        expense_id: Expense ID
+
+    Returns:
+        True if all splits have status SETTLED, False otherwise
+    """
+    splits = session.exec(
+        select(ExpenseSplit).where(ExpenseSplit.expense_id == expense_id)
+    ).all()
+
+    if not splits:
+        return False
+
+    return all(split.status == SplitStatus.SETTLED for split in splits)
+
+
+def confirm_settlement_claim(
+    session: Session, claim_id: uuid.UUID, current_user_id: uuid.UUID
+) -> SettlementClaimPublic | str | None:
+    """
+    Owner confirms a settlement claim.
+
+    Validates: claim exists, user is expense owner, claim is pending.
+    Updates: claim.status → CONFIRMED, split.status → SETTLED.
+    Checks: if all splits settled → expense.status → SETTLED.
+
+    Args:
+        session: Database session
+        claim_id: Settlement claim ID
+        current_user_id: User ID of the expense owner (payer)
+
+    Returns:
+        SettlementClaimPublic on success,
+        None if claim not found,
+        "FORBIDDEN" if not the expense owner,
+        "CONFLICT" if claim already processed
+    """
+    # 1. Load claim
+    claim = session.get(SettlementClaim, claim_id)
+    if not claim:
+        return None  # Router: 404
+
+    # 2. Load associated split → expense
+    split = session.get(ExpenseSplit, claim.expense_split_id)
+    if not split:
+        return None  # Router: 404
+
+    expense = session.get(Expense, split.expense_id)
+    if not expense:
+        return None  # Router: 404
+
+    # 3. Verify current_user is expense owner (payer)
+    if current_user_id != expense.payer_id:
+        return "FORBIDDEN"  # Router: 403
+
+    # 4. Verify claim is still PENDING
+    if claim.status != SettlementClaimStatus.PENDING:
+        return "CONFLICT"  # Router: 409
+
+    # 5. Update claim: status → CONFIRMED, confirmed_at → now
+    claim.status = SettlementClaimStatus.CONFIRMED
+    claim.confirmed_at = datetime.now(timezone.utc)
+
+    # 6. Update split: status → SETTLED
+    split.status = SplitStatus.SETTLED
+
+    session.add(claim)
+    session.add(split)
+
+    # 7. Record audit (SETTLED, before/after)
+    record_audit(
+        session,
+        expense_id=expense.id,
+        user_id=current_user_id,
+        action_type=AuditActionType.SETTLED,
+        before_data={"status": "pending", "amount": str(claim.amount)},
+        after_data={"status": "confirmed"},
+    )
+
+    # 8. Check if ALL expense splits are now SETTLED → expense.status = SETTLED
+    if check_all_splits_settled(session, expense.id):
+        expense.status = ExpenseStatus.SETTLED
+        session.add(expense)
+
+    # 9. Commit + return
+    session.commit()
+    session.refresh(claim)
+
+    return _build_claim_public(claim, session)
+
+
+def reject_settlement_claim(
+    session: Session, claim_id: uuid.UUID, current_user_id: uuid.UUID
+) -> SettlementClaimPublic | str | None:
+    """
+    Owner rejects a settlement claim.
+
+    Same auth/status guards as confirm.
+    Updates: claim.status → REJECTED.
+    Deletes: the claim record (allows claimant to re-claim).
+    Audit log preserves the rejection history.
+
+    Args:
+        session: Database session
+        claim_id: Settlement claim ID
+        current_user_id: User ID of the expense owner (payer)
+
+    Returns:
+        SettlementClaimPublic on success (built before deletion),
+        None if claim not found,
+        "FORBIDDEN" if not the expense owner,
+        "CONFLICT" if claim already processed
+    """
+    # 1. Load claim
+    claim = session.get(SettlementClaim, claim_id)
+    if not claim:
+        return None  # Router: 404
+
+    # 2. Load associated split → expense
+    split = session.get(ExpenseSplit, claim.expense_split_id)
+    if not split:
+        return None  # Router: 404
+
+    expense = session.get(Expense, split.expense_id)
+    if not expense:
+        return None  # Router: 404
+
+    # 3. Verify current_user is expense owner (payer)
+    if current_user_id != expense.payer_id:
+        return "FORBIDDEN"  # Router: 403
+
+    # 4. Verify claim is still PENDING
+    if claim.status != SettlementClaimStatus.PENDING:
+        return "CONFLICT"  # Router: 409
+
+    # 5. Build response FIRST (before deleting the claim)
+    response = _build_claim_public(claim, session)
+
+    # 6. Record audit (REJECTED, before/after)
+    record_audit(
+        session,
+        expense_id=expense.id,
+        user_id=current_user_id,
+        action_type=AuditActionType.REJECTED,
+        before_data={"status": "pending"},
+        after_data={"status": "rejected"},
+    )
+
+    # 7. Delete the claim so the user can re-claim
+    session.delete(claim)
+
+    # 8. Commit + return pre-built response
+    session.commit()
+
+    return response
+
+
+def get_claims_awaiting_owner_confirmation(
+    session: Session, user_id: uuid.UUID
+) -> list[dict]:
+    """
+    Get all pending settlement claims for expenses owned by the given user.
+
+    Uses JOIN query to avoid N+1 database calls.
+
+    Args:
+        session: Database session
+        user_id: User ID (expense owner/payer)
+
+    Returns:
+        List of dictionaries with expense, split, and claim details
+    """
+    # Single JOIN query to fetch claims + splits + expenses
+    rows = session.exec(
+        select(SettlementClaim, ExpenseSplit, Expense)
+        .join(ExpenseSplit, SettlementClaim.expense_split_id == ExpenseSplit.id)
+        .join(Expense, ExpenseSplit.expense_id == Expense.id)
+        .where(Expense.payer_id == user_id)
+        .where(SettlementClaim.status == SettlementClaimStatus.PENDING)
+    ).all()
+
+    result = []
+    for claim, split, expense in rows:
+        result.append({
+            "expense": expense,
+            "split": split,
+            "claim": _build_claim_public(claim, session),
+        })
+
+    return result
+
+
 def get_pending_settlements_for_user(
     session: Session, user_id: uuid.UUID
 ) -> list[dict]:

@@ -66,7 +66,15 @@ function formatEditedEntry(user: string, log: AuditLog): string {
 }
 
 function formatRejectedEntry(user: string, log: AuditLog): string {
+  const before = log.changes_json?.before
   const after = log.changes_json?.after
+
+  // Owner rejected a settlement claim: before has status "pending", after has status "rejected"
+  if (before?.status === "pending" && after?.status === "rejected") {
+    return `${user} rejected a settlement claim`
+  }
+
+  // Standard expense rejection
   const description = after?.description as string | undefined
 
   if (description) {
@@ -76,9 +84,29 @@ function formatRejectedEntry(user: string, log: AuditLog): string {
 }
 
 function formatSettledEntry(user: string, log: AuditLog): string {
+  const before = log.changes_json?.before
   const after = log.changes_json?.after
-  const amount = after?.amount as number | undefined
 
+  // Owner confirmation: before has status "pending" and after has status "confirmed"
+  if (before?.status === "pending" && after?.status === "confirmed") {
+    const amount = before?.amount as number | undefined
+    if (amount != null) {
+      return `${user} confirmed settlement of Rs ${amount}`
+    }
+    return `${user} confirmed a settlement`
+  }
+
+  // Claim creation: after has status "pending" (original Story 5.1 behavior)
+  if (after?.status === "pending") {
+    const amount = after?.amount as number | undefined
+    if (amount != null) {
+      return `${user} marked Rs ${amount} as settled`
+    }
+    return `${user} marked an expense as settled`
+  }
+
+  // Fallback
+  const amount = after?.amount as number | undefined
   if (amount != null) {
     return `${user} marked Rs ${amount} as settled`
   }

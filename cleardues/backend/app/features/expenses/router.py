@@ -26,6 +26,11 @@ from app.features.expenses.models import (
     SettlementClaimPublic,
     PendingSettlementPublic,
 )
+from app.features.expenses.service import (
+    confirm_settlement_claim,
+    reject_settlement_claim,
+    get_claims_awaiting_owner_confirmation,
+)
 from app.features.groups.models import ExpenseGroup, GroupMember
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -528,12 +533,36 @@ def get_pending_settlements(
     return result
 
 
+@router.get("/settlement-claims/pending-for-owner", response_model=list[PendingSettlementPublic])
+def get_pending_claims_for_owner(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> list[PendingSettlementPublic]:
+    """
+    Get all pending settlement claims for expenses owned by the current user.
+
+    Returns claims where the current user is the expense owner (payer)
+    and the claim status is still 'pending'.
+    """
+    pending_data = get_claims_awaiting_owner_confirmation(
+        session, current_user.id
+    )
+
+    result = []
+    for item in pending_data:
+        result.append(PendingSettlementPublic(
+            expense=ExpensePublic.model_validate(item["expense"]),
+            split=ExpenseSplitPublic.model_validate(item["split"]),
+            claim=item["claim"],
+        ))
+
+    return result
+
+
 # =============================================================================
 # Story 4.4: Audit Log Retrieval
-# =============================================================================
-
-
-@router.get("/{expense_id}/audit-log", response_model=AuditLogsPublic)
+# =============================================================================@router.get("/{expense_id}/audit-log", response_model=AuditLogsPublic)
 def get_expense_audit_log(
     *,
     session: SessionDep,
@@ -621,6 +650,85 @@ def settle_expense_endpoint(
         raise HTTPException(
             status_code=403,
             detail="You are not involved in this expense",
+        )
+
+    return result
+
+
+# =============================================================================
+# Story 5.2: Owner Confirms Settlement
+# =============================================================================
+
+
+@router.post("/settlement-claims/{claim_id}/confirm", response_model=SettlementClaimPublic)
+def confirm_settlement_claim_endpoint(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    claim_id: uuid.UUID,
+) -> SettlementClaimPublic:
+    """
+    Confirm a settlement claim.
+
+    Only the expense owner (payer) can confirm settlement claims.
+    On confirmation: claim status → confirmed, split status → settled.
+    If all splits in the expense are settled, expense status → settled.
+
+    Error responses: 403 (not expense owner), 404 (claim not found),
+                     409 (claim already processed)
+    """
+    result = confirm_settlement_claim(session, claim_id, current_user.id)
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="Settlement claim not found")
+
+    if result == "FORBIDDEN":
+        raise HTTPException(
+            status_code=403,
+            detail="Only the expense owner can confirm settlements",
+        )
+
+    if result == "CONFLICT":
+        raise HTTPException(
+            status_code=409,
+            detail="Settlement claim has already been processed",
+        )
+
+    return result
+
+
+@router.post("/settlement-claims/{claim_id}/reject", response_model=SettlementClaimPublic)
+def reject_settlement_claim_endpoint(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    claim_id: uuid.UUID,
+) -> SettlementClaimPublic:
+    """
+    Reject a settlement claim.
+
+    Only the expense owner (payer) can reject settlement claims.
+    On rejection: claim deleted (allows claimant to re-claim).
+    Audit log preserves the rejection history.
+
+    Error responses: 403 (not expense owner), 404 (claim not found),
+                     409 (claim already processed)
+    """
+    result = reject_settlement_claim(session, claim_id, current_user.id)
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="Settlement claim not found")
+
+    if result == "FORBIDDEN":
+        raise HTTPException(
+            status_code=403,
+            detail="Only the expense owner can reject settlements",
+        )
+
+    if result == "CONFLICT":
+        raise HTTPException(
+            status_code=409,
+            detail="Settlement claim has already been processed",
         )
 
     return result

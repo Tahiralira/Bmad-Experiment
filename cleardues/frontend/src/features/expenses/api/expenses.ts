@@ -337,3 +337,90 @@ export function usePendingSettlements() {
     queryFn: getPendingSettlements,
   })
 }
+
+// =============================================================================
+// Story 5.2: Owner Confirms Settlement
+// =============================================================================
+
+async function confirmSettlement(claimId: string): Promise<SettlementClaimPublic> {
+  return __request(OpenAPI, {
+    method: "POST",
+    url: `/api/v1/expenses/settlement-claims/${claimId}/confirm`,
+    errors: {
+      403: "Only the expense owner can confirm settlements",
+      404: "Settlement claim not found",
+      409: "Settlement claim has already been processed",
+    },
+  })
+}
+
+export function useConfirmSettlement() {
+  const queryClient = useQueryClient()
+
+  return useMutation<SettlementClaimPublic, Error, string>({
+    mutationFn: (claimId) => confirmSettlement(claimId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["pending-settlements"] })
+      queryClient.invalidateQueries({ queryKey: ["pending-settlement-claims"] })
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-balances"] })
+      toast.success("Settlement confirmed")
+    },
+    onError: (error) => {
+      toast.error(`Failed to confirm settlement: ${error.message}`)
+    },
+  })
+}
+
+async function rejectSettlement(claimId: string): Promise<SettlementClaimPublic> {
+  return __request(OpenAPI, {
+    method: "POST",
+    url: `/api/v1/expenses/settlement-claims/${claimId}/reject`,
+    errors: {
+      403: "Only the expense owner can reject settlements",
+      404: "Settlement claim not found",
+      409: "Settlement claim has already been processed",
+    },
+  })
+}
+
+export function useRejectSettlement() {
+  const queryClient = useQueryClient()
+
+  return useMutation<SettlementClaimPublic, Error, string>({
+    mutationFn: (claimId) => rejectSettlement(claimId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["pending-settlements"] })
+      queryClient.invalidateQueries({ queryKey: ["pending-settlement-claims"] })
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-balances"] })
+      toast.success("Settlement rejected")
+    },
+    onError: (error) => {
+      toast.error(`Failed to reject settlement: ${error.message}`)
+    },
+  })
+}
+
+async function getPendingSettlementClaims(): Promise<PendingSettlement[]> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: "/api/v1/expenses/settlement-claims/pending-for-owner",
+    errors: {
+      401: "Unauthorized",
+    },
+  })
+}
+
+export function usePendingSettlementClaims() {
+  return useQuery<PendingSettlement[], Error>({
+    queryKey: ["pending-settlement-claims"],
+    queryFn: getPendingSettlementClaims,
+  })
+}
