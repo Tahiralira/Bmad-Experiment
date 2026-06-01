@@ -226,3 +226,28 @@ export interface AuditLogsResponse {
   data: AuditLog[]
   count: number
 }
+
+// =============================================================================
+// Settlement Claim Types (Story 5.1 - Mark Debt as Settled)
+// =============================================================================
+
+export type SettlementClaimStatus = "pending" | "confirmed" | "rejected"
+
+export interface SettlementClaimPublic {
+  id: string
+  expense_split_id: string
+  claimant_user_id: string
+  amount: number
+  status: SettlementClaimStatus
+  claimed_at: string
+  confirmed_at: string | null
+  rejected_at: string | null
+  created_at: string
+  user_name: string | null
+}
+
+export interface PendingSettlement {
+  expense: Expense
+  split: ExpenseSplit
+  claim: SettlementClaimPublic
+}

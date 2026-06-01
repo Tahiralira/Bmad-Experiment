@@ -12,8 +12,8 @@
 metadata:
   version: "1.0"
   created_at: "2026-01-12"
-  last_review: "Story 4.4 Code Review"
-  total_items: 33  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM + 3 Epic 4
+  last_review: "Story 5.1 Code Review"
+  total_items: 36  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM + 3 Epic 4 + 3 Epic 5
   status_legend:
     open: "Not yet addressed"
     in_progress: "Currently being worked on"
@@ -402,13 +402,13 @@ summary:
     user-experience: 1  # +1 from retrospective (group nav)
 
   by_status:
-    open: 29  # +5 from Epic 2.5 retrospective (3 HIGH + 2 MEDIUM) + 3 from Epic 4
+    open: 32  # +5 from Epic 2.5 retrospective (3 HIGH + 2 MEDIUM) + 3 from Epic 4 + 3 from Epic 5
     resolved: 4
     in_progress: 0
     wont_fix: 0
 
   by_effort:
-    small: 25  # +1 from retrospective (console.log) + 3 from Epic 4
+    small: 28  # +1 from retrospective (console.log) + 3 from Epic 4 + 3 from Epic 5
     medium: 8  # +4 from retrospective (group nav, dark mode, Storybook)
     large: 0
 
@@ -502,4 +502,40 @@ epic_4:
         file: "cleardues/frontend/src/features/expenses/components/ActivityFeedItem.tsx"
         description: "React.ElementType used without explicit import - works via global types but not best practice"
         suggested_fix: "Changed to import { type ElementType } from 'react' during code review"
+        effort: "small"
+
+# =============================================================================
+# EPIC 5: Settlement & Payment Tracking
+# =============================================================================
+
+epic_5:
+  story_5_1:
+    title: "Mark Debt as Settled (Claim Payment)"
+    reviewed: true
+    review_date: "2026-06-01"
+    items:
+      - id: "5.1-L1"
+        type: "migration"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/backend/app/alembic/versions/a6b7c8d9e0f1_add_settlement_claim_table.py"
+        description: "Manual migration with hardcoded down_revision — may conflict if other migrations created on same base"
+        suggested_fix: "Verify migration chain with `docker compose exec backend alembic heads` when Docker is available"
+        effort: "small"
+      - id: "5.1-L2"
+        type: "test-quality"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/backend/tests/api/routes/test_settlement.py"
+        lines: "144"
+        description: "Amount assertion uses string comparison (claim['amount'] == '50.00') — fragile if serialization changes"
+        suggested_fix: "Use Decimal comparison: Decimal(claim['amount']) == Decimal('50.00')"
+        effort: "small"
+      - id: "5.1-L3"
+        type: "documentation"
+        severity: "LOW"
+        status: "open"
+        file: "_bmad-output/implementation-artifacts/5-1-mark-debt-as-settled-claim-payment.md"
+        description: "Story File List doesn't include sprint-status.yaml and session-context.md changes (tracking file drift)"
+        suggested_fix: "Add tracking file updates to File List or note as auto-managed by BMAD"
         effort: "small"

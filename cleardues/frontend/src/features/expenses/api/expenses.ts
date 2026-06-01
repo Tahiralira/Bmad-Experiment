@@ -15,6 +15,8 @@ import type {
   ExpenseRejectResponse,
   PendingConfirmation,
   AuditLogsResponse,
+  SettlementClaimPublic,
+  PendingSettlement,
 } from "../types"
 
 
@@ -280,5 +282,58 @@ export function useGroupAuditLog(
     queryKey: ["group-audit-log", groupId, limit, offset],
     queryFn: () => getGroupAuditLog(groupId!, limit, offset),
     enabled: !!groupId,
+  })
+}
+
+// =============================================================================
+// Story 5.1: Settlement Claims
+// =============================================================================
+
+async function settleExpense(expenseId: string): Promise<SettlementClaimPublic> {
+  return __request(OpenAPI, {
+    method: "POST",
+    url: `/api/v1/expenses/${expenseId}/settle`,
+    errors: {
+      400: "Expense must be confirmed before settling",
+      403: "You are not involved in this expense",
+      404: "Expense not found",
+      409: "Settlement already claimed for this expense",
+    },
+  })
+}
+
+export function useSettleExpense() {
+  const queryClient = useQueryClient()
+
+  return useMutation<SettlementClaimPublic, Error, string>({
+    mutationFn: (expenseId) => settleExpense(expenseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["pending-settlements"] })
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
+      toast.success("Settlement claim submitted")
+    },
+    onError: (error) => {
+      toast.error(`Failed to submit settlement: ${error.message}`)
+    },
+  })
+}
+
+async function getPendingSettlements(): Promise<PendingSettlement[]> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: "/api/v1/expenses/pending-settlements",
+    errors: {
+      401: "Unauthorized",
+    },
+  })
+}
+
+export function usePendingSettlements() {
+  return useQuery<PendingSettlement[], Error>({
+    queryKey: ["pending-settlements"],
+    queryFn: getPendingSettlements,
   })
 }

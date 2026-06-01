@@ -23,6 +23,8 @@ from app.features.expenses.models import (
     ExpenseRejectRequest,
     ExpenseRejectResponse,
     PendingConfirmationPublic,
+    SettlementClaimPublic,
+    PendingSettlementPublic,
 )
 from app.features.groups.models import ExpenseGroup, GroupMember
 
@@ -499,6 +501,33 @@ def get_pending_confirmations(
     return result
 
 
+@router.get("/pending-settlements", response_model=list[PendingSettlementPublic])
+def get_pending_settlements(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> list[PendingSettlementPublic]:
+    """
+    Get all expenses with pending settlement claims for the current user.
+
+    Returns expenses where the user has submitted a settlement claim
+    that is still awaiting owner confirmation (status: pending).
+    """
+    pending_data = expense_service.get_pending_settlements_for_user(
+        session, current_user.id
+    )
+
+    result = []
+    for item in pending_data:
+        result.append(PendingSettlementPublic(
+            expense=ExpensePublic.model_validate(item["expense"]),
+            split=ExpenseSplitPublic.model_validate(item["split"]),
+            claim=item["claim"],
+        ))
+
+    return result
+
+
 # =============================================================================
 # Story 4.4: Audit Log Retrieval
 # =============================================================================
@@ -541,3 +570,57 @@ def get_expense_audit_log(
         data=logs,
         count=count,
     )
+
+
+# =============================================================================
+# Story 5.1: Settlement Claims
+# =============================================================================
+
+
+@router.post("/{expense_id}/settle", response_model=SettlementClaimPublic, status_code=201)
+def settle_expense_endpoint(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    expense_id: uuid.UUID,
+) -> SettlementClaimPublic:
+    """
+    Mark an expense split as settled (claim payment).
+
+    Creates a settlement claim for the current user's split in the expense.
+    The claim starts with status 'pending' and awaits owner confirmation (Story 5.2).
+
+    Returns 201 Created with the settlement claim details.
+    Error responses: 400 (expense not confirmed), 403 (not involved),
+                     404 (expense not found), 409 (already claimed)
+    """
+    # Get expense (404 if not found)
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Status guard: Only confirmed expenses can be settled
+    if expense.status != ExpenseStatus.CONFIRMED:
+        raise HTTPException(
+            status_code=400,
+            detail="Expense must be confirmed before settling",
+        )
+
+    # Use service layer for business logic
+    result = expense_service.settle_expense_split(
+        session, expense_id, current_user.id
+    )
+
+    if result == "CONFLICT":
+        raise HTTPException(
+            status_code=409,
+            detail="Settlement already claimed for this expense",
+        )
+
+    if not result:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not involved in this expense",
+        )
+
+    return result

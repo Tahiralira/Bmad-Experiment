@@ -110,17 +110,17 @@ development_status:
   # Epic 3 retrospective action items completed. Epic 4 started.
   # See: epic-4-preparation-action-items.md for preparation status
   #
-  epic-4: in-progress
+  epic-4: done
   4-1-creator-only-edit-restriction: done
   4-2-expense-confirmation-workflow: done
   4-3-finalize-expense-after-all-confirmations: done
   4-4-immutable-audit-log-for-all-actions: done
   4-5-activity-feed-display: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   # Epic 5: Settlement & Payment Tracking (3 stories)
-  epic-5: backlog
-  5-1-mark-debt-as-settled-claim-payment: backlog
+  epic-5: in-progress
+  5-1-mark-debt-as-settled-claim-payment: done
   5-2-owner-confirms-settlement: backlog
   5-3-settlement-audit-trail: backlog
   epic-5-retrospective: optional

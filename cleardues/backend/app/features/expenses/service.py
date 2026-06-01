@@ -16,6 +16,9 @@ from app.features.expenses.models import (
     ExpenseSplit,
     ExpenseStatus,
     ExpenseUpdate,
+    SettlementClaim,
+    SettlementClaimPublic,
+    SettlementClaimStatus,
     SplitStatus,
 )
 from app.features.auth.models import User
@@ -808,3 +811,133 @@ def get_group_audit_logs(
     enriched = _build_audit_log_public(logs, session)
 
     return enriched, count
+
+
+# =============================================================================
+# Story 5.1: Settlement Claim - Service Layer
+# =============================================================================
+
+
+def _build_claim_public(
+    claim: SettlementClaim, session: Session
+) -> SettlementClaimPublic:
+    """
+    Build a SettlementClaimPublic schema with user_name populated.
+
+    Shared helper to avoid duplicating field mapping across service functions.
+    """
+    user = session.get(User, claim.claimant_user_id)
+    user_name = user.full_name or user.email if user else None
+
+    return SettlementClaimPublic(
+        id=claim.id,
+        expense_split_id=claim.expense_split_id,
+        claimant_user_id=claim.claimant_user_id,
+        amount=claim.amount,
+        status=claim.status,
+        claimed_at=claim.claimed_at,
+        confirmed_at=claim.confirmed_at,
+        rejected_at=claim.rejected_at,
+        created_at=claim.created_at,
+        user_name=user_name,
+    )
+
+
+def settle_expense_split(
+    session: Session, expense_id: uuid.UUID, current_user_id: uuid.UUID
+) -> SettlementClaimPublic:
+    """
+    Create a settlement claim for the current user's split in an expense.
+
+    Creates: SettlementClaim record + AuditLog entry.
+    Caller (router) is responsible for validation (404, 400, 403, 409).
+
+    Args:
+        session: Database session
+        expense_id: Expense ID
+        current_user_id: User ID of the claimant
+
+    Returns:
+        SettlementClaimPublic with populated user_name
+    """
+    # Find user's split in this expense
+    split = session.exec(
+        select(ExpenseSplit)
+        .where(ExpenseSplit.expense_id == expense_id)
+        .where(ExpenseSplit.user_id == current_user_id)
+    ).first()
+
+    if not split:
+        return None  # Signal to router that user is not involved
+
+    # Check for existing claim on this split
+    existing_claim = session.exec(
+        select(SettlementClaim).where(
+            SettlementClaim.expense_split_id == split.id
+        )
+    ).first()
+
+    if existing_claim:
+        return "CONFLICT"  # Signal to router for 409
+
+    # Create SettlementClaim with status PENDING
+    claim = SettlementClaim(
+        expense_split_id=split.id,
+        claimant_user_id=current_user_id,
+        amount=split.amount_owed,
+        status=SettlementClaimStatus.PENDING,
+        claimed_at=datetime.now(timezone.utc),
+    )
+    session.add(claim)
+    session.commit()
+    session.refresh(claim)
+
+    # Record audit log (action_type="settled")
+    record_audit(
+        session,
+        expense_id=expense_id,
+        user_id=current_user_id,
+        action_type=AuditActionType.SETTLED,
+        after_data={
+            "amount": str(split.amount_owed),
+            "status": "pending",
+        },
+    )
+    session.commit()
+
+    return _build_claim_public(claim, session)
+
+
+def get_pending_settlements_for_user(
+    session: Session, user_id: uuid.UUID
+) -> list[dict]:
+    """
+    Get all pending settlement claims for a user.
+
+    Uses JOIN query to avoid N+1 database calls.
+
+    Args:
+        session: Database session
+        user_id: User ID
+
+    Returns:
+        List of dictionaries with expense, split, and claim details
+    """
+    # Single JOIN query to fetch claims + splits + expenses
+    rows = session.exec(
+        select(SettlementClaim, ExpenseSplit, Expense)
+        .join(ExpenseSplit, SettlementClaim.expense_split_id == ExpenseSplit.id)
+        .join(Expense, ExpenseSplit.expense_id == Expense.id)
+        .where(SettlementClaim.claimant_user_id == user_id)
+        .where(SettlementClaim.status == SettlementClaimStatus.PENDING)
+    ).all()
+
+    result = []
+    for claim, split, expense in rows:
+        result.append({
+            "expense": expense,
+            "split": split,
+            "claim": _build_claim_public(claim, session),
+        })
+
+    return result

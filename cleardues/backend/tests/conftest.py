@@ -9,7 +9,7 @@ from app.core.db import engine, init_db
 from app.main import app
 from app.models import Item, MagicLinkToken, User
 from app.features.groups.models import ExpenseGroup, GroupInvite, GroupMember
-from app.features.expenses.models import AuditLog
+from app.features.expenses.models import AuditLog, SettlementClaim
 from tests.utils.user import authentication_token_from_email
 from tests.utils.utils import get_superuser_token_headers
 
@@ -21,6 +21,8 @@ def db() -> Generator[Session, None, None]:
         yield session
         # Clean up in correct order (respect foreign key constraints)
         statement = delete(AuditLog)
+        session.execute(statement)
+        statement = delete(SettlementClaim)
         session.execute(statement)
         statement = delete(GroupInvite)
         session.execute(statement)

@@ -28,6 +28,14 @@ class SplitStatus(str, PyEnum):
     SETTLED = "settled"
 
 
+class SettlementClaimStatus(str, PyEnum):
+    """Status lifecycle for settlement claims."""
+
+    PENDING = "pending"  # User marked as paid, awaiting owner confirmation
+    CONFIRMED = "confirmed"  # Owner confirmed the payment
+    REJECTED = "rejected"  # Owner rejected the claim
+
+
 # === Request/Response Schemas ===
 
 
@@ -167,6 +175,32 @@ class ExpenseRejectResponse(SQLModel):
     remaining_splits: int
 
 
+# === Settlement Claim Schemas (Story 5.1) ===
+
+
+class SettlementClaimPublic(SQLModel):
+    """Response schema for a settlement claim."""
+
+    id: uuid.UUID
+    expense_split_id: uuid.UUID
+    claimant_user_id: uuid.UUID
+    amount: Decimal
+    status: SettlementClaimStatus
+    claimed_at: datetime
+    confirmed_at: datetime | None = None
+    rejected_at: datetime | None = None
+    created_at: datetime
+    user_name: str | None = None
+
+
+class PendingSettlementPublic(SQLModel):
+    """Response schema for pending settlements with expense and split details."""
+
+    expense: ExpensePublic
+    split: ExpenseSplitPublic
+    claim: SettlementClaimPublic
+
+
 # === Audit Log Types and Schemas (Story 4.4) ===
 
 
@@ -293,3 +327,36 @@ class AuditLog(SQLModel, table=True):
     # Relationships
     expense: Expense = Relationship()
     user: User = Relationship()
+
+
+class SettlementClaim(SQLModel, table=True):
+    """
+    Settlement claim for an expense split.
+
+    Created when a user marks their split as "settled" (paid).
+    The expense owner confirms or rejects the claim in Story 5.2.
+
+    Unique constraint on expense_split_id ensures one claim per split.
+    """
+
+    __tablename__ = "settlement_claim"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    expense_split_id: uuid.UUID = Field(
+        foreign_key="expense_split.id", nullable=False, unique=True, index=True
+    )
+    claimant_user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, index=True
+    )
+    amount: Decimal = Field(max_digits=10, decimal_places=2)
+    status: SettlementClaimStatus = Field(default=SettlementClaimStatus.PENDING)
+    claimed_at: datetime = Field(default_factory=utc_now)
+    confirmed_at: datetime | None = None
+    rejected_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+    # Relationships
+    split: ExpenseSplit = Relationship()
+    claimant: User = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "settlement_claim.c.claimant_user_id"}
+    )

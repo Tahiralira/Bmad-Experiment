@@ -11,7 +11,7 @@
 
 metadata:
   version: "1.0"
-  total_patterns: 11
+  total_patterns: 13
   categories:
     - docker
     - database
@@ -21,6 +21,7 @@ metadata:
     - git
     - imports
     - deployment
+    - error-handling
 
 # =============================================================================
 # DOCKER PATTERNS
@@ -218,6 +219,29 @@ frontend:
     stories_encountered: ["2.5.6"]
     tokens_saved_estimate: "~100 per occurrence"
 
+  - id: "FE-005"
+    title: "Optimistic UI without error recovery leaves UI stuck"
+    symptoms:
+      - "Card/button shows 'success' state optimistically"
+      - "If actual API call fails, UI stays in success state permanently"
+      - "User cannot retry or revert"
+    root_cause: "Optimistic state set to true but never reset on mutation error"
+    solution: |
+      Always add a useEffect to revert optimistic state on error:
+      ```typescript
+      const [isOptimistic, setIsOptimistic] = useState(false)
+
+      // Revert on mutation failure
+      useEffect(() => {
+        if (mutation.isError && isOptimistic) {
+          setIsOptimistic(false)
+        }
+      }, [mutation.isError, isOptimistic])
+      ```
+    prevention: "For every optimistic UI update, add error recovery that resets the optimistic state"
+    stories_encountered: ["5.1"]
+    tokens_saved_estimate: "~300 per occurrence"
+
   - id: "FE-004"
     title: "Numbers look unnatural in UI - tabular vs proportional figures"
     symptoms:
@@ -281,6 +305,44 @@ testing:
     prevention: "Use session-scoped fixtures with rollback"
     stories_encountered: ["1.4"]
     tokens_saved_estimate: "~400 per occurrence"
+
+  - id: "TEST-003"
+    title: "String-prefix ValueError for HTTP status code translation"
+    symptoms:
+      - "Service raises ValueError('NOT_FOUND:...') or ValueError('CONFLICT:...')"
+      - "Router parses string prefix to determine HTTP status code"
+    root_cause: "Inconsistent error handling pattern — dev invents ad-hoc error translation instead of following existing pattern"
+    solution: |
+      Use the EXISTING pattern from confirm/reject endpoints:
+      1. Router does validation (404 check, status guard) with HTTPException directly
+      2. Service does business logic and returns result or sentinel value
+      3. Router translates sentinel values to appropriate HTTP status
+
+      WRONG (fragile string-prefix):
+      ```python
+      # service.py
+      raise ValueError("NOT_FOUND:Expense not found")
+
+      # router.py
+      except ValueError as e:
+          if str(e).startswith("NOT_FOUND:"):
+              raise HTTPException(status_code=404, ...)
+      ```
+
+      CORRECT (consistent with existing endpoints):
+      ```python
+      # router.py — validation here
+      expense = session.get(Expense, expense_id)
+      if not expense:
+          raise HTTPException(status_code=404, detail="Expense not found")
+
+      result = expense_service.settle_expense_split(session, expense_id, user_id)
+      if not result:
+          raise HTTPException(status_code=403, detail="Not involved")
+      ```
+    prevention: "Always check how EXISTING endpoints handle errors before inventing new patterns"
+    stories_encountered: ["5.1"]
+    tokens_saved_estimate: "~500 per occurrence"
 
 # =============================================================================
 # GIT PATTERNS

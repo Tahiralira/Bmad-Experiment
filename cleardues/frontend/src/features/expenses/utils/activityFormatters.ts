@@ -80,9 +80,9 @@ function formatSettledEntry(user: string, log: AuditLog): string {
   const amount = after?.amount as number | undefined
 
   if (amount != null) {
-    return `${user} settled Rs ${amount}`
+    return `${user} marked Rs ${amount} as settled`
   }
-  return `${user} settled an expense`
+  return `${user} marked an expense as settled`
 }
 
 function formatSplitUpdatedEntry(user: string, log: AuditLog): string {
