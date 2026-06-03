@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-06-01 (Story 5.1 code review complete - Epic 5 in progress!)
+**Last Updated:** 2026-06-01 (Story 5.2 code review complete - Epic 5 in progress!)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -14,13 +14,13 @@
 | **Epic 2.5: UX Foundation** | **DONE** | 7/7 ✅ |
 | Epic 3: Expenses | **DONE** | 8/8 ✅ |
 | **Epic 4: Trust & Confirmation** | **DONE** | 5/5 ✅ |
-| **Epic 5: Settlement** | **IN-PROGRESS** | 1/3 |
+| **Epic 5: Settlement** | **IN-PROGRESS** | 2/3 |
 | Epic 6-7 | BACKLOG | 0/18 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
 
-**Current Progress:** 31 stories completed, 14 remaining (Story 5.1 done ✅)
+**Current Progress:** 32 stories completed, 13 remaining (Story 5.2 done ✅)
 
-> **IMPORTANT:** Story 5.1 code review PASSED — 6 issues found and fixed (3 HIGH, 3 MEDIUM). Key fixes: ValueError→HTTPException pattern, N+1 query→JOIN, optimistic UI error recovery. Pre-existing test suite issue (`GroupSettings | None` SQLAlchemy error) blocks pytest.
+> **IMPORTANT:** Story 5.2 code review PASSED — 7 issues found and fixed (3 HIGH, 4 MEDIUM). Key fix: payer split auto-settle (expense could never transition to SETTLED without it). Pre-existing test suite issue (`GroupSettings | None` SQLAlchemy error) blocks pytest.
 
 ---
 
@@ -121,6 +121,7 @@ cd cleardues/frontend && npm run build
 16. **Don't access `.router` on already-imported router objects** - `from x import router as y` then `y.router` fails. Use just `y`.
 17. **Don't invent new error handling patterns** — Check how existing endpoints handle errors (HTTPException in router, not ValueError string-prefixes in service)
 18. **Don't write optimistic UI without error recovery** — Always add `useEffect` to revert optimistic state when `mutation.isError` is true
+19. **Don't assume "check all X done" works when owner has their own record** — When using check_all_X patterns, verify the owner's record can reach the target status or needs auto-transition
 
 ---
 
@@ -130,8 +131,8 @@ cd cleardues/frontend && npm run build
 
 **Epic 5: Settlement & Payment Tracking** ← **IN-PROGRESS** (1/3)
 - Story 5.1: Mark Debt as Settled / Claim Payment ← **DONE** ✓ (code review passed)
-- Story 5.2: Owner Confirms Settlement ← **NEXT**
-- Story 5.3: Settlement Audit Trail ← **BACKLOG**
+- Story 5.2: Owner Confirms Settlement ← **DONE** ✓ (code review passed)
+- Story 5.3: Settlement Audit Trail ← **NEXT**
 
 **Pre-existing Issue Found:** `GroupSettings | None` SQLAlchemy relationship error in `ExpenseGroup` model breaks ALL pytest tests. Backend server runs fine. Needs fix before tests can run.
 
@@ -149,6 +150,12 @@ cd cleardues/frontend && npm run build
 - Use JOIN queries for list endpoints that need related data (avoid N+1 per-item queries)
 - Extract shared response builders (like `_build_claim_public`) to deduplicate field mapping
 - Optimistic UI MUST have error recovery: `useEffect(() => { if (mutation.isError) revert() })`
+
+**Key Pattern from Story 5.2 Code Review:**
+- When using "check all X done" patterns, verify the entity OWNER's own record can reach the target status — auto-settle the payer's split when confirming settlement claims
+- Batch-fetch related entities (users) instead of per-row lookups in JOIN query result loops
+- Extract shared error handling helpers (`_handle_settlement_result`) to deduplicate sentinel→HTTPException translation
+- Don't use `useCallback` with `useMutation()` as a dep — mutation object changes every render, making the memoization useless
 
 ---
 

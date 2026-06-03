@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Check, X, Clock } from "lucide-react"
 
@@ -80,19 +80,19 @@ export function SettlementClaimCard({
     }
   }, [rejectMutation.isError, optimisticState])
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = () => {
     setOptimisticState("confirmed")
     // Start glow animation, then collapse
     setTimeout(() => {
       setIsRemoving(true)
     }, GLOW_DURATION_MS)
     confirmMutation.mutate(claim.id)
-  }, [claim.id, confirmMutation])
+  }
 
-  const handleReject = useCallback(() => {
+  const handleReject = () => {
     setOptimisticState("rejected")
     rejectMutation.mutate(claim.id)
-  }, [claim.id, rejectMutation])
+  }
 
   const claimantName = claim.user_name || "Someone"
 

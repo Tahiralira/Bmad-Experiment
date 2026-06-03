@@ -11,7 +11,7 @@
 
 metadata:
   version: "1.0"
-  total_patterns: 13
+  total_patterns: 14
   categories:
     - docker
     - database
@@ -343,6 +343,30 @@ testing:
     prevention: "Always check how EXISTING endpoints handle errors before inventing new patterns"
     stories_encountered: ["5.1"]
     tokens_saved_estimate: "~500 per occurrence"
+
+  - id: "BE-002"
+    title: "'Check all X done' pattern ignores entity owner's own record"
+    symptoms:
+      - "Expense/split never transitions to final status (SETTLED, CONFIRMED)"
+      - "check_all_splits_X() returns False even after all non-owner members completed their action"
+      - "One split remains in previous status — the payer/creator's own split"
+    root_cause: "In split-based workflows, the expense payer/creator also has a split. When other members settle/confirm, the payer's split isn't explicitly handled because 'the payer doesn't owe themselves.' But the check-all function requires ALL splits."
+    solution: |
+      When processing the last member action (e.g., settlement confirmation), also auto-settle the payer's split:
+      ```python
+      # In confirm_settlement_claim, after settling claimant's split:
+      payer_split = session.exec(
+          select(ExpenseSplit)
+          .where(ExpenseSplit.expense_id == expense.id)
+          .where(ExpenseSplit.user_id == expense.payer_id)
+      ).first()
+      if payer_split and payer_split.status != SplitStatus.SETTLED:
+          payer_split.status = SplitStatus.SETTLED
+          session.add(payer_split)
+      ```
+    prevention: "When using 'check all X' patterns, verify whether ALL entities can realistically reach the target status, or if the owner's record needs auto-transition"
+    stories_encountered: ["5.2"]
+    tokens_saved_estimate: "~600 per occurrence"
 
 # =============================================================================
 # GIT PATTERNS

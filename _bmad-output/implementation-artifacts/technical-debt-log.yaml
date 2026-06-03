@@ -12,8 +12,8 @@
 metadata:
   version: "1.0"
   created_at: "2026-01-12"
-  last_review: "Story 5.1 Code Review"
-  total_items: 36  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM + 3 Epic 4 + 3 Epic 5
+  last_review: "Story 5.2 Code Review"
+  total_items: 39  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM + 3 Epic 4 + 6 Epic 5
   status_legend:
     open: "Not yet addressed"
     in_progress: "Currently being worked on"
@@ -402,14 +402,14 @@ summary:
     user-experience: 1  # +1 from retrospective (group nav)
 
   by_status:
-    open: 32  # +5 from Epic 2.5 retrospective (3 HIGH + 2 MEDIUM) + 3 from Epic 4 + 3 from Epic 5
+    open: 35  # +5 from Epic 2.5 retrospective (3 HIGH + 2 MEDIUM) + 3 from Epic 4 + 6 from Epic 5
     resolved: 4
     in_progress: 0
     wont_fix: 0
 
   by_effort:
-    small: 28  # +1 from retrospective (console.log) + 3 from Epic 4 + 3 from Epic 5
-    medium: 8  # +4 from retrospective (group nav, dark mode, Storybook)
+    small: 30  # +1 from retrospective (console.log) + 3 from Epic 4 + 5 from Epic 5 (3+2 new)
+    medium: 9  # +4 from retrospective (group nav, dark mode, Storybook) + 1 from 5.2 (currency)
     large: 0
 
 # =============================================================================
@@ -538,4 +538,35 @@ epic_5:
         file: "_bmad-output/implementation-artifacts/5-1-mark-debt-as-settled-claim-payment.md"
         description: "Story File List doesn't include sprint-status.yaml and session-context.md changes (tracking file drift)"
         suggested_fix: "Add tracking file updates to File List or note as auto-managed by BMAD"
+        effort: "small"
+  story_5_2:
+    title: "Owner Confirms Settlement"
+    reviewed: true
+    review_date: "2026-06-01"
+    items:
+      - id: "5.2-L1"
+        type: "code-quality"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/backend/app/features/expenses/router.py"
+        lines: "9,29-33"
+        description: "Inconsistent import style — imports both `expense_service` module AND individual functions from it directly"
+        suggested_fix: "Pick one style: either use `expense_service.func()` consistently or import all needed functions directly"
+        effort: "small"
+      - id: "5.2-L2"
+        type: "code-quality"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/frontend/src/features/expenses/utils/activityFormatters.ts"
+        lines: "90-95"
+        description: "Hardcoded 'Rs' currency prefix — not localization-friendly. Pre-existing pattern across the codebase."
+        suggested_fix: "Extract to shared currency formatter utility when i18n is implemented"
+        effort: "medium"
+      - id: "5.2-L3"
+        type: "documentation"
+        severity: "LOW"
+        status: "open"
+        file: "_bmad-output/implementation-artifacts/5-2-owner-confirms-settlement.md"
+        description: "Task 8.2 claims 'Wire up ConfirmedExpenseCard' but ConfirmedExpenseCard.tsx not in git changes — integration achieved via query invalidation alone"
+        suggested_fix: "Update task description to clarify that query invalidation handles the state sync without direct component changes"
         effort: "small"

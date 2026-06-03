@@ -562,7 +562,10 @@ def get_pending_claims_for_owner(
 
 # =============================================================================
 # Story 4.4: Audit Log Retrieval
-# =============================================================================@router.get("/{expense_id}/audit-log", response_model=AuditLogsPublic)
+# =============================================================================
+
+
+@router.get("/{expense_id}/audit-log", response_model=AuditLogsPublic)
 def get_expense_audit_log(
     *,
     session: SessionDep,
@@ -660,6 +663,23 @@ def settle_expense_endpoint(
 # =============================================================================
 
 
+def _handle_settlement_result(result):
+    """Translate service sentinel values to HTTPException for settlement endpoints."""
+    if result is None:
+        raise HTTPException(status_code=404, detail="Settlement claim not found")
+    if result == "FORBIDDEN":
+        raise HTTPException(
+            status_code=403,
+            detail="Only the expense owner can manage settlements",
+        )
+    if result == "CONFLICT":
+        raise HTTPException(
+            status_code=409,
+            detail="Settlement claim has already been processed",
+        )
+    return result
+
+
 @router.post("/settlement-claims/{claim_id}/confirm", response_model=SettlementClaimPublic)
 def confirm_settlement_claim_endpoint(
     *,
@@ -678,23 +698,7 @@ def confirm_settlement_claim_endpoint(
                      409 (claim already processed)
     """
     result = confirm_settlement_claim(session, claim_id, current_user.id)
-
-    if result is None:
-        raise HTTPException(status_code=404, detail="Settlement claim not found")
-
-    if result == "FORBIDDEN":
-        raise HTTPException(
-            status_code=403,
-            detail="Only the expense owner can confirm settlements",
-        )
-
-    if result == "CONFLICT":
-        raise HTTPException(
-            status_code=409,
-            detail="Settlement claim has already been processed",
-        )
-
-    return result
+    return _handle_settlement_result(result)
 
 
 @router.post("/settlement-claims/{claim_id}/reject", response_model=SettlementClaimPublic)
@@ -715,20 +719,4 @@ def reject_settlement_claim_endpoint(
                      409 (claim already processed)
     """
     result = reject_settlement_claim(session, claim_id, current_user.id)
-
-    if result is None:
-        raise HTTPException(status_code=404, detail="Settlement claim not found")
-
-    if result == "FORBIDDEN":
-        raise HTTPException(
-            status_code=403,
-            detail="Only the expense owner can reject settlements",
-        )
-
-    if result == "CONFLICT":
-        raise HTTPException(
-            status_code=409,
-            detail="Settlement claim has already been processed",
-        )
-
-    return result
+    return _handle_settlement_result(result)

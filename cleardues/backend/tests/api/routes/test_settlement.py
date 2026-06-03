@@ -653,7 +653,7 @@ def test_confirm_settlement_transitions_expense_to_settled(
     second_user_token_headers: dict[str, str],
     db: Session,
 ) -> None:
-    """Test that confirming all splits transitions expense to SETTLED."""
+    """Test that confirming a settlement claim settles ALL splits and transitions expense to SETTLED."""
     data = _create_pending_claim(
         client, normal_user_token_headers, second_user_token_headers, amount="100.00"
     )
@@ -666,19 +666,25 @@ def test_confirm_settlement_transitions_expense_to_settled(
     )
     assert response.status_code == 200
 
-    # Verify the split was settled
-    split = db.exec(
+    # Verify ALL splits are settled (claimant's split + payer's auto-settled split)
+    splits = db.exec(
         select(ExpenseSplit).where(
             ExpenseSplit.expense_id == uuid.UUID(data["expense_id"])
         )
     ).all()
 
-    # In a 2-person equal split, both splits exist.
-    # Only the claimant's split has been settled. The owner (payer) has no claim.
-    # So the expense should NOT be SETTLED yet (only 1 of 2 splits settled).
-    # For the expense to be SETTLED, ALL splits need to be settled.
-    settled_count = sum(1 for s in split if s.status == SplitStatus.SETTLED)
-    assert settled_count >= 1
+    assert len(splits) >= 2, f"Expected at least 2 splits, got {len(splits)}"
+    for s in splits:
+        assert s.status == SplitStatus.SETTLED, (
+            f"Split {s.user_id} expected SETTLED but got {s.status}"
+        )
+
+    # Verify the expense itself transitioned to SETTLED
+    expense = db.get(Expense, uuid.UUID(data["expense_id"]))
+    assert expense is not None
+    assert expense.status == ExpenseStatus.SETTLED, (
+        f"Expected expense status SETTLED but got {expense.status}"
+    )
 
 
 def test_reject_settlement_claim_success(

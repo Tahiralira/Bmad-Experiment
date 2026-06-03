@@ -121,7 +121,7 @@ development_status:
   # Epic 5: Settlement & Payment Tracking (3 stories)
   epic-5: in-progress
   5-1-mark-debt-as-settled-claim-payment: done
-  5-2-owner-confirms-settlement: review
+  5-2-owner-confirms-settlement: done
   5-3-settlement-audit-trail: backlog
   epic-5-retrospective: optional
 

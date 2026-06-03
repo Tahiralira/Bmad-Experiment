@@ -979,6 +979,17 @@ def confirm_settlement_claim(
     # 6. Update split: status → SETTLED
     split.status = SplitStatus.SETTLED
 
+    # 6b. Also settle the payer's own split (payer has no debt to settle —
+    #     they're the one receiving payment, so their split is resolved too)
+    payer_split = session.exec(
+        select(ExpenseSplit)
+        .where(ExpenseSplit.expense_id == expense.id)
+        .where(ExpenseSplit.user_id == expense.payer_id)
+    ).first()
+    if payer_split and payer_split.status != SplitStatus.SETTLED:
+        payer_split.status = SplitStatus.SETTLED
+        session.add(payer_split)
+
     session.add(claim)
     session.add(split)
 
@@ -1094,12 +1105,36 @@ def get_claims_awaiting_owner_confirmation(
         .where(SettlementClaim.status == SettlementClaimStatus.PENDING)
     ).all()
 
+    # Batch-fetch all claimant users to avoid N+1 per-row lookups
+    claimant_ids = {claim.claimant_user_id for claim, _, _ in rows}
+    users_map: dict[uuid.UUID, User | None] = {}
+    if claimant_ids:
+        users = session.exec(
+            select(User).where(User.id.in_(claimant_ids))
+        ).all()
+        users_map = {u.id: u for u in users}
+
     result = []
     for claim, split, expense in rows:
+        # Build claim public inline (avoids per-row session.get in _build_claim_public)
+        user = users_map.get(claim.claimant_user_id)
+        user_name = user.full_name or user.email if user else None
+        claim_public = SettlementClaimPublic(
+            id=claim.id,
+            expense_split_id=claim.expense_split_id,
+            claimant_user_id=claim.claimant_user_id,
+            amount=claim.amount,
+            status=claim.status,
+            claimed_at=claim.claimed_at,
+            confirmed_at=claim.confirmed_at,
+            rejected_at=claim.rejected_at,
+            created_at=claim.created_at,
+            user_name=user_name,
+        )
         result.append({
             "expense": expense,
             "split": split,
-            "claim": _build_claim_public(claim, session),
+            "claim": claim_public,
         })
 
     return result
