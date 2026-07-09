@@ -67,7 +67,7 @@ export function Dashboard() {
           Total balance
         </p>
         <BalanceDisplay
-          amount={data.total_balance}
+          amount={Number(data.total_balance)}
           variant="display"
           contextDescription="across all groups"
         />
@@ -115,9 +115,9 @@ function GroupRow({ group }: GroupRowProps) {
         </div>
         <div className="shrink-0 text-right">
           <BalanceDisplay
-            amount={group.net_balance}
+            amount={Number(group.net_balance)}
             variant="title"
-            contextLabel={group.net_balance < 0 ? "You owe" : "You're owed"}
+            contextLabel={Number(group.net_balance) < 0 ? "You owe" : "You're owed"}
             contextDescription={`in ${group.group_name}`}
           />
         </div>
