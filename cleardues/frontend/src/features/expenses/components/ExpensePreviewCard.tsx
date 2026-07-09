@@ -1,5 +1,3 @@
-import { motion, useReducedMotion } from "framer-motion"
-
 import { cn } from "@/lib/utils"
 import { EditableExpensePreview } from "./EditableExpensePreview"
 import type { ExpenseParseResponse } from "../types"
@@ -48,16 +46,12 @@ export function ExpensePreviewCard({
   autoConfirmEnabled = false,
   className,
 }: ExpensePreviewCardProps) {
-  const shouldReduceMotion = useReducedMotion()
-
   // Placeholder state (Story 3.2)
   if (status === "placeholder") {
     return (
-      <motion.div
-        initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      <div
         className={cn(
+          "animate-in fade-in-0 duration-150",
           "mt-4 p-6 rounded-lg",
           "bg-surface border border-border",
           "text-center",
@@ -67,7 +61,7 @@ export function ExpensePreviewCard({
         <p className="text-text-muted text-body-small">
           Enter expense above to see preview
         </p>
-      </motion.div>
+      </div>
     )
   }
 
@@ -103,11 +97,9 @@ export function ExpensePreviewCard({
   // Error state (Story 3.4)
   if (status === "error") {
     return (
-      <motion.div
-        initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      <div
         className={cn(
+          "animate-in fade-in-0 duration-150",
           "mt-4 p-4 rounded-lg",
           "bg-error/10 border border-error/30",
           className
@@ -116,7 +108,7 @@ export function ExpensePreviewCard({
         <p className="text-error text-sm">
           Failed to parse expense. Please try again or switch to manual form.
         </p>
-      </motion.div>
+      </div>
     )
   }
 

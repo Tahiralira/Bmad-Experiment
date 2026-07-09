@@ -1,7 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { BalanceDisplay } from "@/components/ui/balance-display"
 import { Check } from "lucide-react"
-import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import type { GroupMember } from "../types"
 
@@ -92,15 +91,13 @@ export function UnequalSplitInputs({
           const hasAmount = amount > 0
 
           return (
-            <motion.div
+            <div
               key={member.user_id}
               className={cn(
+                "animate-in fade-in-0 duration-150",
                 "flex items-center gap-3 p-3 rounded-lg border",
                 hasAmount ? "border-action bg-action/5" : "border-border bg-surface"
               )}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
             >
               <Avatar className="w-8 h-8">
                 {member.avatar_url && <AvatarImage src={member.avatar_url} />}
@@ -148,7 +145,7 @@ export function UnequalSplitInputs({
                   <Check className="absolute right-3 w-4 h-4 text-action" />
                 )}
               </div>
-            </motion.div>
+            </div>
           )
         })}
       </div>

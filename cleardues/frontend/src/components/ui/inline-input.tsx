@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { motion, useReducedMotion, type TargetAndTransition } from "framer-motion"
 import { RotateCcw } from "lucide-react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
@@ -38,7 +37,6 @@ interface InlineEditableFieldProps {
  * - Tooltip showing original AI value when edited
  * - Currency formatting for amount fields
  * - Inline validation errors
- * - Framer Motion animations (respects reduced motion)
  *
  * @example
  * ```tsx
@@ -67,41 +65,19 @@ export function InlineEditableField({
   name,
 }: InlineEditableFieldProps) {
   const [isFocused, setIsFocused] = useState(false)
-  const shouldReduceMotion = useReducedMotion()
-
-  // Animation variants
-  const fieldVariants = {
-    normal: {
-      borderColor: "var(--border)",
-      backgroundColor: "var(--surface)",
-    } as TargetAndTransition,
-    focused: {
-      borderColor: "var(--action)",
-      backgroundColor: "var(--surface)",
-    } as TargetAndTransition,
-    edited: {
-      borderColor: "var(--action)",
-      backgroundColor: "var(--success-subtle)",
-    } as TargetAndTransition,
-  }
-
-  // Determine animation state
-  const getAnimationState = () => {
-    if (isEdited) return "edited"
-    if (isFocused) return "focused"
-    return "normal"
-  }
 
   return (
-    <motion.div
+    <div
       className={cn(
-        "inline-field relative rounded-lg border p-3",
+        "inline-field relative rounded-md border p-3",
         "transition-colors duration-200",
+        isEdited
+          ? "border-action bg-success-subtle"
+          : isFocused
+            ? "border-action bg-surface"
+            : "border-border bg-surface",
         className
       )}
-      variants={shouldReduceMotion ? undefined : fieldVariants}
-      animate={getAnimationState()}
-      transition={{ duration: 0.2 }}
     >
       {/* Label */}
       <label
@@ -223,6 +199,6 @@ export function InlineEditableField({
           </span>
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

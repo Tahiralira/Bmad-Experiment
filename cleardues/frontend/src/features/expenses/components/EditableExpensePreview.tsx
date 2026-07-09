@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react"
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { Check, ChevronDown, ChevronUp, Settings, Lock } from "lucide-react"
@@ -73,7 +72,6 @@ export function EditableExpensePreview({
   currentUserId,
   expense,
 }: EditableExpensePreviewProps) {
-  const shouldReduceMotion = useReducedMotion()
 
   // Fetch group members for payer selection and split
   const { data: membersData, isLoading: isLoadingMembers } = useGroupMembers(groupId)
@@ -270,12 +268,9 @@ export function EditableExpensePreview({
   const isValid = isComplexMode ? isBasicValid && isSplitValid : isBasicValid
 
   return (
-    <motion.div
-      initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.2 }}
+    <div
       className={cn(
+        "animate-in fade-in-0 duration-150",
         "flex flex-col gap-3",
         "p-4 rounded-lg",
         "bg-surface-elevated border border-border",
@@ -435,15 +430,8 @@ export function EditableExpensePreview({
       </div>
 
       {/* Complex Edit Mode - Split Controls (Story 3.5) */}
-      <AnimatePresence>
-        {isComplexMode && (
-          <motion.div
-            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col gap-3 pt-3 border-t border-border"
-          >
+      {isComplexMode && (
+          <div className="animate-in fade-in-0 duration-150 flex flex-col gap-3 pt-3 border-t border-border">
             {/* Split Type Picker */}
             <SplitPicker
               selectedType={splitType}
@@ -502,9 +490,8 @@ export function EditableExpensePreview({
             >
               Done
             </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+      )}
 
       {/* Story 4.1: Non-creator restriction notice */}
       {!canEdit && expense && (
@@ -575,6 +562,6 @@ export function EditableExpensePreview({
           </TooltipPrimitive.Root>
         </TooltipPrimitive.Provider>
       </div>
-    </motion.div>
+    </div>
   )
 }

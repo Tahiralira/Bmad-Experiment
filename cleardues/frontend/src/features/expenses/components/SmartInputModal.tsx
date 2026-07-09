@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { motion, type PanInfo, type TargetAndTransition, useReducedMotion, useMotionValue } from "framer-motion"
 import { X } from "lucide-react"
 import FocusTrap from "focus-trap-react"
 import { toast } from "sonner"
@@ -27,52 +26,8 @@ export interface SmartInputModalProps {
   groupId?: string
   /** Entry point context - affects group selector visibility */
   entryPoint?: "dashboard" | "group"
-  /** Ref to the Agent Orb element for focus return on close */
+  /** Ref to the FAB element for focus return on close */
   triggerRef?: React.RefObject<HTMLElement | null>
-}
-
-// ============================================================================
-// Animation Variants
-// ============================================================================
-
-// Modal animates from bottom-right (Agent Orb position)
-// On mobile: slides up from bottom with origin at bottom-right
-// On desktop: scales from bottom-right corner
-const modalVariants = {
-  hidden: {
-    opacity: 0,
-    y: "100%",
-    x: 50, // Start slightly offset toward right (Orb is at right)
-    scale: 0.9,
-    originY: 1, // Origin at bottom (Agent Orb position)
-    originX: 1, // Origin at right (Agent Orb is on right side)
-  } as TargetAndTransition,
-  visible: {
-    opacity: 1,
-    y: 0,
-    x: 0,
-    scale: 1,
-    originY: 1,
-    originX: 1,
-    transition: {
-      type: "spring" as const,
-      stiffness: 300,
-      damping: 30,
-      duration: 0.3,
-    },
-  } as TargetAndTransition,
-  exit: {
-    opacity: 0,
-    y: "100%",
-    x: 50,
-    scale: 0.9,
-    originY: 1,
-    originX: 1,
-    transition: {
-      duration: 0.2,
-      ease: "easeIn" as const,
-    },
-  } as TargetAndTransition,
 }
 
 // ============================================================================
@@ -84,14 +39,12 @@ const modalVariants = {
  *
  * Features:
  * - Full-screen on mobile, centered dialog (600px max) on desktop
- * - Slide-up animation from Agent Orb position
  * - Natural language input field with contextual placeholder
  * - AI commentary bubble with streaming text effect
  * - Expense preview card with editable fields (Story 3.4)
  * - Toggle between smart input and manual form
- * - Close via X button, Escape key, backdrop tap, or swipe down
+ * - Close via X button, Escape key, or backdrop tap
  * - Full keyboard accessibility with focus trap
- * - Reduced motion support
  *
  * @example
  * ```tsx
@@ -110,8 +63,6 @@ export function SmartInputModal({
   entryPoint = "dashboard",
   triggerRef,
 }: SmartInputModalProps) {
-  const shouldReduceMotion = useReducedMotion()
-
   // State
   const [inputText, setInputText] = useState("")
   const [mode, setMode] = useState<"smart" | "manual">("smart")
@@ -135,11 +86,6 @@ export function SmartInputModal({
   // isProcessing = AI processing duration (includes streaming + simulated API call time)
   // isStreaming = text animation duration only
   // We keep isProcessing true for full 2 seconds to simulate API call, not just streaming time
-
-  // Motion value for swipe gesture (mobile)
-  const y = useMotionValue(0)
-  // Swipe threshold - dismiss if dragged down more than this
-  const SWIPE_DISMISS_THRESHOLD = 100
 
   // Handle smart input submission
   const handleSmartSubmit = async () => {
@@ -229,16 +175,6 @@ export function SmartInputModal({
     }
   }
 
-  // Handle swipe-to-dismiss gesture
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    if (info.offset.y > SWIPE_DISMISS_THRESHOLD) {
-      handleClose()
-    } else {
-      // Spring back to position
-      y.set(0)
-    }
-  }
-
   // Handle Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -300,21 +236,11 @@ export function SmartInputModal({
           onClick={handleClose}
         />
 
-        {/* Modal content with drag gesture on mobile */}
+        {/* Modal content */}
         <DialogPrimitive.Content asChild>
-          <motion.div
-            // Swipe down to dismiss on mobile/touch devices
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={0.2}
-            onDragEnd={handleDragEnd}
-            style={{ y }}
-            // Modal variants
-            variants={shouldReduceMotion ? undefined : modalVariants}
-            initial="hidden"
-            animate="visible"
-            exit={{ y: "100%", opacity: 0, transition: { duration: 0.2 } }}
+          <div
             className={cn(
+              "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-4 duration-200",
               // Mobile: full-screen from bottom (responsive classes, no variant needed)
               "fixed inset-x-0 bottom-0 z-50 w-full",
               "bg-surface rounded-t-lg shadow-lg",
@@ -339,17 +265,6 @@ export function SmartInputModal({
               }}
             >
               <div className="flex flex-col h-full max-h-[80vh] p-6">
-                  {/* Drag handle indicator - visual affordance for swipe gesture */}
-                  <div
-                    className={cn(
-                      "flex justify-center pt-1 pb-2 lg:hidden",
-                      "touch-none"
-                    )}
-                    aria-hidden="true"
-                  >
-                    <div className="w-12 h-1.5 bg-muted rounded-full" />
-                  </div>
-
                   {/* Header */}
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-title font-medium text-text-primary">
@@ -467,7 +382,7 @@ export function SmartInputModal({
                   )}
               </div>
             </FocusTrap>
-          </motion.div>
+          </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

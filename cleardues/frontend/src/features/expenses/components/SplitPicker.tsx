@@ -1,4 +1,3 @@
-import { motion } from "framer-motion"
 import * as Icons from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SplitType, SPLIT_TYPE_OPTIONS } from "../types"
@@ -41,14 +40,15 @@ export function SplitPicker({ selectedType, onSelectType }: SplitPickerProps) {
           const isSelected = selectedType === option.type
 
           return (
-            <motion.button
+            <button
               key={option.type}
               type="button"
               onClick={() => !option.disabled && onSelectType(option.type)}
               disabled={option.disabled}
               className={cn(
                 "relative flex flex-col items-center justify-center",
-                "p-4 rounded-lg border-2 transition-all",
+                "p-4 rounded-lg border-2",
+                "transition-transform duration-100 active:scale-95",
                 "min-h-[100px]",
                 isSelected && "border-action bg-action/10",
                 !isSelected && "border-border bg-surface",
@@ -57,9 +57,6 @@ export function SplitPicker({ selectedType, onSelectType }: SplitPickerProps) {
                   : "hover:border-action/50 hover:bg-action/5",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
               )}
-              whileHover={!option.disabled ? { scale: 1.02 } : undefined}
-              whileTap={!option.disabled ? { scale: 0.98 } : undefined}
-              transition={{ duration: 0.2 }}
             >
               {Icon && <Icon className="w-6 h-6 mb-2 text-text-primary" />}
               <span className="text-xs font-medium text-text-primary">
@@ -73,7 +70,7 @@ export function SplitPicker({ selectedType, onSelectType }: SplitPickerProps) {
                   </span>
                 </div>
               )}
-            </motion.button>
+            </button>
           )
         })}
       </div>

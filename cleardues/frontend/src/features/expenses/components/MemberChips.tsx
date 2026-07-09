@@ -1,6 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Check, X } from "lucide-react"
-import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import type { GroupMember } from "../types"
 
@@ -63,23 +62,20 @@ export function MemberChips({
             .slice(0, 2)
 
           return (
-            <motion.button
+            <button
               key={member.user_id || member.id}
               type="button"
               onClick={() => onToggleInclude(member.user_id || member.id)}
               className={cn(
                 "member-chip",
                 "flex items-center gap-2 px-3 py-2 rounded-full border",
-                "transition-all",
+                "transition-transform duration-100 active:scale-95",
                 isIncluded
                   ? "border-action bg-action/5"
                   : "border-border bg-surface opacity-60",
                 "hover:border-action/50 hover:bg-action/5",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
               )}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.2 }}
             >
               <Avatar className="w-6 h-6">
                 {member.avatar_url && (
@@ -111,7 +107,7 @@ export function MemberChips({
                   <X className="w-4 h-4 text-muted-foreground" />
                 )}
               </div>
-            </motion.button>
+            </button>
           )
         })}
       </div>

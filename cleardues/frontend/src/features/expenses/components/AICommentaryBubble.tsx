@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react"
-import { motion, useReducedMotion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 
@@ -40,7 +39,6 @@ export function AICommentaryBubble({
   className,
 }: AICommentaryBubbleProps) {
   const [showTypingIndicator, setShowTypingIndicator] = useState(false)
-  const shouldReduceMotion = useReducedMotion()
 
   // Show typing indicator after 300ms of processing with no text
   useEffect(() => {
@@ -58,14 +56,11 @@ export function AICommentaryBubble({
   }
 
   return (
-    <motion.div
-      initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
+    <div
       className={cn(
+        "animate-in fade-in-0 slide-in-from-bottom-1 duration-150",
         "mb-4 p-4 rounded-lg relative",
-        "bg-surface-elevated border border-border shadow-sm",
+        "bg-surface-elevated border border-border",
         "text-text-primary text-sm",
         className
       )}
@@ -107,6 +102,6 @@ export function AICommentaryBubble({
           {text || "Processing your expense..."}
         </p>
       )}
-    </motion.div>
+    </div>
   )
 }

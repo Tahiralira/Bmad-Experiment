@@ -1,4 +1,3 @@
-import { motion } from "framer-motion"
 import {
   Plus,
   Pencil,
@@ -42,11 +41,8 @@ export function ActivityFeedItem({
   const description = formatActivityEntry(log)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="flex items-start gap-3 py-3"
+    <div
+      className="animate-in fade-in-0 duration-150 flex items-start gap-3 py-3"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -83,6 +79,6 @@ export function ActivityFeedItem({
             : formatRelativeTime(log.created_at)}
         </p>
       </div>
-    </motion.div>
+    </div>
   )
 }
