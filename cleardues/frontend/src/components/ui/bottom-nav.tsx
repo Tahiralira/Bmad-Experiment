@@ -37,7 +37,7 @@ function BottomNav({ className }: BottomNavProps) {
       aria-label="Main navigation"
       className={cn(
         "fixed inset-x-0 bottom-0 z-40",
-        "border-t border-border bg-surface-elevated/95 backdrop-blur",
+        "border-t border-border bg-background",
         "pb-[env(safe-area-inset-bottom)]",
         className,
       )}
@@ -53,14 +53,14 @@ function BottomNav({ className }: BottomNavProps) {
                 activeOptions={item.exact ? { exact: true } : undefined}
                 className={cn(
                   "flex min-h-14 flex-col items-center justify-center gap-1",
-                  "text-muted-foreground transition-colors",
-                  "hover:text-foreground",
+                  "text-text-muted transition-colors",
+                  "hover:text-text-primary",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                  "data-[status=active]:text-action",
+                  "data-[status=active]:text-primary",
                 )}
               >
                 <Icon className="size-5" aria-hidden="true" />
-                <span className="text-[11px] font-medium leading-none">
+                <span className="text-caption font-medium uppercase tracking-[0.06em] leading-none">
                   {item.label}
                 </span>
               </Link>

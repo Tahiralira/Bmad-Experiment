@@ -19,15 +19,16 @@ export interface BalanceDisplayProps {
 
   /**
    * Size variant for different contexts
-   * - display: 32px - For dashboard balances, large numbers
-   * - title: 24px - For card titles, section headers
-   * - body: 16px - For inline amounts, list items
+   * - display: 28px - dashboard balance hero
+   * - title: 20px - card/row amounts
+   * - body: 15px - inline amounts
    */
   variant?: BalanceDisplayVariant
 
   /**
-   * Optional context label ("You owe" / "You're owed")
-   * Displayed above (display/title) or inline (body variant)
+   * Optional context label ("You owe" / "You're owed").
+   * When present, the label carries direction and the amount renders UNSIGNED —
+   * amounts are neutral facts (design v2 constitution; v1 UX-L2).
    */
   contextLabel?: string
 
@@ -44,19 +45,16 @@ export interface BalanceDisplayProps {
 }
 
 /**
- * Currency formatter for Indian Rupees with "Rs" prefix
- * Handles comma separators for thousands, lakhs, crores
- * Shows decimals only for amounts with paise (e.g., Rs 100.50)
+ * Currency formatter with "Rs" prefix.
+ * NOTE: hardcoded currency is a known WS10 item (per-group currency + formatCurrency
+ * util). Do not fix here — WS3 is visual only.
  */
-function formatCurrency(amount: number): string {
-  // Handle zero edge case (JavaScript has both 0 and -0)
+function formatCurrency(amount: number, signed: boolean): string {
   const absAmount = amount === 0 ? 0 : Math.abs(amount)
 
-  // Show decimals only if amount has paise
   const hasDecimals = absAmount % 1 !== 0
   const fractionDigits = hasDecimals ? 2 : 0
 
-  // Use Intl.NumberFormat for proper Indian locale formatting
   const formatter = new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
@@ -64,28 +62,22 @@ function formatCurrency(amount: number): string {
     maximumFractionDigits: fractionDigits,
   })
 
-  // Get formatted string (will be "₹1,500" or "₹100.50")
-  let formatted = formatter.format(absAmount)
+  let formatted = formatter.format(absAmount).replace("₹", "Rs ")
 
-  // Replace ₹ symbol with "Rs" prefix (ClearDues brand standard)
-  formatted = formatted.replace("₹", "Rs ")
-
-  // Add negative sign if needed (format: "-Rs 450")
-  if (amount < 0) {
+  if (signed && amount < 0) {
     formatted = `-${formatted}`
   }
 
-  return formatted // "Rs 1,500", "-Rs 450", or "Rs 100.50"
+  return formatted
 }
 
 /**
- * Variant-specific typography classes
- * Based on ClearDues design system tokens
+ * Variant-specific typography classes (design v2 type scale)
  */
 const variantClasses: Record<BalanceDisplayVariant, string> = {
-  display: "text-[32px] font-medium leading-tight", // 32px, Medium, 1.2
-  title: "text-[24px] font-medium leading-snug", // 24px, Medium, 1.3
-  body: "text-base font-normal leading-normal", // 16px, Regular, 1.5
+  display: "text-display font-semibold",
+  title: "text-title font-semibold",
+  body: "text-body font-normal",
 }
 
 /**
@@ -93,30 +85,6 @@ const variantClasses: Record<BalanceDisplayVariant, string> = {
  *
  * Displays monetary amounts in a consistent, neutral format.
  * Never uses red/green colors for debt - money is fact, not judgment.
- *
- * @example
- * ```tsx
- * // Dashboard large balance
- * <BalanceDisplay
- *   amount={1500}
- *   variant="display"
- *   contextLabel="Total balance across all groups"
- * />
- *
- * // Group card balance (debt)
- * <BalanceDisplay
- *   amount={-450}
- *   variant="title"
- *   contextLabel="You owe"
- *   contextDescription="to Weekend Trip group"
- * />
- *
- * // Inline expense amount
- * <BalanceDisplay
- *   amount={375}
- *   variant="body"
- * />
- * ```
  */
 export function BalanceDisplay({
   amount,
@@ -125,56 +93,52 @@ export function BalanceDisplay({
   contextDescription,
   className,
 }: BalanceDisplayProps) {
-  // Format the currency amount
-  const formattedAmount = useMemo(() => formatCurrency(amount), [amount])
+  // With a direction label, the amount is an unsigned neutral fact.
+  const formattedAmount = useMemo(
+    () => formatCurrency(amount, !contextLabel),
+    [amount, contextLabel],
+  )
 
-  // Build full context for screen readers
-  const ariaLabel = useMemo(() => {
+  // Full sentence for screen readers; the visual spans are hidden from AT so
+  // nothing is announced twice (v1 UX-L3).
+  const srText = useMemo(() => {
     const amountText = `${Math.abs(amount)} rupees`
     const direction = amount < 0 ? "owe" : "are owed"
 
     if (contextDescription) {
-      // "You owe 450 rupees to Sam"
       return `You ${direction} ${amountText} ${contextDescription}`
-    } else if (contextLabel) {
-      // "You owe 450 rupees"
-      return `${contextLabel} ${amountText}`
-    } else {
-      // "450 rupees"
-      return amountText
     }
+    if (contextLabel) {
+      return `${contextLabel} ${amountText}`
+    }
+    return amountText
   }, [amount, contextLabel, contextDescription])
 
-  // Determine label position based on variant
   const showLabelAbove = variant === "display" || variant === "title"
 
   return (
     <div className={cn("flex flex-col", className)}>
-      {/* Optional context label - above amount for display/title, inline for body */}
+      <span className="sr-only">{srText}</span>
+
       {contextLabel && showLabelAbove && (
         <span
-          className="text-text-secondary text-sm font-normal mb-1"
+          className="text-text-secondary text-body-small font-normal mb-1"
           aria-hidden="true"
         >
           {contextLabel}
         </span>
       )}
 
-      {/* Amount display with accessibility */}
       <span
         className={cn(
-          // Variant-specific typography
           variantClasses[variant],
-          // Amount styling - neutral color strategy (CRITICAL: never red/green)
-          // Use proportional-nums for natural number flow (not tabular)
-          "text-text-primary proportional-nums tracking-tight"
+          // Neutral ink, tabular figures (design v2: tabular-nums mandatory on amounts)
+          "text-text-primary tabular-nums tracking-tight",
         )}
-        aria-label={ariaLabel}
-        role="text"
+        aria-hidden="true"
       >
-        {/* Inline context label for body variant */}
         {contextLabel && variant === "body" && (
-          <span className="text-text-secondary mr-1" aria-hidden="true">
+          <span className="text-text-secondary font-normal mr-1">
             {contextLabel}
           </span>
         )}
