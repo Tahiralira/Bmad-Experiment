@@ -2,11 +2,16 @@
 import secrets
 import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Optional
 
+import sqlalchemy as sa
 from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
 
 from app.features.auth.models import User, utc_now
+
+# Timezone-aware timestamps to match the migrations (WS5/B-H9 reconcile)
+_AWARE_DATETIME = sa.DateTime(timezone=True)
 
 
 # === Request/Response Schemas ===
@@ -32,6 +37,16 @@ class ExpenseGroupWithMembers(ExpenseGroupPublic):
     """Response schema for a group with member count."""
 
     member_count: int = 0
+
+
+class ExpenseGroupDetail(ExpenseGroupWithMembers):
+    """Response schema for the group detail screen (WS5/B-H7).
+
+    net_balance is the requesting user's balance in this group, computed the
+    same way as the dashboard: positive = owed to the user, negative = user
+    owes. Decimal to the wire (serialized as a string, e.g. "12.50")."""
+
+    net_balance: Decimal = Decimal("0.00")
 
 
 # === Member Schemas ===
@@ -89,10 +104,14 @@ class ExpenseGroup(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str = Field(max_length=100, index=True)
-    created_by: uuid.UUID = Field(foreign_key="user.id", nullable=False)
-    created_at: datetime = Field(default_factory=utc_now)
+    created_by: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
     updated_at: datetime = Field(
-        default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now}
+        default_factory=utc_now,
+        sa_type=_AWARE_DATETIME,
+        sa_column_kwargs={"onupdate": utc_now},
     )
 
     # Relationships
@@ -120,11 +139,14 @@ class GroupMember(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     group_id: uuid.UUID = Field(
-        foreign_key="expense_group.id", nullable=False, index=True
+        foreign_key="expense_group.id", nullable=False, index=True,
+        ondelete="CASCADE",
     )
-    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False, index=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, index=True, ondelete="CASCADE"
+    )
     role: str = Field(default=GROUP_ROLE_MEMBER, max_length=20)
-    joined_at: datetime = Field(default_factory=utc_now)
+    joined_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
 
     # Relationships
     group: ExpenseGroup = Relationship(back_populates="members")
@@ -149,11 +171,15 @@ class GroupSettings(SQLModel, table=True):
     __tablename__ = "group_settings"
 
     id: uuid.UUID | None = Field(default_factory=uuid.uuid4, primary_key=True)
-    group_id: uuid.UUID = Field(foreign_key="expense_group.id", unique=True, index=True)
+    group_id: uuid.UUID = Field(
+        foreign_key="expense_group.id", unique=True, index=True, ondelete="CASCADE"
+    )
     ai_personality: str = Field(default="friendly", index=True)
-    created_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
     updated_at: datetime = Field(
-        default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now}
+        default_factory=utc_now,
+        sa_type=_AWARE_DATETIME,
+        sa_column_kwargs={"onupdate": utc_now},
     )
 
     # Relationship
@@ -170,12 +196,15 @@ class GroupInvite(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     group_id: uuid.UUID = Field(
-        foreign_key="expense_group.id", nullable=False, index=True
+        foreign_key="expense_group.id", nullable=False, index=True,
+        ondelete="CASCADE",
     )
     token: str = Field(unique=True, index=True, max_length=64)
-    expires_at: datetime
-    created_by: uuid.UUID = Field(foreign_key="user.id", nullable=False)
-    created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime = Field(sa_type=_AWARE_DATETIME)
+    created_by: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
 
     # Relationships
     group: ExpenseGroup = Relationship()

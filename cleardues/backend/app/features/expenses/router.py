@@ -1,37 +1,34 @@
 # Expenses feature router - API routes for expense management
 import uuid
-from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, Body
-from sqlmodel import delete, select
+from fastapi import APIRouter, Body, HTTPException, Query
+from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.features.expenses import service as expense_service
 from app.features.expenses.models import (
-    AuditActionType,
-    AuditLogPublic,
     AuditLogsPublic,
     Expense,
     ExpenseCreate,
     ExpensePublic,
-    ExpenseSplit,
     ExpenseSplitPublic,
     ExpenseSplitResponse,
+    ExpenseSplitsPublic,
     ExpenseStatus,
     ExpenseUpdate,
-    ExpenseConfirmRequest,
     ExpenseRejectRequest,
     ExpenseRejectResponse,
     PendingConfirmationPublic,
     SettlementClaimPublic,
     PendingSettlementPublic,
+    SplitRequest,
 )
 from app.features.expenses.service import (
     confirm_settlement_claim,
     reject_settlement_claim,
     get_claims_awaiting_owner_confirmation,
 )
-from app.features.groups.models import ExpenseGroup, GroupMember
+from app.features.groups.models import ExpenseGroup
 from app.features.groups.service import is_group_member
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -141,13 +138,18 @@ def update_expense_split(
     *,
     session: SessionDep,
     expense_id: uuid.UUID,
-    split_data: dict = Body(...),
+    split_data: SplitRequest = Body(...),
     current_user: CurrentUser,
 ) -> ExpenseSplitResponse:
     """
     Update expense split configuration.
 
-    Supports equal split (Story 3.5), unequal split (Story 3.6), and percentage split (Story 3.7).
+    The body is a discriminated union on `type`: equal (Story 3.5), unequal
+    (Story 3.6), or percentage (Story 3.7) — malformed bodies (bad UUIDs,
+    missing fields, out-of-range values, unknown types) are rejected with 422
+    by schema validation (WS5/B-H6). Domain failures (non-members, sums that
+    don't match the total) return 400.
+
     Only the expense creator can modify the split.
     Confirmed/settled expenses cannot have splits modified.
     """
@@ -175,235 +177,26 @@ def update_expense_split(
             detail="Only expense creator can modify split",
         )
 
-    # Get split type
-    split_type = split_data.get("type")
-
-    # Handle equal split
-    if split_type == "equal":
-        # Get group members
-        statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
-        members = session.exec(statement).all()
-        member_ids = [m.user_id for m in members]
-
-        # Calculate split
-        try:
-            splits_data = expense_service.calculate_equal_split(
-                total_amount=expense.amount,
-                member_ids=member_ids,
-                excluded_user_ids=split_data.get("excluded_user_ids", []),
-                payer_id=expense.payer_id,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-    # Handle unequal split
-    elif split_type == "unequal":
-        # Get excluded user IDs
-        excluded_user_ids = split_data.get("excluded_user_ids", [])
-
-        # Validate excluded members are group members
-        if excluded_user_ids:
-            statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
-            group_members = session.exec(statement).all()
-            group_member_user_ids = {m.user_id for m in group_members}
-
-            for excluded_id in excluded_user_ids:
-                excluded_uuid = uuid.UUID(str(excluded_id))
-                if excluded_uuid not in group_member_user_ids:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Excluded user {excluded_id} is not a member of this group",
-                    )
-
-        # Validate splits provided
-        splits_data_raw = split_data.get("splits", [])
-        if not splits_data_raw:
-            raise HTTPException(
-                status_code=400,
-                detail="Unequal split requires 'splits' array with user_id and amount",
-            )
-
-        # Validate each split item has required fields and valid amounts
-        for idx, split_item in enumerate(splits_data_raw):
-            if "user_id" not in split_item:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Split item at index {idx} missing 'user_id'",
-                )
-            if "amount" not in split_item:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Split item at index {idx} missing 'amount'",
-                )
-            # Validate amount is positive
-            try:
-                amount = Decimal(str(split_item["amount"]))
-                if amount <= 0:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Split amount must be greater than 0 (got {amount} at index {idx})",
-                    )
-            except (ValueError, TypeError) as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid amount at index {idx}: {str(e)}",
-                )
-
-        # Get group members for validation and calculation
-        statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
-        group_members = session.exec(statement).all()
-        member_ids = [m.user_id for m in group_members]
-
-        # Validate all users in splits are group members
-        group_member_user_ids = {m.user_id for m in group_members}
-
-        for idx, split_item in enumerate(splits_data_raw):
-            user_id = uuid.UUID(str(split_item["user_id"]))
-            if user_id not in group_member_user_ids:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"User at index {idx} is not a member of this group",
-                )
-
-        # Calculate and validate unequal split
-        try:
-            splits_data = expense_service.calculate_unequal_split(
-                total_amount=expense.amount,
-                splits=splits_data_raw,
-                member_ids=member_ids,
-                excluded_user_ids=excluded_user_ids,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-    # Handle percentage split (Story 3.7)
-    elif split_type == "percentage":
-        # Get excluded user IDs
-        excluded_user_ids = split_data.get("excluded_user_ids", [])
-
-        # Validate excluded members are group members
-        if excluded_user_ids:
-            statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
-            group_members = session.exec(statement).all()
-            group_member_user_ids = {m.user_id for m in group_members}
-
-            for excluded_id in excluded_user_ids:
-                excluded_uuid = uuid.UUID(str(excluded_id))
-                if excluded_uuid not in group_member_user_ids:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Excluded user {excluded_id} is not a member of this group",
-                    )
-
-        # Validate splits provided
-        splits_data_raw = split_data.get("splits", [])
-        if not splits_data_raw:
-            raise HTTPException(
-                status_code=400,
-                detail="Percentage split requires 'splits' array with user_id and percentage",
-            )
-
-        # Validate each split item has required fields and valid percentages
-        for idx, split_item in enumerate(splits_data_raw):
-            if "user_id" not in split_item:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Split item at index {idx} missing 'user_id'",
-                )
-            if "percentage" not in split_item:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Split item at index {idx} missing 'percentage'",
-                )
-            # Validate percentage is in valid range [0, 100]
-            try:
-                percentage = Decimal(str(split_item["percentage"]))
-                if percentage < 0 or percentage > 100:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Percentage must be between 0 and 100 (got {percentage} at index {idx})",
-                    )
-            except (ValueError, TypeError) as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid percentage at index {idx}: {str(e)}",
-                )
-
-        # Get group members for validation and calculation
-        statement = select(GroupMember).where(GroupMember.group_id == expense.group_id)
-        group_members = session.exec(statement).all()
-        member_ids = [m.user_id for m in group_members]
-
-        # Validate all users in splits are group members
-        group_member_user_ids = {m.user_id for m in group_members}
-
-        for idx, split_item in enumerate(splits_data_raw):
-            user_id = uuid.UUID(str(split_item["user_id"]))
-            if user_id not in group_member_user_ids:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"User at index {idx} is not a member of this group",
-                )
-
-        # Calculate and validate percentage split
-        try:
-            splits_data = expense_service.calculate_percentage_split(
-                total_amount=expense.amount,
-                splits=splits_data_raw,
-                member_ids=member_ids,
-                excluded_user_ids=excluded_user_ids,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-    # Unimplemented split types
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Split type '{split_type}' not yet implemented. Use 'equal', 'unequal', or 'percentage'.",
+    # Validation + calculation + persistence live in ONE service function
+    # (was ~220 lines copy-pasted three times here); audit entry joins the
+    # same transaction (WS4/H5)
+    try:
+        splits_data = expense_service.apply_split(
+            session, expense, split_data, current_user.id
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # Delete existing splits for this expense
-    session.exec(
-        delete(ExpenseSplit).where(ExpenseSplit.expense_id == expense_id)
-    )
-
-    # Create new splits
-    for split in splits_data:
-        expense_split = ExpenseSplit(
-            expense_id=expense_id,
-            user_id=split["user_id"],
-            amount_owed=split["amount_owed"],
-        )
-        session.add(expense_split)
-
-    # Transition expense to PENDING_CONFIRMATION when splits are assigned
-    if expense.status == ExpenseStatus.DRAFT:
-        expense.status = ExpenseStatus.PENDING_CONFIRMATION
-        session.add(expense)
-
-    # Audit entry joins the same transaction: splits, status transition, and
-    # audit land atomically (WS4/H5)
-    expense_service.record_audit(
-        session,
-        expense_id=expense_id,
-        user_id=current_user.id,
-        action_type=AuditActionType.SPLIT_UPDATED,
-        after_data={"type": split_type, "members": len(splits_data)},
-    )
     session.commit()
-
-    # Get excluded_user_ids from request for all split types
-    excluded_user_ids = split_data.get("excluded_user_ids", [])
 
     return ExpenseSplitResponse(
         expense_id=expense_id,
-        split_type=split_type,
+        split_type=split_data.type,
         splits=[{
             "user_id": s["user_id"],
             "amount_owed": s["amount_owed"],
         } for s in splits_data],
-        excluded_user_ids=excluded_user_ids,
+        excluded_user_ids=split_data.excluded_user_ids,
     )
 
 
@@ -559,15 +352,18 @@ def get_pending_claims_for_owner(
     *,
     session: SessionDep,
     current_user: CurrentUser,
+    group_id: uuid.UUID | None = None,
 ) -> list[PendingSettlementPublic]:
     """
     Get all pending settlement claims for expenses owned by the current user.
 
     Returns claims where the current user is the expense owner (payer)
-    and the claim status is still 'pending'.
+    and the claim status is still 'pending'. Pass ?group_id= to scope the
+    list to one group (WS5/S4-M6 — group screens must not show other
+    groups' claims).
     """
     pending_data = get_claims_awaiting_owner_confirmation(
-        session, current_user.id
+        session, current_user.id, group_id=group_id
     )
 
     result = []
@@ -592,8 +388,8 @@ def get_expense_audit_log(
     session: SessionDep,
     current_user: CurrentUser,
     expense_id: uuid.UUID,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> AuditLogsPublic:
     """
     Get audit logs for a specific expense.
@@ -749,3 +545,61 @@ def reject_settlement_claim_endpoint(
     )
     session.commit()
     return result
+
+
+# =============================================================================
+# WS5 (B-H7): Ledger read endpoints
+#
+# NOTE: these are declared LAST on purpose. Starlette matches routes in
+# declaration order, so GET /{expense_id} must come after the static GET
+# routes (/pending-confirmations, /pending-settlements,
+# /settlement-claims/...) or it would capture them and 422 on the UUID parse.
+# =============================================================================
+
+
+def _get_expense_for_member(
+    session: SessionDep, expense_id: uuid.UUID, current_user: CurrentUser
+) -> Expense:
+    """Load an expense and enforce group membership (404 / 403)."""
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    if not is_group_member(
+        session, group_id=expense.group_id, user_id=current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of the group to view this expense",
+        )
+    return expense
+
+
+@router.get("/{expense_id}", response_model=ExpensePublic)
+def get_expense(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    expense_id: uuid.UUID,
+) -> ExpensePublic:
+    """
+    Get a single expense. User must be a member of the expense's group.
+    """
+    expense = _get_expense_for_member(session, expense_id, current_user)
+    return ExpensePublic.model_validate(expense)
+
+
+@router.get("/{expense_id}/splits", response_model=ExpenseSplitsPublic)
+def get_expense_splits(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    expense_id: uuid.UUID,
+) -> ExpenseSplitsPublic:
+    """
+    Get who owes what on an expense, with member names.
+    User must be a member of the expense's group.
+    """
+    _get_expense_for_member(session, expense_id, current_user)
+    splits = expense_service.get_expense_splits(session, expense_id)
+    return ExpenseSplitsPublic(data=splits, count=len(splits))

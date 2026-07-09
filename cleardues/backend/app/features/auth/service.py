@@ -349,11 +349,24 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
     # NOTE: Import inside function to avoid circular dependency between
     # auth.service -> groups.models -> auth.models. This is intentional.
     from app.features.groups.models import ExpenseGroup, GroupMember
+    from app.features.expenses.models import Expense, ExpenseSplit, ExpenseStatus, SplitStatus
 
     # Subquery to count members per group
     member_count_subq = (
         select(GroupMember.group_id, func.count().label("member_count"))
         .group_by(GroupMember.group_id)
+        .subquery()
+    )
+
+    # Last expense activity per group (WS5/B-M2): the group row's updated_at
+    # only changes on renames, so "last activity" must also consider expense
+    # writes (create/edit/confirm/settle all bump expense.updated_at).
+    expense_activity_subq = (
+        select(
+            Expense.group_id,
+            func.max(Expense.updated_at).label("last_expense_at"),
+        )
+        .group_by(Expense.group_id)
         .subquery()
     )
 
@@ -364,11 +377,16 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
             ExpenseGroup.name,
             ExpenseGroup.updated_at,
             member_count_subq.c.member_count,
+            expense_activity_subq.c.last_expense_at,
         )
         .join(GroupMember, GroupMember.group_id == ExpenseGroup.id)
         .join(member_count_subq, member_count_subq.c.group_id == ExpenseGroup.id)
+        .join(
+            expense_activity_subq,
+            expense_activity_subq.c.group_id == ExpenseGroup.id,
+            isouter=True,  # groups without expenses still appear
+        )
         .where(GroupMember.user_id == user_id)
-        .order_by(ExpenseGroup.updated_at.desc())  # Most recent activity first
     )
 
     results = session.exec(statement).all()
@@ -379,8 +397,6 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
     # Calculate net balances from confirmed expenses using a single aggregated query
     # Net balance = (sum of splits where user is payer) - (sum of user's own splits)
     from sqlalchemy import case, literal
-
-    from app.features.expenses.models import Expense, ExpenseSplit, ExpenseStatus, SplitStatus
 
     group_ids = [row.id for row in results]
 
@@ -423,15 +439,25 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
         for row in all_balances
     }
 
+    # last_activity = the later of (group row change, latest expense write).
+    # All timestamp columns are timezone-aware after the WS5/B-H9 reconcile,
+    # so max() is a safe comparison.
     summaries = [
         GroupBalanceSummary(
             group_id=row.id,
             group_name=row.name,
             net_balance=balance_map.get(row.id, zero),
-            last_activity=row.updated_at,
+            last_activity=(
+                max(row.updated_at, row.last_expense_at)
+                if row.last_expense_at is not None
+                else row.updated_at
+            ),
             member_count=row.member_count,
         )
         for row in results
     ]
+
+    # Most recent activity first (ordering must use the merged timestamp)
+    summaries.sort(key=lambda s: s.last_activity, reverse=True)
 
     return summaries

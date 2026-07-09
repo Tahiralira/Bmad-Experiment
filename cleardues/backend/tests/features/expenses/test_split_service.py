@@ -439,13 +439,14 @@ class TestExpenseSplitAPI:
         )
         assert response.status_code == 404
 
-    def test_split_unimplemented_type_returns_400(
+    def test_split_unknown_type_rejected_by_schema(
         self,
         client: TestClient,
         normal_user_token_headers: dict[str, str],
         db: Session,
     ) -> None:
-        """Test that unimplemented split types return 400"""
+        """Unknown split types are rejected by the discriminated-union
+        schema with 422 (WS5/B-H6) — previously a hand-rolled 400."""
         # Create a group and expense first
         group_data = {"name": "Split Type Test Group"}
         group_response = client.post(
@@ -474,8 +475,24 @@ class TestExpenseSplitAPI:
             headers=normal_user_token_headers,
             json=split_data,
         )
-        assert split_response.status_code == 400
-        assert "not yet implemented" in split_response.json()["detail"]
+        assert split_response.status_code == 422
+
+    def test_split_malformed_uuid_rejected_by_schema(
+        self,
+        client: TestClient,
+        normal_user_token_headers: dict[str, str],
+        db: Session,
+    ) -> None:
+        """Malformed UUIDs in the split body are a 422 validation error, not
+        an unhandled 500 (WS5/B-H6 — the old dict body crashed on
+        uuid.UUID('not-a-uuid'))."""
+        split_data = {"type": "equal", "excluded_user_ids": ["not-a-uuid"]}
+        response = client.put(
+            f"{settings.API_V1_STR}/expenses/{uuid.uuid4()}/split",
+            headers=normal_user_token_headers,
+            json=split_data,
+        )
+        assert response.status_code == 422
 
 
 class TestCalculatePercentageSplit:

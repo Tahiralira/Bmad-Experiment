@@ -17,17 +17,22 @@ from app.features.expenses.models import (
     AuditActionType,
     AuditLog,
     AuditLogPublic,
+    EqualSplitRequest,
     Expense,
     ExpenseCreate,
     ExpenseSplit,
+    ExpenseSplitPublic,
     ExpenseStatus,
     ExpenseUpdate,
+    PercentageSplitRequest,
     SettlementClaim,
     SettlementClaimPublic,
     SettlementClaimStatus,
     SplitStatus,
+    UnequalSplitRequest,
 )
 from app.features.auth.models import User
+from app.features.groups.models import GroupMember
 
 
 # =============================================================================
@@ -425,6 +430,95 @@ def calculate_percentage_split(
     return calculated_splits
 
 
+def apply_split(
+    session: Session,
+    expense: Expense,
+    req: EqualSplitRequest | UnequalSplitRequest | PercentageSplitRequest,
+    current_user_id: uuid.UUID,
+) -> list[dict]:
+    """
+    Validate, calculate, and persist a split configuration (WS5/B-H6).
+
+    One home for the member validation that used to be copy-pasted three
+    times in the router. Existing splits are replaced; a DRAFT expense
+    transitions to PENDING_CONFIRMATION; the audit entry joins the same
+    transaction (ARCH-001 — caller commits).
+
+    Raises:
+        ValueError: any domain validation failure (router translates to 400)
+
+    Returns:
+        List of {user_id, amount_owed} for the created splits
+    """
+    members = session.exec(
+        select(GroupMember).where(GroupMember.group_id == expense.group_id)
+    ).all()
+    member_ids = [m.user_id for m in members]
+    member_id_set = set(member_ids)
+
+    for excluded_id in req.excluded_user_ids:
+        if excluded_id not in member_id_set:
+            raise ValueError(
+                f"Excluded user {excluded_id} is not a member of this group"
+            )
+
+    if isinstance(req, EqualSplitRequest):
+        splits_data = calculate_equal_split(
+            total_amount=expense.amount,
+            member_ids=member_ids,
+            excluded_user_ids=req.excluded_user_ids,
+            payer_id=expense.payer_id,
+        )
+    else:
+        for item in req.splits:
+            if item.user_id not in member_id_set:
+                raise ValueError(
+                    f"User {item.user_id} is not a member of this group"
+                )
+        raw_splits = [item.model_dump() for item in req.splits]
+        if isinstance(req, UnequalSplitRequest):
+            splits_data = calculate_unequal_split(
+                total_amount=expense.amount,
+                splits=raw_splits,
+                member_ids=member_ids,
+                excluded_user_ids=req.excluded_user_ids,
+            )
+        else:
+            splits_data = calculate_percentage_split(
+                total_amount=expense.amount,
+                splits=raw_splits,
+                member_ids=member_ids,
+                excluded_user_ids=req.excluded_user_ids,
+            )
+
+    # Replace any existing splits with the new configuration
+    session.exec(delete(ExpenseSplit).where(ExpenseSplit.expense_id == expense.id))
+    for split in splits_data:
+        session.add(
+            ExpenseSplit(
+                expense_id=expense.id,
+                user_id=split["user_id"],
+                amount_owed=split["amount_owed"],
+            )
+        )
+
+    # Assigning splits moves a DRAFT expense into the confirmation flow
+    if expense.status == ExpenseStatus.DRAFT:
+        expense.status = ExpenseStatus.PENDING_CONFIRMATION
+        session.add(expense)
+
+    record_audit(
+        session,
+        expense_id=expense.id,
+        user_id=current_user_id,
+        action_type=AuditActionType.SPLIT_UPDATED,
+        after_data={"type": req.type, "members": len(splits_data)},
+    )
+    session.flush()
+
+    return splits_data
+
+
 # =============================================================================
 # Story 4.2: Expense Confirmation Workflow - Service Layer
 # =============================================================================
@@ -707,6 +801,9 @@ def get_pending_confirmations_for_user(
     """
     Get all expenses pending confirmation for a user.
 
+    Single JOIN query (WS5/B-M6) — the previous per-split session.get was an
+    N+1; the settlement worklists already used this pattern.
+
     Args:
         session: Database session
         user_id: User ID
@@ -714,23 +811,128 @@ def get_pending_confirmations_for_user(
     Returns:
         List of dictionaries with expense and split details
     """
-    # Find all pending splits for user
-    splits = session.exec(
-        select(ExpenseSplit)
+    rows = session.exec(
+        select(ExpenseSplit, Expense)
+        .join(Expense, ExpenseSplit.expense_id == Expense.id)
         .where(ExpenseSplit.user_id == user_id)
         .where(ExpenseSplit.status == SplitStatus.PENDING)
+        .where(Expense.status == ExpenseStatus.PENDING_CONFIRMATION)
     ).all()
 
-    result = []
-    for split in splits:
-        expense = session.get(Expense, split.expense_id)
-        if expense and expense.status == ExpenseStatus.PENDING_CONFIRMATION:
-            result.append({
-                "expense": expense,
-                "split": split,
-            })
+    return [{"expense": expense, "split": split} for split, expense in rows]
 
-    return result
+
+# =============================================================================
+# WS5 (B-H7): Ledger read endpoints - Service Layer
+# =============================================================================
+
+
+def get_group_expenses(
+    session: Session,
+    group_id: uuid.UUID,
+    user_id: uuid.UUID,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[tuple[Expense, ExpenseSplit | None]], int]:
+    """
+    Get a group's expense ledger, newest first, with the requesting user's
+    own split attached to each expense (LEFT JOIN — None when the user is
+    not part of that split).
+
+    Returns:
+        Tuple of (list of (expense, my_split | None), total_count)
+    """
+    count = session.exec(
+        select(sa.func.count())
+        .select_from(Expense)
+        .where(Expense.group_id == group_id)
+    ).one()
+
+    rows = session.exec(
+        select(Expense, ExpenseSplit)
+        .join(
+            ExpenseSplit,
+            sa.and_(
+                ExpenseSplit.expense_id == Expense.id,
+                ExpenseSplit.user_id == user_id,
+            ),
+            isouter=True,
+        )
+        .where(Expense.group_id == group_id)
+        .order_by(Expense.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    return list(rows), count
+
+
+def get_expense_splits(
+    session: Session, expense_id: uuid.UUID
+) -> list[ExpenseSplitPublic]:
+    """
+    Get all splits for an expense with user names populated (who owes what).
+    """
+    rows = session.exec(
+        select(ExpenseSplit, User)
+        .join(User, ExpenseSplit.user_id == User.id)
+        .where(ExpenseSplit.expense_id == expense_id)
+        .order_by(ExpenseSplit.created_at.asc())
+    ).all()
+
+    return [
+        ExpenseSplitPublic(
+            id=split.id,
+            expense_id=split.expense_id,
+            user_id=split.user_id,
+            amount_owed=split.amount_owed,
+            status=split.status,
+            confirmed_at=split.confirmed_at,
+            created_at=split.created_at,
+            user_name=user.full_name or user.email,
+        )
+        for split, user in rows
+    ]
+
+
+def get_group_net_balance(
+    session: Session, group_id: uuid.UUID, user_id: uuid.UUID
+) -> Decimal:
+    """
+    The user's net balance in one group — same semantics as the dashboard
+    (confirmed splits on confirmed expenses; positive = owed to the user).
+    Decimal end-to-end (WS4/M1).
+    """
+    from sqlalchemy import case, literal
+
+    row = session.exec(
+        select(
+            sa.func.sum(
+                case(
+                    (ExpenseSplit.user_id == user_id, -ExpenseSplit.amount_owed),
+                    else_=literal(0),
+                )
+            ).label("user_owes"),
+            sa.func.sum(
+                case(
+                    (Expense.payer_id == user_id, ExpenseSplit.amount_owed),
+                    else_=literal(0),
+                )
+            ).label("owed_to_user"),
+        )
+        .select_from(Expense)
+        .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
+        .where(
+            Expense.status == ExpenseStatus.CONFIRMED,
+            ExpenseSplit.status == SplitStatus.CONFIRMED,
+            Expense.group_id == group_id,
+        )
+    ).one()
+
+    zero = Decimal("0.00")
+    return ((row.owed_to_user or zero) + (row.user_owes or zero)).quantize(
+        Decimal("0.01")
+    )
 
 
 # =============================================================================
@@ -1156,7 +1358,7 @@ def reject_settlement_claim(
 
 
 def get_claims_awaiting_owner_confirmation(
-    session: Session, user_id: uuid.UUID
+    session: Session, user_id: uuid.UUID, group_id: uuid.UUID | None = None
 ) -> list[dict]:
     """
     Get all pending settlement claims for expenses owned by the given user.
@@ -1166,18 +1368,23 @@ def get_claims_awaiting_owner_confirmation(
     Args:
         session: Database session
         user_id: User ID (expense owner/payer)
+        group_id: Optional group scope (WS5/S4-M6 — a group screen must not
+            show other groups' claims)
 
     Returns:
         List of dictionaries with expense, split, and claim details
     """
     # Single JOIN query to fetch claims + splits + expenses
-    rows = session.exec(
+    statement = (
         select(SettlementClaim, ExpenseSplit, Expense)
         .join(ExpenseSplit, SettlementClaim.expense_split_id == ExpenseSplit.id)
         .join(Expense, ExpenseSplit.expense_id == Expense.id)
         .where(Expense.payer_id == user_id)
         .where(SettlementClaim.status == SettlementClaimStatus.PENDING)
-    ).all()
+    )
+    if group_id is not None:
+        statement = statement.where(Expense.group_id == group_id)
+    rows = session.exec(statement).all()
 
     # Batch-fetch all claimant users to avoid N+1 per-row lookups
     claimant_ids = {claim.claimant_user_id for claim, _, _ in rows}

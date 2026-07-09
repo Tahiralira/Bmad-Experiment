@@ -1,15 +1,22 @@
 # Groups feature router - API routes for group management
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
-from app.features.expenses.models import AuditLogsPublic
+from app.features.expenses.models import (
+    AuditLogsPublic,
+    ExpensePublic,
+    ExpenseSplitPublic,
+    GroupExpenseItem,
+    GroupExpensesPublic,
+)
 from app.features.groups import service
 from app.features.groups.models import (
     ExpenseGroup,
     ExpenseGroupCreate,
+    ExpenseGroupDetail,
     ExpenseGroupPublic,
     ExpenseGroupWithMembers,
     GroupInvitePublic,
@@ -52,6 +59,96 @@ def list_user_groups(
     Uses optimized single-query to fetch groups with member counts.
     """
     return service.get_user_groups_with_member_count(session, current_user.id)
+
+
+# === Group Detail & Ledger Endpoints (WS5/B-H7) ===
+
+
+def _get_group_for_member(
+    session: SessionDep, group_id: uuid.UUID, current_user: CurrentUser
+) -> ExpenseGroup:
+    """Load a group and enforce membership (404 / 403)."""
+    group = service.get_group_by_id(session, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+    if not service.is_group_member(
+        session, group_id=group_id, user_id=current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this group",
+        )
+    return group
+
+
+@router.get("/{group_id}", response_model=ExpenseGroupDetail)
+def get_group_detail(
+    group_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> ExpenseGroupDetail:
+    """
+    Get one group with member count and the current user's net balance.
+
+    Only group members can view group details. This is the backing endpoint
+    for the /groups/$groupId screen (deep-linkable group detail).
+    """
+    from app.features.expenses import service as expense_service
+
+    group = _get_group_for_member(session, group_id, current_user)
+
+    return ExpenseGroupDetail(
+        id=group.id,
+        name=group.name,
+        created_by=group.created_by,
+        created_at=group.created_at,
+        updated_at=group.updated_at,
+        member_count=service.get_group_member_count(session, group_id),
+        net_balance=expense_service.get_group_net_balance(
+            session, group_id, current_user.id
+        ),
+    )
+
+
+@router.get("/{group_id}/expenses", response_model=GroupExpensesPublic)
+def list_group_expenses(
+    group_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> GroupExpensesPublic:
+    """
+    List a group's expenses, newest first, each with the current user's own
+    split attached (my_split is null when they are not part of the split).
+
+    Only group members can view the ledger.
+    """
+    from app.features.expenses import service as expense_service
+
+    _get_group_for_member(session, group_id, current_user)
+
+    rows, count = expense_service.get_group_expenses(
+        session, group_id, current_user.id, limit=limit, offset=offset
+    )
+
+    return GroupExpensesPublic(
+        data=[
+            GroupExpenseItem(
+                expense=ExpensePublic.model_validate(expense),
+                my_split=(
+                    ExpenseSplitPublic.model_validate(split)
+                    if split is not None
+                    else None
+                ),
+            )
+            for expense, split in rows
+        ],
+        count=count,
+    )
 
 
 # === Member Endpoints ===
@@ -201,8 +298,8 @@ def get_group_audit_log(
     group_id: uuid.UUID,
     session: SessionDep,
     current_user: CurrentUser,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> AuditLogsPublic:
     """
     Get audit logs for all expenses in a group.

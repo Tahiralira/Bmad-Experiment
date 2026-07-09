@@ -5,8 +5,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+import sqlalchemy as sa
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
+
+# Timezone-aware timestamps to match the migrations (WS5/B-H9 reconcile)
+_AWARE_DATETIME = sa.DateTime(timezone=True)
 
 # Avoid circular imports - ExpenseSplit is only used for type hints
 if TYPE_CHECKING:
@@ -77,11 +81,26 @@ class User(UserBase, table=True):
     )
     # Soft-delete marker (WS4/C4): users with financial history are never
     # hard-deleted — PII is anonymized and login disabled, financial rows stay.
-    deleted_at: datetime | None = Field(default=None)
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now})
+    deleted_at: datetime | None = Field(default=None, sa_type=_AWARE_DATETIME)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_type=_AWARE_DATETIME,
+        sa_column_kwargs={"onupdate": utc_now},
+    )
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
     expense_splits: list["ExpenseSplit"] = Relationship(back_populates="user")
+
+    # Composite unique index from the OAuth migration (declared here so
+    # alembic autogenerate sees it — WS5/B-H9 reconcile)
+    __table_args__ = (
+        sa.Index(
+            "ix_user_oauth_provider_id",
+            "oauth_provider",
+            "oauth_provider_id",
+            unique=True,
+        ),
+    )
 
 
 # Magic link token for passwordless authentication
@@ -95,9 +114,9 @@ class MagicLinkToken(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(index=True, max_length=255)
     token: str = Field(unique=True, index=True, max_length=64)
-    expires_at: datetime
-    used_at: datetime | None = Field(default=None)
-    created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime = Field(sa_type=_AWARE_DATETIME)
+    used_at: datetime | None = Field(default=None, sa_type=_AWARE_DATETIME)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
 
     @classmethod
     def generate_token(cls) -> str:
