@@ -19,6 +19,21 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-tanstack": [
+            "@tanstack/react-router",
+            "@tanstack/react-query",
+            "@tanstack/react-table",
+          ],
+          "vendor-forms": ["react-hook-form", "zod", "@hookform/resolvers"],
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,
