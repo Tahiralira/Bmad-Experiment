@@ -2,6 +2,7 @@
 import secrets
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from pydantic import EmailStr
@@ -74,6 +75,9 @@ class User(UserBase, table=True):
         max_length=512,
         description="Encrypted Gemini API key for this user (AES-256)",
     )
+    # Soft-delete marker (WS4/C4): users with financial history are never
+    # hard-deleted — PII is anonymized and login disabled, financial rows stay.
+    deleted_at: datetime | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"onupdate": utc_now})
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
@@ -181,11 +185,17 @@ class ItemsPublic(SQLModel):
 
 
 class GroupBalanceSummary(SQLModel):
-    """Summary of a group with net balance for dashboard display."""
+    """Summary of a group with net balance for dashboard display.
+
+    Balances are Decimal end-to-end (WS4/M1): the core tables store
+    Numeric(10,2) and converting to float at the API edge reintroduced the
+    representation drift the schema exists to prevent. Serializes as a JSON
+    string (e.g. "12.50"), same as every other monetary field.
+    """
 
     group_id: uuid.UUID
     group_name: str
-    net_balance: float  # Positive = owed to user, negative = user owes
+    net_balance: Decimal  # Positive = owed to user, negative = user owes
     last_activity: datetime
     member_count: int
 
@@ -194,5 +204,5 @@ class DashboardResponse(SQLModel):
     """Response schema for user dashboard."""
 
     groups: list[GroupBalanceSummary]
-    total_balance: float  # Sum of all net_balances
+    total_balance: Decimal  # Sum of all net_balances
     count: int  # Number of groups

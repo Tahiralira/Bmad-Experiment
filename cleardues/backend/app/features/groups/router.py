@@ -78,7 +78,7 @@ def list_group_members(
         )
 
     # Verify user is a member
-    if not service.is_group_member(session, group_id, current_user.id):
+    if not service.is_group_member(session, group_id=group_id, user_id=current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a member of this group",
@@ -221,7 +221,7 @@ def get_group_audit_log(
         )
 
     # Verify user is a member
-    if not service.is_group_member(session, group_id, current_user.id):
+    if not service.is_group_member(session, group_id=group_id, user_id=current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a member of this group",

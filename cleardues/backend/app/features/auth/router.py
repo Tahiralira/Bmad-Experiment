@@ -4,6 +4,7 @@
 import secrets
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -280,7 +281,7 @@ def get_dashboard(
     Groups are sorted by most recent activity.
     """
     groups = auth_service.get_user_dashboard(session, current_user.id)
-    total_balance = sum(g.net_balance for g in groups)
+    total_balance = sum((g.net_balance for g in groups), Decimal("0.00"))
 
     return DashboardResponse(
         groups=groups,
@@ -292,15 +293,29 @@ def get_dashboard(
 @users_router.delete("/me", response_model=Message)
 def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     """
-    Delete own user.
+    Delete own account (soft delete — WS4/C4).
+
+    Expenses and splits are records shared with other people, so the account
+    is anonymized (PII scrubbed, login disabled) rather than hard-deleted;
+    financial history and the audit trail stay intact. Deletion is blocked
+    while the user still has unsettled expenses.
     """
     if current_user.is_superuser:
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
-    session.delete(current_user)
+    if auth_service.has_unsettled_obligations(session, current_user.id):
+        raise HTTPException(
+            status_code=409,
+            detail="You still have unsettled expenses. Settle up with your "
+            "groups before deleting your account.",
+        )
+    auth_service.soft_delete_user(session, current_user)
     session.commit()
-    return Message(message="User deleted successfully")
+    return Message(
+        message="Account deleted. Your personal data has been removed; "
+        "settled expense history is kept for your groups' records."
+    )
 
 
 @users_router.post("/signup", response_model=UserPublic)
@@ -327,13 +342,16 @@ def read_user_by_id(
     Get a specific user by id.
     """
     user = session.get(User, user_id)
-    if user == current_user:
+    if user is not None and user == current_user:
         return user
     if not current_user.is_superuser:
         raise HTTPException(
             status_code=403,
             detail="The user doesn't have enough privileges",
         )
+    # 404 guard (WS4/M9): returning None made response validation 500
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
     return user
 
 
@@ -373,7 +391,10 @@ def delete_user(
     session: SessionDep, current_user: CurrentUser, user_id: uuid.UUID
 ) -> Message:
     """
-    Delete a user.
+    Delete a user (soft delete — WS4/C4).
+
+    Same semantics as self-deletion: anonymize + disable login, keep shared
+    financial records, refuse while the user has unsettled expenses.
     """
     user = session.get(User, user_id)
     if not user:
@@ -382,9 +403,14 @@ def delete_user(
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
+    if auth_service.has_unsettled_obligations(session, user.id):
+        raise HTTPException(
+            status_code=409,
+            detail="User still has unsettled expenses and cannot be deleted.",
+        )
     statement = delete(Item).where(col(Item.owner_id) == user_id)
     session.exec(statement)  # type: ignore
-    session.delete(user)
+    auth_service.soft_delete_user(session, user)
     session.commit()
     return Message(message="User deleted successfully")
 

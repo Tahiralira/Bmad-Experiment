@@ -681,8 +681,10 @@ def test_reject_settlement_claim_success(
     assert response.status_code == 200
     claim = response.json()
 
-    # Response still shows the claim data (built before deletion)
+    # Response shows the claim data with the TRUTHFUL rejected state (WS4/H4)
     assert claim["id"] == data["claim_id"]
+    assert claim["status"] == "rejected"
+    assert claim["rejected_at"] is not None
 
     # Verify claim was deleted from database (allows re-claim)
     db_claim = db.exec(

@@ -1,10 +1,12 @@
 # Auth feature service - CRUD operations for users and magic link tokens
 import hashlib
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any
 
-from sqlmodel import Session, func, select
+from sqlmodel import Session, delete, func, select
 
 from app.core.security import get_password_hash, verify_password
 from app.features.auth.models import (
@@ -69,6 +71,84 @@ def authenticate(*, session: Session, email: str, password: str) -> User | None:
     if not verify_password(password, db_user.hashed_password):
         return None
     return db_user
+
+
+# ============================================================================
+# ACCOUNT DELETION (WS4/C4)
+# ============================================================================
+
+
+def has_unsettled_obligations(session: Session, user_id: uuid.UUID) -> bool:
+    """
+    True if the user still owes money or is owed money in any group.
+
+    Blocks account deletion: splits and expenses are SHARED records — deleting
+    a debtor or creditor mid-flight would falsify other members' ledgers.
+    DRAFT expenses don't count (no splits exist, nobody has consented).
+    """
+    # Import inside the function to avoid a circular import
+    # (expenses.models imports auth.models at module level)
+    from app.features.expenses.models import (
+        Expense,
+        ExpenseSplit,
+        ExpenseStatus,
+        SplitStatus,
+    )
+
+    own_unsettled = session.exec(
+        select(func.count())
+        .select_from(ExpenseSplit)
+        .where(
+            ExpenseSplit.user_id == user_id,
+            ExpenseSplit.status != SplitStatus.SETTLED,
+        )
+    ).one()
+    if own_unsettled:
+        return True
+
+    payer_unsettled = session.exec(
+        select(func.count())
+        .select_from(Expense)
+        .where(
+            Expense.payer_id == user_id,
+            Expense.status.in_(
+                [ExpenseStatus.PENDING_CONFIRMATION, ExpenseStatus.CONFIRMED]
+            ),
+        )
+    ).one()
+    return payer_unsettled > 0
+
+
+def soft_delete_user(session: Session, user: User) -> None:
+    """
+    Soft-delete a user: anonymize PII and disable login, keep financial rows.
+
+    The user row must survive because expenses, splits, settlement claims and
+    audit entries reference it — the audit trail outlives the account (PRD).
+    The original email is freed for future re-registration; pending magic-link
+    tokens for it are invalidated so they can't touch the anonymized account.
+
+    Flushes only; the caller commits the request transaction.
+    """
+    original_email = user.email
+
+    # example.com is IANA-reserved (never deliverable) AND passes EmailStr
+    # validation — .invalid/.test are special-use domains email-validator
+    # rejects, which would 500 every response that serializes this user
+    user.email = f"deleted-{user.id}@anonymized.example.com"
+    user.full_name = "Deleted User"
+    user.hashed_password = get_password_hash(secrets.token_urlsafe(32))
+    user.oauth_provider = None
+    user.oauth_provider_id = None
+    user.gemini_api_key_encrypted = None
+    user.is_active = False
+    user.deleted_at = datetime.now(timezone.utc)
+    session.add(user)
+
+    session.exec(
+        delete(MagicLinkToken).where(MagicLinkToken.email == original_email)
+    )
+    session.flush()
 
 
 # Item CRUD - temporarily kept here for backward compatibility
@@ -332,8 +412,14 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
         .group_by(Expense.group_id)
     ).all()
 
+    # Keep Decimal to the wire (WS4/M1): the columns are Numeric(10,2), so the
+    # SQL sums arrive as Decimal — casting to float here reintroduced binary
+    # representation error on the product's headline number.
+    zero = Decimal("0.00")
     balance_map = {
-        row.group_id: float((row.owed_to_user or 0) + (row.user_owes or 0))
+        row.group_id: (
+            (row.owed_to_user or zero) + (row.user_owes or zero)
+        ).quantize(Decimal("0.01"))
         for row in all_balances
     }
 
@@ -341,7 +427,7 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
         GroupBalanceSummary(
             group_id=row.id,
             group_name=row.name,
-            net_balance=round(balance_map.get(row.id, 0.0), 2),
+            net_balance=balance_map.get(row.id, zero),
             last_activity=row.updated_at,
             member_count=row.member_count,
         )

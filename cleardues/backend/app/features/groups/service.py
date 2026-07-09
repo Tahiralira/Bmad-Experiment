@@ -73,9 +73,15 @@ def get_user_groups(session: Session, user_id: uuid.UUID) -> list[ExpenseGroup]:
 
 
 def is_group_member(
-    session: Session, group_id: uuid.UUID, user_id: uuid.UUID
+    session: Session, *, group_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:
-    """Check if user is a member of the group."""
+    """Check if user is a member of the group.
+
+    The ONLY membership helper — its former twin
+    (expenses.service.is_user_group_member) took the same two UUIDs in the
+    opposite order and caused a swapped-argument bug (review B-C1/B-M10).
+    Arguments are keyword-only so call sites can never silently transpose them.
+    """
     statement = select(GroupMember).where(
         GroupMember.group_id == group_id, GroupMember.user_id == user_id
     )
@@ -204,7 +210,7 @@ def accept_invite(
         Tuple of (success, message)
     """
     # Check if already a member
-    if is_group_member(session, invite.group_id, user_id):
+    if is_group_member(session, group_id=invite.group_id, user_id=user_id):
         return True, "You are already a member of this group"
 
     # Add as member

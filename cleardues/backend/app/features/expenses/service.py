@@ -1,10 +1,16 @@
 # Expenses feature service - CRUD operations for expenses
+#
+# TRANSACTION DISCIPLINE (WS4/H5): service functions NEVER commit. They flush,
+# so the operation and its audit entry live or die in ONE transaction, and the
+# router (the request boundary) commits exactly once. See solution-patterns.yaml
+# ARCH-001.
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, delete, select
 
 from app.features.expenses.models import (
@@ -22,7 +28,6 @@ from app.features.expenses.models import (
     SplitStatus,
 )
 from app.features.auth.models import User
-from app.features.groups.models import GroupMember
 
 
 # =============================================================================
@@ -42,40 +47,21 @@ def record_audit(
     """
     Create an immutable audit log entry.
 
-    Non-blocking: logs errors but does not fail the parent operation.
-    Does NOT commit — lets the parent operation's commit handle it for atomicity.
+    Joins the caller's transaction (no commit here): the audited operation and
+    its audit entry are atomic — if either fails, both roll back. An operation
+    without its audit row must never be persisted (PRD: complete audit trail).
     """
-    import logging
+    changes = None
+    if before_data is not None or after_data is not None:
+        changes = {"before": before_data, "after": after_data}
 
-    try:
-        changes = None
-        if before_data is not None or after_data is not None:
-            changes = {"before": before_data, "after": after_data}
-
-        audit_entry = AuditLog(
-            expense_id=expense_id,
-            user_id=user_id,
-            action_type=action_type,
-            changes_json=changes,
-        )
-        session.add(audit_entry)
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error(
-            "Failed to record audit log: expense_id=%s action=%s error=%s",
-            expense_id, action_type.value, e,
-            exc_info=True,
-        )
-
-
-def is_user_group_member(
-    session: Session, user_id: uuid.UUID, group_id: uuid.UUID
-) -> bool:
-    """Check if user is a member of the specified group."""
-    statement = select(GroupMember).where(
-        GroupMember.user_id == user_id, GroupMember.group_id == group_id
+    audit_entry = AuditLog(
+        expense_id=expense_id,
+        user_id=user_id,
+        action_type=action_type,
+        changes_json=changes,
     )
-    return session.exec(statement).first() is not None
+    session.add(audit_entry)
 
 
 def filter_included_members(
@@ -125,6 +111,7 @@ def create_expense(
         - payer_id defaults to current_user_id if not provided
         - status is always DRAFT for new expenses
         - Caller must verify user is member of group first
+        - Flushes only; the router commits the request transaction
     """
     expense = Expense(
         group_id=expense_in.group_id,
@@ -135,10 +122,10 @@ def create_expense(
         status=ExpenseStatus.DRAFT,
     )
     session.add(expense)
-    session.commit()
+    session.flush()
     session.refresh(expense)
 
-    # Audit log for expense creation
+    # Audit entry is atomic with the creation (same transaction)
     record_audit(
         session,
         expense_id=expense.id,
@@ -146,9 +133,14 @@ def create_expense(
         action_type=AuditActionType.CREATED,
         after_data={"amount": str(expense.amount), "description": expense.description},
     )
-    session.commit()
+    session.flush()
 
     return expense
+
+
+# Fields whose change alters what members consented to owe: the amount, and
+# who the money is owed to. Changing either re-opens consent (WS4/H2).
+_CONSENT_FIELDS = ("amount", "payer_id")
 
 
 def update_expense(
@@ -157,33 +149,59 @@ def update_expense(
     """
     Update expense fields. Only updates provided (non-None) fields.
 
+    Consent contract (WS4/H2): if amount or payer changes while splits exist,
+    the splits are deleted and the expense reverts to DRAFT — members must
+    re-confirm what they actually owe. Splits can never drift out of sync with
+    the expense amount, and nobody stays "confirmed" on numbers they never saw.
+
     Args:
         session: Database session
         expense: Existing Expense object to update
         update_data: ExpenseUpdate with optional fields
 
     Returns:
-        Updated Expense object
+        Updated Expense object (possibly reverted to DRAFT)
     """
     update_dict = update_data.model_dump(exclude_unset=True)
+
+    original_status = expense.status
 
     # Capture BEFORE state for changed fields only
     before_data = {}
     for field in update_dict:
         before_data[field] = str(getattr(expense, field))
 
+    consent_changed = any(
+        field in _CONSENT_FIELDS and getattr(expense, field) != value
+        for field, value in update_dict.items()
+    )
+
     for field, value in update_dict.items():
         setattr(expense, field, value)
     session.add(expense)
-    session.commit()
+
+    reverted = False
+    if consent_changed:
+        deleted = session.exec(
+            delete(ExpenseSplit).where(ExpenseSplit.expense_id == expense.id)
+        )
+        if deleted.rowcount > 0:
+            expense.status = ExpenseStatus.DRAFT
+            reverted = True
+
+    session.flush()
     session.refresh(expense)
 
     # Capture AFTER state for changed fields only
     after_data = {}
     for field in update_dict:
         after_data[field] = str(getattr(expense, field))
+    if reverted:
+        before_data["status"] = original_status.value
+        after_data["status"] = ExpenseStatus.DRAFT.value
+        after_data["splits"] = "removed — consent re-opened"
 
-    # Audit log for expense edit
+    # Audit entry is atomic with the edit (same transaction)
     record_audit(
         session,
         expense_id=expense.id,
@@ -192,7 +210,7 @@ def update_expense(
         before_data=before_data,
         after_data=after_data,
     )
-    session.commit()
+    session.flush()
 
     return expense
 
@@ -465,7 +483,7 @@ def finalize_expense(session: Session, expense_id: uuid.UUID) -> Expense | None:
     expense.confirmed_at = datetime.now(timezone.utc)
 
     session.add(expense)
-    session.commit()
+    session.flush()
     session.refresh(expense)
 
     # Publish Redis event for notifications
@@ -474,7 +492,7 @@ def finalize_expense(session: Session, expense_id: uuid.UUID) -> Expense | None:
     # Create notification records for group members
     notify_group_of_finalized_expense(session, expense)
 
-    # Audit log for expense finalization
+    # Audit entry is atomic with the finalization (same transaction)
     record_audit(
         session,
         expense_id=expense_id,
@@ -482,7 +500,7 @@ def finalize_expense(session: Session, expense_id: uuid.UUID) -> Expense | None:
         action_type=AuditActionType.CONFIRMED,
         after_data={"status": "confirmed"},
     )
-    session.commit()
+    session.flush()
 
     return expense
 
@@ -556,6 +574,11 @@ def confirm_expense_split(
     """
     Confirm a user's expense split.
 
+    Locks the expense row (WS4/M8) so concurrent confirms serialize: exactly
+    one of two racing last-member confirms triggers finalization, and a
+    concurrent reject (which reverts to DRAFT and deletes splits) cannot
+    interleave — if it wins, the split lookup below comes up empty.
+
     Args:
         session: Database session
         expense_id: Expense ID
@@ -564,6 +587,12 @@ def confirm_expense_split(
     Returns:
         Updated ExpenseSplit with status confirmed
     """
+    expense = session.exec(
+        select(Expense).where(Expense.id == expense_id).with_for_update()
+    ).first()
+    if not expense:
+        return None
+
     # Find and update the split
     split = session.exec(
         select(ExpenseSplit)
@@ -579,17 +608,17 @@ def confirm_expense_split(
     split.confirmed_at = datetime.now(timezone.utc)
 
     session.add(split)
-    session.commit()
+    session.flush()
     session.refresh(split)
 
-    # Audit log for split confirmation
+    # Audit entry is atomic with the confirmation (same transaction)
     record_audit(
         session,
         expense_id=expense_id,
         user_id=user_id,
         action_type=AuditActionType.CONFIRMED,
     )
-    session.commit()
+    session.flush()
 
     # After confirming, check if any splits remain pending — if not, finalize
     pending_count = session.exec(
@@ -608,7 +637,17 @@ def reject_expense_split(
     session: Session, expense_id: uuid.UUID, user_id: uuid.UUID
 ) -> dict | None:
     """
-    Reject a user's expense split and recalculate remaining splits.
+    Reject a user's expense split: the expense reverts to DRAFT.
+
+    Product decision (WS4/H3): rejection does NOT redistribute the rejected
+    amount over the remaining members — that silently rewrote amounts other
+    members had already confirmed, destroyed unequal/percentage splits, and
+    could strand the expense in PENDING_CONFIRMATION forever. Instead, ALL
+    splits are deleted and the expense returns to DRAFT so the creator
+    re-splits and every member re-confirms. The audit trail records who
+    rejected. (Creator notification delivery arrives with the WS12 nudge
+    infrastructure; until then the status change and audit entry are the
+    signal.)
 
     Args:
         session: Database session
@@ -616,9 +655,17 @@ def reject_expense_split(
         user_id: User ID
 
     Returns:
-        Dictionary with message and remaining split count
+        Dictionary with message and remaining split count (always 0 —
+        kept for response-shape compatibility)
     """
-    # Find and delete the split
+    # Lock the expense row: serializes against concurrent confirms/rejects
+    expense = session.exec(
+        select(Expense).where(Expense.id == expense_id).with_for_update()
+    ).first()
+    if not expense:
+        return None
+
+    # The rejecting user must actually hold a split in this expense
     split = session.exec(
         select(ExpenseSplit)
         .where(ExpenseSplit.expense_id == expense_id)
@@ -628,40 +675,29 @@ def reject_expense_split(
     if not split:
         return None
 
-    # Delete the split
-    session.delete(split)
-
-    # Get remaining splits before commit
-    remaining_statement = select(ExpenseSplit).where(
-        ExpenseSplit.expense_id == expense_id
+    # Re-open consent: drop every split and return the expense to DRAFT
+    session.exec(
+        delete(ExpenseSplit).where(ExpenseSplit.expense_id == expense_id)
     )
-    remaining_splits = session.exec(remaining_statement).all()
+    original_status = expense.status
+    expense.status = ExpenseStatus.DRAFT
+    session.add(expense)
 
-    # Recalculate remaining splits if any remain
-    if remaining_splits:
-        # Get expense to redistribute amount
-        expense = session.get(Expense, expense_id)
-        if expense:
-            # Redistribute amount equally among remaining members
-            per_person = expense.amount / len(remaining_splits)
-            for s in remaining_splits:
-                s.amount_owed = per_person
-                session.add(s)
-
-    session.commit()
-
-    # Audit log for split rejection
+    # Audit entry is atomic with the revert (same transaction)
     record_audit(
         session,
         expense_id=expense_id,
         user_id=user_id,
         action_type=AuditActionType.REJECTED,
+        before_data={"status": original_status.value},
+        after_data={"status": ExpenseStatus.DRAFT.value,
+                    "splits": "removed — consent re-opened"},
     )
-    session.commit()
+    session.flush()
 
     return {
-        "message": "Expense rejected",
-        "remaining_splits": len(remaining_splits) if remaining_splits else 0,
+        "message": "Expense rejected — it's back with the creator to re-split",
+        "remaining_splits": 0,
     }
 
 
@@ -852,6 +888,12 @@ def settle_expense_split(
     Creates: SettlementClaim record + AuditLog entry.
     Caller (router) is responsible for validation (404, 400, 403, 409).
 
+    Concurrency (WS4/M8): the split row is locked FOR UPDATE, so a
+    double-submit serializes and the loser sees the existing claim. If an
+    insert still races past (e.g. a lock-free code path elsewhere), the
+    unique index on expense_split_id raises IntegrityError at flush, which is
+    translated to the same CONFLICT signal instead of leaking a 500.
+
     Args:
         session: Database session
         expense_id: Expense ID
@@ -860,11 +902,12 @@ def settle_expense_split(
     Returns:
         SettlementClaimPublic with populated user_name
     """
-    # Find user's split in this expense
+    # Find and lock user's split in this expense
     split = session.exec(
         select(ExpenseSplit)
         .where(ExpenseSplit.expense_id == expense_id)
         .where(ExpenseSplit.user_id == current_user_id)
+        .with_for_update()
     ).first()
 
     if not split:
@@ -889,10 +932,15 @@ def settle_expense_split(
         claimed_at=datetime.now(timezone.utc),
     )
     session.add(claim)
-    session.commit()
+    try:
+        session.flush()
+    except IntegrityError:
+        # Unique index on expense_split_id: someone else's claim won the race
+        session.rollback()
+        return "CONFLICT"
     session.refresh(claim)
 
-    # Record audit log (action_type="settled")
+    # Audit entry is atomic with the claim (same transaction)
     record_audit(
         session,
         expense_id=expense_id,
@@ -903,7 +951,7 @@ def settle_expense_split(
             "status": "pending",
         },
     )
-    session.commit()
+    session.flush()
 
     return _build_claim_public(claim, session)
 
@@ -939,6 +987,12 @@ def confirm_settlement_claim(
     Updates: claim.status → CONFIRMED, split.status → SETTLED.
     Checks: if all splits settled → expense.status → SETTLED.
 
+    Concurrency (WS4/M8): locks claim → split → expense (always in that
+    order, shared with reject, so no deadlock). The claim lock serializes a
+    confirm/reject race on the same claim; the expense lock serializes the
+    "all splits settled?" check so exactly one of two concurrent
+    confirmations flips the expense to SETTLED.
+
     Args:
         session: Database session
         claim_id: Settlement claim ID
@@ -950,17 +1004,27 @@ def confirm_settlement_claim(
         "FORBIDDEN" if not the expense owner,
         "CONFLICT" if claim already processed
     """
-    # 1. Load claim
-    claim = session.get(SettlementClaim, claim_id)
+    # 1. Load and lock claim
+    claim = session.exec(
+        select(SettlementClaim)
+        .where(SettlementClaim.id == claim_id)
+        .with_for_update()
+    ).first()
     if not claim:
         return None  # Router: 404
 
-    # 2. Load associated split → expense
-    split = session.get(ExpenseSplit, claim.expense_split_id)
+    # 2. Load and lock associated split → expense
+    split = session.exec(
+        select(ExpenseSplit)
+        .where(ExpenseSplit.id == claim.expense_split_id)
+        .with_for_update()
+    ).first()
     if not split:
         return None  # Router: 404
 
-    expense = session.get(Expense, split.expense_id)
+    expense = session.exec(
+        select(Expense).where(Expense.id == split.expense_id).with_for_update()
+    ).first()
     if not expense:
         return None  # Router: 404
 
@@ -993,7 +1057,7 @@ def confirm_settlement_claim(
     session.add(claim)
     session.add(split)
 
-    # 7. Record audit (SETTLED, before/after)
+    # 7. Record audit (SETTLED, before/after) — atomic with the confirmation
     record_audit(
         session,
         expense_id=expense.id,
@@ -1004,12 +1068,14 @@ def confirm_settlement_claim(
     )
 
     # 8. Check if ALL expense splits are now SETTLED → expense.status = SETTLED
+    # (the split status changes above must be flushed so the check sees them)
+    session.flush()
     if check_all_splits_settled(session, expense.id):
         expense.status = ExpenseStatus.SETTLED
         session.add(expense)
 
-    # 9. Commit + return
-    session.commit()
+    # 9. Flush + return (router commits the request transaction)
+    session.flush()
     session.refresh(claim)
 
     return _build_claim_public(claim, session)
@@ -1022,9 +1088,10 @@ def reject_settlement_claim(
     Owner rejects a settlement claim.
 
     Same auth/status guards as confirm.
-    Updates: claim.status → REJECTED.
-    Deletes: the claim record (allows claimant to re-claim).
-    Audit log preserves the rejection history.
+    Updates (WS4/H4): claim.status → REJECTED and rejected_at → now, so the
+    response tells the truth instead of echoing a stale "pending" object.
+    Deletes: the claim record (allows claimant to re-claim — the audit log
+    preserves the rejection history).
 
     Args:
         session: Database session
@@ -1032,13 +1099,17 @@ def reject_settlement_claim(
         current_user_id: User ID of the expense owner (payer)
 
     Returns:
-        SettlementClaimPublic on success (built before deletion),
+        SettlementClaimPublic with status "rejected" and rejected_at set,
         None if claim not found,
         "FORBIDDEN" if not the expense owner,
         "CONFLICT" if claim already processed
     """
-    # 1. Load claim
-    claim = session.get(SettlementClaim, claim_id)
+    # 1. Load and lock claim (serializes a confirm/reject race — WS4/M8)
+    claim = session.exec(
+        select(SettlementClaim)
+        .where(SettlementClaim.id == claim_id)
+        .with_for_update()
+    ).first()
     if not claim:
         return None  # Router: 404
 
@@ -1059,10 +1130,13 @@ def reject_settlement_claim(
     if claim.status != SettlementClaimStatus.PENDING:
         return "CONFLICT"  # Router: 409
 
-    # 5. Build response FIRST (before deleting the claim)
+    # 5. Record the rejection on the claim, THEN build the response from the
+    #    truthful state (WS4/H4)
+    claim.status = SettlementClaimStatus.REJECTED
+    claim.rejected_at = datetime.now(timezone.utc)
     response = _build_claim_public(claim, session)
 
-    # 6. Record audit (REJECTED, before/after)
+    # 6. Record audit (REJECTED, before/after) — atomic with the rejection
     record_audit(
         session,
         expense_id=expense.id,
@@ -1075,8 +1149,8 @@ def reject_settlement_claim(
     # 7. Delete the claim so the user can re-claim
     session.delete(claim)
 
-    # 8. Commit + return pre-built response
-    session.commit()
+    # 8. Flush + return (router commits the request transaction)
+    session.flush()
 
     return response
 

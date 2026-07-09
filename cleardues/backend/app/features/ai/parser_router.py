@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse
 from app.api.deps import CurrentUser, SessionDep
 from app.features.ai import parser_service
 from app.features.ai.models import ExpenseParseRequest, ParseStreamEvent
-from app.features.expenses.service import is_user_group_member
+from app.features.groups.service import is_group_member
 
 router = APIRouter()
 
@@ -64,7 +64,11 @@ async def parse_expense(
     async def event_generator():
         try:
             # 1. Validate user is member of group
-            if not is_user_group_member(session, expense_in.group_id, current_user.id):
+            # (WS4/M10: keyword-only helper replaces the twin whose positional
+            # args were transposed here for months — review B-C1)
+            if not is_group_member(
+                session, group_id=expense_in.group_id, user_id=current_user.id
+            ):
                 event = ParseStreamEvent(
                     type="error",
                     error="You must be a member of this group to parse expenses.",

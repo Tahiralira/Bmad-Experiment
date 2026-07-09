@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -403,14 +404,24 @@ def test_delete_user_me(client: TestClient, db: Session) -> None:
         headers=headers,
     )
     assert r.status_code == 200
-    deleted_user = r.json()
-    assert deleted_user["message"] == "User deleted successfully"
-    result = db.exec(select(User).where(User.id == user_id)).first()
-    assert result is None
+    assert "Account deleted" in r.json()["message"]
 
-    user_query = select(User).where(User.id == user_id)
-    user_db = db.execute(user_query).first()
-    assert user_db is None
+    # WS4/C4: soft delete — the row survives (financial records reference it)
+    # but PII is anonymized and login is disabled.
+    db.expire_all()
+    result = db.exec(select(User).where(User.id == user_id)).first()
+    assert result is not None
+    assert result.is_active is False
+    assert result.deleted_at is not None
+    assert result.email != username
+    assert result.email.startswith("deleted-")
+    assert result.full_name == "Deleted User"
+    assert result.oauth_provider is None
+    assert result.gemini_api_key_encrypted is None
+
+    # The soft-deleted user's token no longer authenticates
+    r = client.get(f"{settings.API_V1_STR}/users/me", headers=headers)
+    assert r.status_code == 400  # "Inactive user"
 
 
 def test_delete_user_me_as_superuser(
@@ -440,8 +451,14 @@ def test_delete_user_super_user(
     assert r.status_code == 200
     deleted_user = r.json()
     assert deleted_user["message"] == "User deleted successfully"
+
+    # WS4/C4: soft delete — anonymized, deactivated, row preserved
+    db.expire_all()
     result = db.exec(select(User).where(User.id == user_id)).first()
-    assert result is None
+    assert result is not None
+    assert result.is_active is False
+    assert result.deleted_at is not None
+    assert result.email != username
 
 
 def test_delete_user_not_found(
@@ -505,7 +522,9 @@ def test_get_dashboard_authenticated(
     assert "total_balance" in data
     assert "count" in data
     assert isinstance(data["groups"], list)
-    assert isinstance(data["total_balance"], (int, float))
+    # WS4/M1: money is Decimal to the wire — serialized as a decimal string
+    assert isinstance(data["total_balance"], str)
+    Decimal(data["total_balance"])  # parseable as an exact decimal
     assert isinstance(data["count"], int)
 
 
@@ -666,10 +685,10 @@ def test_get_dashboard_net_balance_is_zero(client: TestClient, db: Session) -> N
     assert r.status_code == 200
     data = r.json()
 
-    # All net_balance values should be 0 (placeholder until expenses are implemented)
+    # All net_balance values should be 0 — as exact decimal strings (WS4/M1)
     assert data["count"] == 1
-    assert data["groups"][0]["net_balance"] == 0.0
-    assert data["total_balance"] == 0.0
+    assert Decimal(data["groups"][0]["net_balance"]) == Decimal("0.00")
+    assert Decimal(data["total_balance"]) == Decimal("0.00")
 
 
 def test_get_dashboard_empty_for_new_user(client: TestClient, db: Session) -> None:
@@ -692,4 +711,4 @@ def test_get_dashboard_empty_for_new_user(client: TestClient, db: Session) -> No
 
     assert data["groups"] == []
     assert data["count"] == 0
-    assert data["total_balance"] == 0.0
+    assert Decimal(data["total_balance"]) == Decimal("0.00")

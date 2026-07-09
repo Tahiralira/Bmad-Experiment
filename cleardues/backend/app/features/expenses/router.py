@@ -32,8 +32,14 @@ from app.features.expenses.service import (
     get_claims_awaiting_owner_confirmation,
 )
 from app.features.groups.models import ExpenseGroup, GroupMember
+from app.features.groups.service import is_group_member
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
+
+# TRANSACTION DISCIPLINE (WS4/H5): the service layer only flushes; every
+# mutating endpoint here commits exactly once, after all writes (including
+# audit entries) have joined the same transaction. See solution-patterns.yaml
+# ARCH-001.
 
 
 @router.post("/", response_model=ExpensePublic)
@@ -56,8 +62,8 @@ def create_expense(
         raise HTTPException(status_code=404, detail="Group not found")
 
     # Verify user is member of group
-    if not expense_service.is_user_group_member(
-        session, current_user.id, expense_in.group_id
+    if not is_group_member(
+        session, group_id=expense_in.group_id, user_id=current_user.id
     ):
         raise HTTPException(
             status_code=403,
@@ -66,15 +72,17 @@ def create_expense(
 
     # If payer_id provided, verify payer is also a group member
     if expense_in.payer_id and expense_in.payer_id != current_user.id:
-        if not expense_service.is_user_group_member(
-            session, expense_in.payer_id, expense_in.group_id
+        if not is_group_member(
+            session, group_id=expense_in.group_id, user_id=expense_in.payer_id
         ):
             raise HTTPException(
                 status_code=400, detail="Payer must be a member of the group"
             )
 
     expense = expense_service.create_expense(session, expense_in, current_user.id)
-    return ExpensePublic.model_validate(expense)
+    response = ExpensePublic.model_validate(expense)
+    session.commit()
+    return response
 
 
 @router.patch("/{expense_id}", response_model=ExpensePublic)
@@ -88,8 +96,13 @@ def edit_expense(
     """
     Edit expense details. Only the creator can edit.
     Only DRAFT and PENDING_CONFIRMATION expenses can be edited.
+
+    Changing the amount or the payer while splits exist re-opens consent:
+    the splits are removed and the expense reverts to DRAFT for re-splitting.
     """
-    expense = session.get(Expense, expense_id)
+    expense = session.exec(
+        select(Expense).where(Expense.id == expense_id).with_for_update()
+    ).first()
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
 
@@ -109,8 +122,8 @@ def edit_expense(
 
     # If payer_id changed, verify new payer is group member
     if expense_in.payer_id is not None and expense_in.payer_id != expense.payer_id:
-        if not expense_service.is_user_group_member(
-            session, expense_in.payer_id, expense.group_id
+        if not is_group_member(
+            session, group_id=expense.group_id, user_id=expense_in.payer_id
         ):
             raise HTTPException(
                 status_code=400,
@@ -118,7 +131,9 @@ def edit_expense(
             )
 
     expense = expense_service.update_expense(session, expense, expense_in, current_user.id)
-    return ExpensePublic.model_validate(expense)
+    response = ExpensePublic.model_validate(expense)
+    session.commit()
+    return response
 
 
 @router.put("/{expense_id}/split", response_model=ExpenseSplitResponse)
@@ -136,8 +151,11 @@ def update_expense_split(
     Only the expense creator can modify the split.
     Confirmed/settled expenses cannot have splits modified.
     """
-    # Get expense
-    expense = session.get(Expense, expense_id)
+    # Get and lock expense (serializes against concurrent confirm/reject,
+    # which also lock this row — WS4/M8)
+    expense = session.exec(
+        select(Expense).where(Expense.id == expense_id).with_for_update()
+    ).first()
     if not expense:
         raise HTTPException(
             status_code=404, detail="Expense not found"
@@ -359,15 +377,13 @@ def update_expense_split(
         )
         session.add(expense_split)
 
-    session.commit()
-
     # Transition expense to PENDING_CONFIRMATION when splits are assigned
     if expense.status == ExpenseStatus.DRAFT:
         expense.status = ExpenseStatus.PENDING_CONFIRMATION
         session.add(expense)
-        session.commit()
 
-    # Audit log for split update
+    # Audit entry joins the same transaction: splits, status transition, and
+    # audit land atomically (WS4/H5)
     expense_service.record_audit(
         session,
         expense_id=expense_id,
@@ -432,7 +448,9 @@ def confirm_expense_split_endpoint(
             detail="You are not involved in this expense"
         )
 
-    return ExpenseSplitPublic.model_validate(split)
+    response = ExpenseSplitPublic.model_validate(split)
+    session.commit()
+    return response
 
 
 @router.post("/{expense_id}/reject", response_model=ExpenseRejectResponse)
@@ -448,9 +466,11 @@ def reject_expense_split_endpoint(
 
     User must have a split in this expense to reject.
     Only pending_confirmation expenses can be rejected.
-    Rejecting removes the user's split and recalculates remaining splits.
+    Rejecting re-opens consent: all splits are removed and the expense
+    reverts to DRAFT so the creator can re-split (WS4/H3 — no silent
+    redistribution).
 
-    Returns success message with remaining split count.
+    Returns success message; remaining_splits is always 0.
     """
     # Get expense
     expense = session.get(Expense, expense_id)
@@ -473,6 +493,7 @@ def reject_expense_split_endpoint(
             detail="You are not involved in this expense"
         )
 
+    session.commit()
     return ExpenseRejectResponse(
         message=result["message"],
         remaining_splits=result["remaining_splits"]
@@ -586,8 +607,8 @@ def get_expense_audit_log(
         raise HTTPException(status_code=404, detail="Expense not found")
 
     # Verify user is member of the expense's group
-    if not expense_service.is_user_group_member(
-        session, current_user.id, expense.group_id
+    if not is_group_member(
+        session, group_id=expense.group_id, user_id=current_user.id
     ):
         raise HTTPException(
             status_code=403,
@@ -655,6 +676,7 @@ def settle_expense_endpoint(
             detail="You are not involved in this expense",
         )
 
+    session.commit()
     return result
 
 
@@ -697,8 +719,11 @@ def confirm_settlement_claim_endpoint(
     Error responses: 403 (not expense owner), 404 (claim not found),
                      409 (claim already processed)
     """
-    result = confirm_settlement_claim(session, claim_id, current_user.id)
-    return _handle_settlement_result(result)
+    result = _handle_settlement_result(
+        confirm_settlement_claim(session, claim_id, current_user.id)
+    )
+    session.commit()
+    return result
 
 
 @router.post("/settlement-claims/{claim_id}/reject", response_model=SettlementClaimPublic)
@@ -712,11 +737,15 @@ def reject_settlement_claim_endpoint(
     Reject a settlement claim.
 
     Only the expense owner (payer) can reject settlement claims.
-    On rejection: claim deleted (allows claimant to re-claim).
+    On rejection: returns the claim with status "rejected" and rejected_at
+    set; the claim record is then deleted (allows claimant to re-claim).
     Audit log preserves the rejection history.
 
     Error responses: 403 (not expense owner), 404 (claim not found),
                      409 (claim already processed)
     """
-    result = reject_settlement_claim(session, claim_id, current_user.id)
-    return _handle_settlement_result(result)
+    result = _handle_settlement_result(
+        reject_settlement_claim(session, claim_id, current_user.id)
+    )
+    session.commit()
+    return result
