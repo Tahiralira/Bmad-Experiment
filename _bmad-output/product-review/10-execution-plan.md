@@ -199,25 +199,59 @@ this file breaks that merge into runnable units.
 
 ### PHASE 1 — Ledger Integrity & Core Loop (backend-heavy; WS4 can start in parallel with WS2)
 
-- [ ] **WS4 — Ledger Integrity (backend)** (≈1 week)
+- [x] **WS4 — Ledger Integrity (backend)** (≈1 week; done in 1 session)
       Goal: the ledger becomes trustworthy — the whole game for this product.
       Depends on: WS1.
       Inputs: 03 §3–§5 (C4, H2, H3, H4, H5, M1, M8, M9, M10).
       Tasks:
-      - [ ] Product decision implemented: "any change to amount/participants reverts
+      - [x] Product decision implemented: "any change to amount/participants reverts
             the expense to DRAFT and re-opens consent" — fixes expense-edit orphaning
-            (H2) and replaces reject-redistribution with reject→DRAFT + notify (H3)
-      - [ ] Settlement rejection sets REJECTED status + `rejected_at` truthfully (H4)
-      - [ ] One-transaction-per-request refactor; audit entries atomic with their
-            operations (H5); add the canonical pattern to solution-patterns.yaml
-      - [ ] Soft-delete/anonymize users; FK policy migration; block hard delete with
-            unsettled shared splits (C4)
-      - [ ] Row locking / idempotency on settle+confirm paths (M8); Decimal to the
-            wire on dashboard balances (M1); 404 guard in `read_user_by_id` (M9)
-      - [ ] Kill one of the twin membership helpers; keyword-only args (M10)
-      - [ ] Tests for every fix (the suite runs now — use it)
-      Verification: suite green in CI including new integrity tests.
-      Status: pending
+            (H2) and replaces reject-redistribution with reject→DRAFT + notify (H3).
+            Consent fields = amount + payer_id; description-only edits don't revert.
+            All splits are deleted on revert (audit records before/after status).
+            "Notify creator" = status change + audit entry until WS12's nudge infra.
+      - [x] Settlement rejection sets REJECTED status + `rejected_at` truthfully (H4)
+            — set on the claim before the response is built; delete-to-allow-reclaim
+            kept (REJECTED persists in the audit log by design, per 03 §4)
+      - [x] One-transaction-per-request refactor; audit entries atomic with their
+            operations (H5); canonical pattern → solution-patterns.yaml **ARCH-001**
+            (services flush, routers commit once; record_audit no longer swallows
+            errors — an operation without its audit row can't persist)
+      - [x] Soft-delete/anonymize users; FK policy migration; block hard delete with
+            unsettled shared splits (C4) — DELETE /users/me and admin DELETE
+            /users/{id} both: 409 while unsettled, else anonymize (PII scrub, OAuth
+            ids cleared, magic-link tokens invalidated, is_active=False,
+            deleted_at). Migration b8c9d0e1f2a3: user.deleted_at +
+            expense.payer_id/created_by + expense_split.user_id CASCADE→RESTRICT.
+      - [x] Row locking / idempotency on settle+confirm paths (M8) — FOR UPDATE on
+            expense row (confirm/reject/split-edit), split row (settle), claim→split
+            →expense (claim confirm/reject, fixed lock order); IntegrityError on
+            double-claim → 409 not 500. Decimal to the wire on dashboard balances
+            (M1) — net_balance/total_balance now exact decimal strings; frontend
+            dashboard types updated. 404 guard in `read_user_by_id` (M9).
+      - [x] Kill one of the twin membership helpers; keyword-only args (M10) —
+            `expenses.service.is_user_group_member` deleted; all call sites use
+            `groups.service.is_group_member(session, *, group_id, user_id)`.
+      - [x] Tests for every fix — 11 new tests in
+            `tests/api/routes/test_ledger_integrity.py` (H2×4, H3×2, H5 atomicity
+            via rollback probe, C4×2 incl. DB-level RESTRICT probe, M9, M1 exact
+            "50.00"/"-50.00" assertions); H4 assertions added to test_settlement;
+            5 existing tests updated to the new soft-delete/Decimal contracts.
+      Verification: DONE 2026-07-09 — **backend 203 passed / 2 skipped** (was 192);
+      frontend typecheck green, 83 passed / 1 expected-fail / 2 skipped, build green
+      (main chunk unchanged 170.6 kB gz); migration applied to dev DB and verified
+      (FKs confdeltype='r'); live health-check + /docs 200 after upgrade.
+      Notes / deviations:
+      - B-C1 (AI parse swapped args) got mechanically fixed by the M10 refactor —
+        writing `user_id=group_id` keyword args deliberately would have been
+        absurd. WS7 still owes the real SSE-payload test; the 2 skipped AI router
+        tests stay skipped until then.
+      - Anonymized email domain must dodge email-validator's special-use list
+        (.invalid/.test reject → response 500s); used
+        `deleted-{id}@anonymized.example.com`.
+      - Admin DELETE /users/{id} (template endpoint, dies in WS8) routed through
+        the same soft-delete path rather than left as a hard-delete hole.
+      Status: DONE 2026-07-09 (branch ws4/ledger-integrity)
 
 - [ ] **WS5 — Ledger API + Group Screen** (≈1 week)
       Goal: the app can display what it stores; the core loop becomes operable.

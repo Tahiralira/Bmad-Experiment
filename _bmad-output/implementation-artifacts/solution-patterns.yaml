@@ -11,7 +11,7 @@
 
 metadata:
   version: "1.0"
-  total_patterns: 14
+  total_patterns: 18
   categories:
     - docker
     - database
@@ -22,6 +22,7 @@ metadata:
     - imports
     - deployment
     - error-handling
+    - architecture
 
 # =============================================================================
 # DOCKER PATTERNS
@@ -367,6 +368,47 @@ testing:
     prevention: "When using 'check all X' patterns, verify whether ALL entities can realistically reach the target status, or if the owner's record needs auto-transition"
     stories_encountered: ["5.2"]
     tokens_saved_estimate: "~600 per occurrence"
+
+# =============================================================================
+# ARCHITECTURE PATTERNS
+# =============================================================================
+
+architecture:
+  - id: "ARCH-001"
+    title: "One transaction per request — services flush, routers commit once (CANONICAL)"
+    symptoms:
+      - "Expense persisted without its CREATED audit entry"
+      - "Splits written but status transition lost after a mid-operation failure"
+      - "Service functions commit 2-4 times per logical operation"
+    root_cause: >
+      Two conflicting idioms coexisted: groups service flushed and let the
+      caller commit (correct), while expenses service committed internally
+      several times per operation. A failure between commits left partial
+      writes — for an audit-trail product, "usually written, in a separate
+      transaction" is a race, not a guarantee (review B-H5).
+    solution: |
+      THE canonical pattern (WS4, applied across the expenses feature):
+      1. Service functions NEVER call session.commit(). They session.flush()
+         so IDs/defaults materialize, and session.refresh() if needed.
+      2. Audit entries are session.add()-ed into the SAME transaction as the
+         operation they describe — atomic by construction (record_audit
+         neither commits nor swallows errors).
+      3. The ROUTER (request boundary) commits exactly once, after building
+         the response:
+         ```python
+         result = expense_service.do_thing(session, ...)
+         response = PublicSchema.model_validate(result)
+         session.commit()
+         return response
+         ```
+      4. Row locks (select(...).with_for_update()) acquired inside the
+         service hold until that single commit — check-then-act stays safe.
+    prevention: >
+      Never commit in a service function. If you see session.commit() below
+      the router layer, it's a bug. New mutating endpoints copy the
+      router-commits-once shape above.
+    stories_encountered: ["WS4"]
+    tokens_saved_estimate: "~800 per occurrence"
 
 # =============================================================================
 # GIT PATTERNS

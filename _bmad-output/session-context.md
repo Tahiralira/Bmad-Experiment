@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-09 (WS3 done — Quiet Ink implemented, brand floor laid)
+**Last Updated:** 2026-07-09 (WS4 done — ledger integrity: consent revert, atomic audit, soft delete)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -36,7 +36,24 @@
 > name; (2) `preview_screenshot` MCP tool times out against the Vite dev
 > server — use Playwright directly for visual proof; (3) devtools packages must
 > be version-pinned to the app's router (1.142.11), latest peer-conflicts.
-> **Next: WS4 (ledger integrity, backend) — can run parallel to design work.**
+> WS4 (ledger integrity, backend) DONE 2026-07-09 on branch
+> `ws4/ledger-integrity`: (a) consent contract — editing amount/payer or
+> rejecting a split reverts the expense to DRAFT and deletes ALL splits (no
+> silent redistribution, B-H2/H3); (b) **ARCH-001 canonical transaction
+> pattern** — services flush, routers commit ONCE, audit entries atomic with
+> operations (B-H5); (c) settlement rejection returns truthful
+> REJECTED+rejected_at (B-H4); (d) user deletion is SOFT (anonymize + block
+> while unsettled) with CASCADE→RESTRICT FK migration `b8c9d0e1f2a3` (B-C4);
+> (e) FOR UPDATE row locks on confirm/reject/settle paths, IntegrityError→409
+> (B-M8); (f) dashboard balances Decimal-to-the-wire as strings, frontend
+> types updated (B-M1); (g) twin membership helper killed — keyword-only
+> `is_group_member(session, *, group_id, user_id)` (B-M10, mechanically fixed
+> B-C1). Backend **203 passed / 2 skipped**; frontend gates green.
+> Key learnings: (1) anonymized emails must avoid `.invalid`/`.test`
+> (email-validator special-use rejection → 500 on response serialization);
+> (2) compose `develop.watch` sync is NOT active on long-running containers —
+> `docker compose cp` before every in-container pytest run.
+> **Next: WS5 (Ledger API + Group Screen) — service semantics now settled.**
 
 ---
 
@@ -145,14 +162,14 @@ cd cleardues/frontend && npm run build
 
 **Plan of record:** `_bmad-output/product-review/10-execution-plan.md` (WS1–WS13 → beta)
 - WS1 Gates & Truth ← **DONE** ✓ (2026-07-07; both suites green, CI live)
-- WS2 Design Direction v2 ← **DONE** ✓ (2026-07-07; "Quiet Ink" adopted →
-  `ux-design-spec-v2.md`: system fonts 0 KB, orb retired, ink-teal accent,
-  hairline ledger rows, perf budget main chunk ≤250 KB gz)
-- WS3 Design System Implementation ← **NEXT** — follow
-  `_bmad-output/planning-artifacts/ws3-implementation-kit.md` VERBATIM (every
-  decision pre-made: paste-ready files, find/replace tables, per-file
-  framer-motion purge recipe, copy deck, DoD checklist). No design thinking needed.
-- WS4 Ledger Integrity (backend) ← can run in parallel with WS3
+- WS2 Design Direction v2 ← **DONE** ✓ (2026-07-07; "Quiet Ink" adopted)
+- WS3 Design System Implementation ← **DONE** ✓ (2026-07-09; branch ws3/quiet-ink)
+- WS4 Ledger Integrity (backend) ← **DONE** ✓ (2026-07-09; branch
+  ws4/ledger-integrity; consent revert, ARCH-001 transactions, soft delete,
+  row locks, Decimal wire; backend 203 passed)
+- WS5 Ledger API + Group Screen ← **NEXT** (read endpoints, typed split
+  schemas, alembic env.py autogenerate reconcile, /groups/$groupId screen,
+  expense entry wiring)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one
