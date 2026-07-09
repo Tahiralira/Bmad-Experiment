@@ -1,15 +1,15 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Border Radius - Soft Corners */
+  /* Border Radius — radius lives on CONTROLS only (Quiet Ink: surfaces are square,
+     separated by hairlines; buttons/inputs 8px, sheets 12px, FAB/avatars full) */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
   /* Colors - mapped from CSS variables */
@@ -33,20 +33,20 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Surface Colors (NEW) */
+  /* Surface Colors */
   --color-surface: var(--surface);
   --color-surface-elevated: var(--surface-elevated);
 
-  /* Action Colors (NEW) */
+  /* Action Colors */
   --color-action: var(--action);
   --color-action-hover: var(--action-hover);
 
-  /* Success Colors (NEW) */
+  /* Success = SETTLED (amber, never green) */
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-success-subtle: var(--success-subtle);
 
-  /* Semantic Colors (NEW) */
+  /* Semantic Colors */
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-warning: var(--warning);
@@ -57,30 +57,34 @@
   /* Text Hierarchy Colors — tokens are namespaced "text-*" so the generated
      utilities are text-text-primary / text-text-secondary / text-text-muted.
      Do NOT map these to --color-primary/secondary/muted: those are shadcn
-     SURFACE tokens (teal action / cream surfaces), not text colors. */
+     SURFACE/ACTION tokens, not text colors. */
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
 
-  /* Typography Scale — generates text-display, text-title, text-heading,
-     text-body, text-body-small, text-caption utilities (UX spec type scale) */
-  --text-display: 32px;
+  /* Typography Scale — Quiet Ink (v2): 28/20/17/15/13/11 */
+  --text-display: 28px;
   --text-display--line-height: 1.2;
-  --text-title: 24px;
+  --text-title: 20px;
   --text-title--line-height: 1.3;
-  --text-heading: 18px;
+  --text-heading: 17px;
   --text-heading--line-height: 1.4;
-  --text-body: 16px;
+  --text-body: 15px;
   --text-body--line-height: 1.5;
-  --text-body-small: 14px;
+  --text-body-small: 13px;
   --text-body-small--line-height: 1.5;
-  --text-caption: 12px;
+  --text-caption: 11px;
   --text-caption--line-height: 1.4;
 
-  /* Shadows — subtle depth per UX spec (overrides Tailwind defaults) */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  /* Shadows — NONE at rest (Quiet Ink). Every resting shadow utility resolves to
+     nothing; only the overlay shadow (shadow-lg/xl, used by dialogs/sheets/FAB)
+     renders. This mechanically strips shadows app-wide. */
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.14);
+  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.14);
 
   /* Chart Colors */
   --color-chart-1: var(--chart-1);
@@ -89,7 +93,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  /* Sidebar Colors */
+  /* Sidebar Colors (template screens only — deleted in WS8; kept so nothing breaks) */
   --color-sidebar: var(--sidebar-background);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -99,9 +103,10 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Font Family */
+  /* Font Family — SYSTEM STACK, zero download (Quiet Ink) */
   --font-sans:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
 }
 
 :root {
@@ -118,198 +123,170 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  /* Border Radius (Soft Corners) */
+  /* Border Radius */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
   --radius-full: 9999px;
-  --radius: 10px; /* Default radius for shadcn */
+  --radius: 8px; /* Default radius for shadcn controls */
 
-  /* Shadows (Subtle Depth) */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  /* Overlay shadow (the ONLY shadow in the system) */
+  --shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.14);
 
-  /* Animation Tokens */
-  --duration-fast: 150ms;
-  --duration-normal: 200ms;
+  /* Animation Tokens — opacity/transform only, nothing infinite */
+  --duration-fast: 120ms;
+  --duration-normal: 150ms;
   --duration-slow: 300ms;
   --easing-default: cubic-bezier(0.4, 0, 0.2, 1);
-  --easing-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Typography Scale */
-  --font-display: 32px;
-  --font-title: 24px;
-  --font-heading: 18px;
-  --font-body: 16px;
-  --font-body-small: 14px;
-  --font-caption: 12px;
+  /* ========== LIGHT THEME — "paper" ========== */
 
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
+  --background: #fcfcfb;
+  --foreground: #1c1b1a;
 
-  --line-height-tight: 1.2;
-  --line-height-snug: 1.3;
-  --line-height-normal: 1.5;
+  --surface: #fcfcfb; /* flat: same as background — separation via hairlines */
+  --surface-elevated: #ffffff; /* overlays only: modals, sheets, popovers */
 
-  /* ========== LIGHT THEME ========== */
+  --border: #e7e5e1;
+  --input: #e7e5e1;
+  --ring: #1f6e68;
 
-  /* Background Colors */
-  --background: #fdfbf7;
-  --foreground: #1f1e1c;
+  /* Text hierarchy */
+  --text-primary: #1c1b1a; /* ink — 16.8:1 */
+  --text-secondary: #6e6b66; /* 5.3:1 */
+  --text-muted: #93908a; /* 3.2:1 — ≥14px non-essential text ONLY */
 
-  /* Surface Colors */
-  --surface: #faf8f5;
-  --surface-elevated: #ffffff;
-
-  /* Border Colors */
-  --border: #e8e4dd;
-  --input: #e8e4dd;
-  --ring: #3d9a94;
-
-  /* Text Colors */
-  --text-primary: #1f1e1c;
-  --text-secondary: #6b6660;
-  --text-muted: #9c9790;
-
-  /* Action Colors (Primary - Muted Teal) */
-  --primary: #3d9a94;
+  /* Interactive ink-teal (spec §3 "--accent") */
+  --primary: #1f6e68; /* 6.0:1 on paper */
   --primary-foreground: #ffffff;
-  --action: #3d9a94;
-  --action-hover: #2d7a75;
+  --action: #1f6e68;
+  --action-hover: #16544f;
 
-  /* Secondary Colors */
-  --secondary: #faf8f5;
-  --secondary-foreground: #1f1e1c;
+  /* Quiet fills */
+  --secondary: #f4f3f0;
+  --secondary-foreground: #1c1b1a;
+  --muted: #f4f3f0;
+  --muted-foreground: #6e6b66;
+  --accent: #f1f0ed; /* hover surface — NEVER teal */
+  --accent-foreground: #1c1b1a;
 
-  /* Muted Colors */
-  --muted: #faf8f5;
-  --muted-foreground: #6b6660;
+  /* Settled (amber — never green) */
+  --success: #8f681c; /* text-safe 5.0:1 */
+  --success-foreground: #ffffff;
+  --success-subtle: #f7efd9;
 
-  /* Accent Colors */
-  --accent: #faf8f5;
-  --accent-foreground: #1f1e1c;
-
-  /* Success Colors (Warm Amber - NOT Green) */
-  --success: #d4a857;
-  --success-foreground: #1f1e1c;
-  --success-subtle: #fdf8ed;
-
-  /* Semantic Colors */
-  --info: #5b8fb9;
+  /* Semantic */
+  --info: #5c6470;
   --info-foreground: #ffffff;
-  --warning: #cc8b4d;
-  --warning-foreground: #1f1e1c;
-  --error: #c97c7c;
+  --warning: #8f681c;
+  --warning-foreground: #ffffff;
+  --error: #a05a52; /* muted clay — never bright red. 5.0:1 */
   --error-foreground: #ffffff;
-  --destructive: #c97c7c;
+  --destructive: #a05a52;
   --destructive-foreground: #ffffff;
 
-  /* Card Colors */
-  --card: #faf8f5;
-  --card-foreground: #1f1e1c;
-
-  /* Popover Colors */
+  --card: #fcfcfb;
+  --card-foreground: #1c1b1a;
   --popover: #ffffff;
-  --popover-foreground: #1f1e1c;
+  --popover-foreground: #1c1b1a;
 
-  /* Chart Colors (Data Visualization) */
-  --chart-1: #3d9a94;
-  --chart-2: #d4a857;
-  --chart-3: #5b8fb9;
-  --chart-4: #cc8b4d;
-  --chart-5: #8b7355;
+  --chart-1: #1f6e68;
+  --chart-2: #8f681c;
+  --chart-3: #6e6b66;
+  --chart-4: #a05a52;
+  --chart-5: #93908a;
 
-  /* Sidebar Colors */
-  --sidebar-background: #faf8f5;
-  --sidebar-foreground: #1f1e1c;
-  --sidebar-primary: #3d9a94;
+  --sidebar-background: #fcfcfb;
+  --sidebar-foreground: #1c1b1a;
+  --sidebar-primary: #1f6e68;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #fdfbf7;
-  --sidebar-accent-foreground: #1f1e1c;
-  --sidebar-border: #e8e4dd;
-  --sidebar-ring: #3d9a94;
+  --sidebar-accent: #f1f0ed;
+  --sidebar-accent-foreground: #1c1b1a;
+  --sidebar-border: #e7e5e1;
+  --sidebar-ring: #1f6e68;
 }
 
 .dark {
   /* ========== DARK THEME ========== */
 
-  /* Background Colors */
-  --background: #1a1a1a;
-  --foreground: #f5f5f5;
+  --background: #141414;
+  --foreground: #eceae6;
 
-  /* Surface Colors */
-  --surface: #252525;
-  --surface-elevated: #2e2e2e;
+  --surface: #141414;
+  --surface-elevated: #1e1e1d;
 
-  /* Border Colors */
-  --border: #3a3a3a;
-  --input: #3a3a3a;
-  --ring: #3d9a94;
+  --border: #2b2a28;
+  --input: #2b2a28;
+  --ring: #57b3aa;
 
-  /* Text Colors */
-  --text-primary: #f5f5f5;
-  --text-secondary: #a0a0a0;
-  --text-muted: #707070;
+  --text-primary: #eceae6; /* 15.6:1 */
+  --text-secondary: #a3a09b; /* 7.1:1 */
+  --text-muted: #767370; /* 3.9:1 — ≥14px non-essential only */
 
-  /* Action Colors */
-  --primary: #3d9a94;
-  --primary-foreground: #ffffff;
-  --action: #3d9a94;
-  --action-hover: #4db0a9;
+  --primary: #57b3aa; /* 7.4:1 */
+  --primary-foreground: #101010;
+  --action: #57b3aa;
+  --action-hover: #6fc4bb;
 
-  /* Secondary Colors */
-  --secondary: #252525;
-  --secondary-foreground: #f5f5f5;
+  --secondary: #201f1e;
+  --secondary-foreground: #eceae6;
+  --muted: #201f1e;
+  --muted-foreground: #a3a09b;
+  --accent: #222120;
+  --accent-foreground: #eceae6;
 
-  /* Muted Colors */
-  --muted: #252525;
-  --muted-foreground: #a0a0a0;
+  --success: #d3a44e; /* 8.1:1 */
+  --success-foreground: #141414;
+  --success-subtle: #26200f;
 
-  /* Accent Colors */
-  --accent: #252525;
-  --accent-foreground: #f5f5f5;
+  --info: #a3a09b;
+  --info-foreground: #141414;
+  --warning: #d3a44e;
+  --warning-foreground: #141414;
+  --error: #ce8a80; /* 6.2:1 */
+  --error-foreground: #141414;
+  --destructive: #ce8a80;
+  --destructive-foreground: #141414;
 
-  /* Success Colors */
-  --success: #d4a857;
-  --success-foreground: #1a1a1a;
-  --success-subtle: #2a2518;
+  --card: #141414;
+  --card-foreground: #eceae6;
+  --popover: #1e1e1d;
+  --popover-foreground: #eceae6;
 
-  /* Semantic Colors */
-  --info: #5b8fb9;
-  --info-foreground: #1a1a1a;
-  --warning: #cc8b4d;
-  --warning-foreground: #1a1a1a;
-  --error: #c97c7c;
-  --error-foreground: #1a1a1a;
-  --destructive: #c97c7c;
-  --destructive-foreground: #1a1a1a;
+  --chart-1: #57b3aa;
+  --chart-2: #d3a44e;
+  --chart-3: #a3a09b;
+  --chart-4: #ce8a80;
+  --chart-5: #767370;
 
-  /* Card Colors */
-  --card: #252525;
-  --card-foreground: #f5f5f5;
+  --sidebar-background: #141414;
+  --sidebar-foreground: #eceae6;
+  --sidebar-primary: #57b3aa;
+  --sidebar-primary-foreground: #101010;
+  --sidebar-accent: #222120;
+  --sidebar-accent-foreground: #eceae6;
+  --sidebar-border: #2b2a28;
+  --sidebar-ring: #57b3aa;
+}
 
-  /* Popover Colors */
-  --popover: #2e2e2e;
-  --popover-foreground: #f5f5f5;
-
-  /* Chart Colors */
-  --chart-1: #4db0a9;
-  --chart-2: #e5bc6a;
-  --chart-3: #6ba0ca;
-  --chart-4: #dd9c5e;
-  --chart-5: #9c8466;
-
-  /* Sidebar Colors */
-  --sidebar-background: #1a1a1a;
-  --sidebar-foreground: #f5f5f5;
-  --sidebar-primary: #3d9a94;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #252525;
-  --sidebar-accent-foreground: #f5f5f5;
-  --sidebar-border: #3a3a3a;
-  --sidebar-ring: #3d9a94;
+/* The settle moment — the app's single choreographed animation (spec §3.5).
+   Apply .settle-glow to a row when its settlement is confirmed. */
+@keyframes settle-glow {
+  0% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 0 var(--success);
+  }
+  30% {
+    background-color: var(--success-subtle);
+    box-shadow: inset 0 0 0 1px var(--success);
+  }
+  100% {
+    background-color: var(--success-subtle);
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+.settle-glow {
+  animation: settle-glow 400ms var(--easing-default) both;
 }
 
 /* Reduced Motion Support */
@@ -338,8 +315,8 @@
   body {
     @apply bg-background text-foreground;
     font-family:
-      "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
