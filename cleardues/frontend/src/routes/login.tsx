@@ -75,9 +75,9 @@ function Login() {
     return (
       <AuthLayout>
         <div className="flex flex-col items-center gap-6 text-center">
-          <div className="rounded-full bg-green-100 p-4">
+          <div className="rounded-full bg-success-subtle p-4">
             <svg
-              className="h-12 w-12 text-green-600"
+              className="h-12 w-12 text-success"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -92,7 +92,7 @@ function Login() {
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">Check your email</h1>
+            <h1 className="text-title font-semibold">Check your email</h1>
             <p className="text-muted-foreground">
               We've sent a login link to{" "}
               <strong>{form.getValues("email")}</strong>
@@ -134,7 +134,7 @@ function Login() {
           className="flex flex-col gap-6"
         >
           <div className="flex flex-col items-center gap-2 text-center">
-            <h1 className="text-2xl font-bold">Login to your account</h1>
+            <h1 className="text-title font-semibold">Login to your account</h1>
             <p className="text-muted-foreground">
               Enter your email to receive a login link
             </p>

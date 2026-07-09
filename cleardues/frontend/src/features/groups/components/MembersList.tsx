@@ -13,7 +13,7 @@ export function MembersList({ groupId }: Props) {
   }
 
   if (error) {
-    return <div className="text-red-600">Failed to load members</div>
+    return <div className="text-destructive">Failed to load members</div>
   }
 
   if (!data?.members.length) {

@@ -15,7 +15,7 @@ export function GroupDetail({ group }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold">{group.name}</h2>
+          <h2 className="text-xl font-semibold">{group.name}</h2>
           <p className="text-sm text-muted-foreground">
             Created {new Date(group.created_at).toLocaleDateString()}
           </p>

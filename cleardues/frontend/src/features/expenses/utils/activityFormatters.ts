@@ -148,7 +148,7 @@ export function getActionColor(
     created: "text-emerald-500",
     edited: "text-blue-500",
     confirmed: "text-green-500",
-    rejected: "text-red-500",
+    rejected: "text-destructive",
     settled: "text-amber-500",
     split_updated: "text-violet-500",
   }

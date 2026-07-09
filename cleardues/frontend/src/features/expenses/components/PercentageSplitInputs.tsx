@@ -72,7 +72,7 @@ export function PercentageSplitInputs({
             Total Percentage:
           </span>
           <span className={cn(
-            "text-sm font-bold",
+            "text-sm font-semibold",
             isExactMatch && "text-success",
             isOverAllocated && "text-destructive",
             !isExactMatch && !isOverAllocated && "text-text-secondary"

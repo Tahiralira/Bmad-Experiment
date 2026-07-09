@@ -1,11 +1,6 @@
 import { Link } from "@tanstack/react-router"
 
-import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
-import icon from "/assets/images/fastapi-icon.svg"
-import iconLight from "/assets/images/fastapi-icon-light.svg"
-import logo from "/assets/images/fastapi-logo.svg"
-import logoLight from "/assets/images/fastapi-logo-light.svg"
 
 interface LogoProps {
   variant?: "full" | "icon" | "responsive"
@@ -13,48 +8,41 @@ interface LogoProps {
   asLink?: boolean
 }
 
-export function Logo({
-  variant = "full",
-  className,
-  asLink = true,
-}: LogoProps) {
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === "dark"
+/** The ClearDues mark: a balanced ledger ("="). Renders in the accent color. */
+function LogoGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      aria-hidden="true"
+      className={cn("size-6 shrink-0", className)}
+    >
+      <rect width="64" height="64" rx="14" className="fill-primary" />
+      <rect x="16" y="25" width="32" height="6" rx="3" className="fill-background" />
+      <rect x="16" y="37" width="32" height="6" rx="3" className="fill-background" />
+    </svg>
+  )
+}
 
-  const fullLogo = isDark ? logoLight : logo
-  const iconLogo = isDark ? iconLight : icon
-
+export function Logo({ variant = "full", className, asLink = true }: LogoProps) {
   const content =
-    variant === "responsive" ? (
-      <>
-        <img
-          src={fullLogo}
-          alt="FastAPI"
-          className={cn(
-            "h-6 w-auto group-data-[collapsible=icon]:hidden",
-            className,
-          )}
-        />
-        <img
-          src={iconLogo}
-          alt="FastAPI"
-          className={cn(
-            "size-5 hidden group-data-[collapsible=icon]:block",
-            className,
-          )}
-        />
-      </>
+    variant === "icon" ? (
+      <LogoGlyph className={className} />
     ) : (
-      <img
-        src={variant === "full" ? fullLogo : iconLogo}
-        alt="FastAPI"
-        className={cn(variant === "full" ? "h-6 w-auto" : "size-5", className)}
-      />
+      <span className={cn("inline-flex items-center gap-2", className)}>
+        <LogoGlyph />
+        <span className="text-heading font-semibold tracking-tight text-text-primary">
+          ClearDues
+        </span>
+      </span>
     )
 
   if (!asLink) {
     return content
   }
 
-  return <Link to="/">{content}</Link>
+  return (
+    <Link to="/" aria-label="ClearDues home">
+      {content}
+    </Link>
+  )
 }

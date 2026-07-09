@@ -11,7 +11,7 @@ function PendingConfirmations() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3">
           <CheckCircle className="size-8 text-primary" aria-hidden="true" />
           Pending Confirmations
         </h1>

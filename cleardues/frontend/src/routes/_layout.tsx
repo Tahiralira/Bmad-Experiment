@@ -6,7 +6,6 @@ import {
 } from "@tanstack/react-router"
 import { useCallback, useRef, useState } from "react"
 
-import { Footer } from "@/components/Common/Footer"
 import { AgentOrb } from "@/components/ui/agent-orb"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import { SmartInputModal } from "@/features/expenses/components"
@@ -52,11 +51,6 @@ function Layout() {
           <Outlet />
         </div>
       </main>
-
-      {/* Footer padded so the fixed bottom nav doesn't cover it */}
-      <div className="pb-16">
-        <Footer />
-      </div>
 
       {/* Agent Orb - floating action button, tap to add an expense */}
       <AgentOrb

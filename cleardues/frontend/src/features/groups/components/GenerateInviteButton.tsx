@@ -72,7 +72,7 @@ export function GenerateInviteButton({ groupId }: Props) {
         >
           {createInvite.isPending ? "Generating..." : "Generate Invite Link"}
         </button>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
     )
   }

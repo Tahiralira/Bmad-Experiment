@@ -58,9 +58,9 @@ function AcceptInvitePage() {
     return (
       <AuthLayout>
         <div className="flex flex-col items-center gap-6 text-center">
-          <div className="rounded-full bg-red-100 p-4">
+          <div className="rounded-full bg-destructive p-4">
             <svg
-              className="h-12 w-12 text-red-600"
+              className="h-12 w-12 text-destructive"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -75,7 +75,7 @@ function AcceptInvitePage() {
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">Could Not Join Group</h1>
+            <h1 className="text-title font-semibold">Could Not Join Group</h1>
             <p className="text-muted-foreground">{error}</p>
           </div>
 
@@ -96,7 +96,7 @@ function AcceptInvitePage() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold">Joining group...</h1>
+          <h1 className="text-title font-semibold">Joining group...</h1>
           <p className="text-muted-foreground">
             Please wait while we add you to the expense group.
           </p>

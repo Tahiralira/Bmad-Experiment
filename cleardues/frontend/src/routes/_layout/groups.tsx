@@ -41,7 +41,7 @@ function Groups() {
   if (error) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-red-600">Failed to load groups</div>
+        <div className="text-destructive">Failed to load groups</div>
       </div>
     )
   }
@@ -50,7 +50,7 @@ function Groups() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Expense Groups</h1>
+          <h1 className="text-title font-semibold tracking-tight">Expense Groups</h1>
           <p className="text-muted-foreground">
             Manage your expense groups and members
           </p>

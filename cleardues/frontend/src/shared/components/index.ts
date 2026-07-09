@@ -7,7 +7,6 @@ export { Appearance, SidebarAppearance } from "@/components/Common/Appearance"
 export { AuthLayout } from "@/components/Common/AuthLayout"
 export { DataTable } from "@/components/Common/DataTable"
 export { default as ErrorComponent } from "@/components/Common/ErrorComponent"
-export { Footer } from "@/components/Common/Footer"
 export { Logo } from "@/components/Common/Logo"
 export { default as NotFound } from "@/components/Common/NotFound"
 // UI components (shadcn/ui)

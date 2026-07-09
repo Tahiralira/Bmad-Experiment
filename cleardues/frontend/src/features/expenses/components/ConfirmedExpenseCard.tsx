@@ -133,7 +133,7 @@ export function ConfirmedExpenseCard({
               Pending
             </span>
           ) : (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-200">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success-subtle px-2.5 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-200">
               <CheckCircle className="h-3 w-3" />
               Confirmed
             </span>

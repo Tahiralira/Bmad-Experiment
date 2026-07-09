@@ -90,7 +90,7 @@ export function ActivityFeed({
         {title && (
           <h2 className="text-heading font-medium text-primary">{title}</h2>
         )}
-        <p className="text-sm text-red-500">
+        <p className="text-sm text-destructive">
           Failed to load activity: {error.message}
         </p>
       </div>

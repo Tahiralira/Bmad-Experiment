@@ -125,7 +125,7 @@ function PendingConfirmationCard({
         {/* Status badge */}
         <div className="flex items-center gap-2">
           {expense.status === "confirmed" ? (
-            <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-200">
+            <span className="inline-flex items-center rounded-full bg-success-subtle px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-200">
               Confirmed
             </span>
           ) : (

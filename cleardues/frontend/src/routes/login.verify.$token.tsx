@@ -70,9 +70,9 @@ function VerifyLoginMagicLink() {
     return (
       <AuthLayout>
         <div className="flex flex-col items-center gap-6 text-center">
-          <div className="rounded-full bg-red-100 p-4">
+          <div className="rounded-full bg-destructive p-4">
             <svg
-              className="h-12 w-12 text-red-600"
+              className="h-12 w-12 text-destructive"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -87,7 +87,7 @@ function VerifyLoginMagicLink() {
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">Login Failed</h1>
+            <h1 className="text-title font-semibold">Login Failed</h1>
             <p className="text-muted-foreground">{error}</p>
           </div>
 
@@ -117,7 +117,7 @@ function VerifyLoginMagicLink() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold">Logging you in...</h1>
+          <h1 className="text-title font-semibold">Logging you in...</h1>
           <p className="text-muted-foreground">
             Please wait while we verify your login link.
           </p>

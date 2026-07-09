@@ -155,7 +155,7 @@ function GroupLogLoader({
 function PageHeader() {
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight text-foreground">
+      <h1 className="text-3xl font-semibold tracking-tight text-foreground">
         Activity Feed
       </h1>
       <p className="text-muted-foreground">
