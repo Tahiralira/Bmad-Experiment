@@ -1,7 +1,17 @@
-import * as Icons from "lucide-react"
+import { BarChart2, Equal, Grid3x3, Percent } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SplitType, SPLIT_TYPE_OPTIONS } from "../types"
 import type { LucideIcon } from "lucide-react"
+
+// Explicit icon map: a `* as Icons` namespace import defeats tree-shaking and
+// bundles the entire lucide set (and the kebab-case names in SPLIT_TYPE_OPTIONS
+// never matched lucide's PascalCase exports anyway, so no icon ever rendered).
+const SPLIT_ICONS: Record<string, LucideIcon> = {
+  equal: Equal,
+  "bar-chart-2": BarChart2,
+  percent: Percent,
+  "squares-3-by-3": Grid3x3,
+}
 
 interface SplitPickerProps {
   /** Currently selected split type */
@@ -36,7 +46,7 @@ export function SplitPicker({ selectedType, onSelectType }: SplitPickerProps) {
 
       <div className="grid grid-cols-4 gap-3">
         {SPLIT_TYPE_OPTIONS.map((option) => {
-          const Icon = Icons[option.icon as keyof typeof Icons] as LucideIcon
+          const Icon = SPLIT_ICONS[option.icon]
           const isSelected = selectedType === option.type
 
           return (
