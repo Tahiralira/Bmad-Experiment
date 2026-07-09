@@ -1,42 +1,94 @@
+"""
+Test configuration.
+
+SAFETY: the suite runs against a dedicated `<POSTGRES_DB>_test` database, never
+the configured application database. The redirect happens BEFORE any app import
+builds the engine, and tests refuse to run outside ENVIRONMENT=local.
+"""
+
 from collections.abc import Generator
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlmodel import Session, delete
+from sqlalchemy import create_engine as _create_admin_engine
+from sqlalchemy import text
 
+# --- Test-DB redirect: must precede every other app import, because
+# app.core.db builds the engine from settings at import time. ---
 from app.core.config import settings
-from app.core.db import engine, init_db
-from app.main import app
-from app.models import Item, MagicLinkToken, User
-from app.features.groups.models import ExpenseGroup, GroupInvite, GroupMember
-from app.features.expenses.models import AuditLog, SettlementClaim
-from tests.utils.user import authentication_token_from_email
-from tests.utils.utils import get_superuser_token_headers
+
+if settings.ENVIRONMENT != "local":
+    raise RuntimeError(
+        f"Refusing to run tests: ENVIRONMENT is '{settings.ENVIRONMENT}', not "
+        "'local'. The suite drops and recreates its own database and must "
+        "never point at a shared environment."
+    )
+
+if not settings.POSTGRES_DB.endswith("_test"):
+    settings.POSTGRES_DB = f"{settings.POSTGRES_DB}_test"
+
+
+def _ensure_test_database_exists() -> None:
+    """Create the dedicated test database if it doesn't exist yet."""
+    admin_uri = str(settings.SQLALCHEMY_DATABASE_URI).rsplit("/", 1)[0] + "/postgres"
+    admin_engine = _create_admin_engine(admin_uri, isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        exists = conn.execute(
+            text("SELECT 1 FROM pg_database WHERE datname = :name"),
+            {"name": settings.POSTGRES_DB},
+        ).scalar()
+        if not exists:
+            conn.execute(text(f'CREATE DATABASE "{settings.POSTGRES_DB}"'))
+    admin_engine.dispose()
+
+
+_ensure_test_database_exists()
+
+# App imports come after the redirect so the engine targets the test DB.
+from pathlib import Path  # noqa: E402
+
+from alembic import command as alembic_command  # noqa: E402
+from alembic.config import Config as AlembicConfig  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlmodel import Session  # noqa: E402
+
+from app.core.db import engine, init_db  # noqa: E402
+from app.main import app  # noqa: E402  # importing app.main registers every feature model
+from tests.utils.user import authentication_token_from_email  # noqa: E402
+from tests.utils.utils import get_superuser_token_headers  # noqa: E402
+
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture(scope="session", autouse=True)
 def db() -> Generator[Session, None, None]:
+    # Deterministic schema per run, built from the REAL alembic migrations —
+    # not SQLModel.create_all — so tests exercise the schema production runs
+    # (e.g. timezone-aware timestamp columns that the models alone would
+    # declare naive). env.py reads the mutated settings, so this migrates the
+    # test database.
+    with engine.connect() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+        conn.commit()
+    alembic_cfg = AlembicConfig(str(_BACKEND_ROOT / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(_BACKEND_ROOT / "app" / "alembic"))
+    alembic_command.upgrade(alembic_cfg, "head")
     with Session(engine) as session:
         init_db(session)
         yield session
-        # Clean up in correct order (respect foreign key constraints)
-        statement = delete(AuditLog)
-        session.execute(statement)
-        statement = delete(SettlementClaim)
-        session.execute(statement)
-        statement = delete(GroupInvite)
-        session.execute(statement)
-        statement = delete(GroupMember)
-        session.execute(statement)
-        statement = delete(ExpenseGroup)
-        session.execute(statement)
-        statement = delete(Item)
-        session.execute(statement)
-        statement = delete(MagicLinkToken)
-        session.execute(statement)
-        statement = delete(User)
-        session.execute(statement)
-        session.commit()
+
+
+@pytest.fixture(autouse=True)
+def _recover_failed_session(db: Session) -> Generator[None, None, None]:
+    """Roll the shared session back after each test.
+
+    A test that dies mid-transaction otherwise leaves the session-scoped
+    Session in a failed state, and every subsequent test errors with
+    PendingRollbackError — one real failure cascades into dozens of phantom
+    ones. Rolling back a healthy session is a no-op, so this is always safe.
+    """
+    yield
+    db.rollback()
 
 
 @pytest.fixture(scope="module")

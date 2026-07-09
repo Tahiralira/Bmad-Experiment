@@ -1,0 +1,79 @@
+# ClearDues CI — the quality gate for every story (WS1, 10-execution-plan.md).
+# Lives at the REPO ROOT because GitHub only scans .github/workflows/ here;
+# the product lives one level down in cleardues/ (working-directory below).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cleardues/backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Settings consumed by app.core.config; env vars take precedence over
+      # the (absent-in-CI) ../.env file. The test suite redirects itself to
+      # an "app_test" database and refuses to run unless ENVIRONMENT=local.
+      PROJECT_NAME: ClearDues
+      ENVIRONMENT: local
+      SECRET_KEY: ci-only-secret-key-do-not-reuse
+      FIRST_SUPERUSER: admin@example.com
+      FIRST_SUPERUSER_PASSWORD: ci-only-password-1234
+      POSTGRES_SERVER: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+      # Match the runtime the Docker image ships (python:3.10) until WS9
+      # bumps both together.
+      UV_PYTHON: "3.10"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Verify lockfile is in sync with pyproject.toml
+        run: uv lock --check
+      - name: Install dependencies (locked)
+        run: uv sync --locked
+      - name: Run tests
+        run: uv run pytest -q
+
+  frontend:
+    name: Frontend typecheck, tests, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cleardues/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cleardues/frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test
+      - name: Build
+        run: npm run build

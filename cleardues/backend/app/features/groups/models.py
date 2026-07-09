@@ -2,6 +2,7 @@
 import secrets
 import uuid
 from datetime import datetime, timedelta
+from typing import Optional
 
 from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
 
@@ -99,7 +100,7 @@ class ExpenseGroup(SQLModel, table=True):
     members: list["GroupMember"] = Relationship(
         back_populates="group", cascade_delete=True
     )
-    settings: "GroupSettings | None" = Relationship(back_populates="group")
+    settings: Optional["GroupSettings"] = Relationship(back_populates="group")
 
 
 # Role constants

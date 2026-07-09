@@ -10,7 +10,6 @@
 
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
-import "@testing-library/jest-dom"
 import { ExpensePreviewCard } from "./ExpensePreviewCard"
 
 describe("ExpensePreviewCard", () => {
@@ -73,14 +72,12 @@ describe("ExpensePreviewCard", () => {
   })
 
   describe("Error State (Story 3.4)", () => {
-    it("returns null when status is error (not implemented yet)", () => {
-      const { container } = render(
-        <ExpensePreviewCard data={null} status="error" />
-      )
+    it("shows error message when status is error (Story 3.4)", () => {
+      render(<ExpensePreviewCard data={null} status="error" />)
 
-      // Story 3.4: Will show error message
-      // For now, returns null
-      expect(container.firstChild).toBeNull()
+      expect(
+        screen.getByText(/Failed to parse expense/)
+      ).toBeInTheDocument()
     })
   })
 

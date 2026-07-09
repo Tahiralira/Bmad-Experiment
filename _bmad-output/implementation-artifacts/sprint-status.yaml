@@ -122,7 +122,7 @@ development_status:
   epic-5: in-progress
   5-1-mark-debt-as-settled-claim-payment: done
   5-2-owner-confirms-settlement: done
-  5-3-settlement-audit-trail: backlog
+  5-3-settlement-audit-trail: ready-for-dev
   epic-5-retrospective: optional
 
   # Epic 6: Agentic Notifications & Nudges (5 stories)

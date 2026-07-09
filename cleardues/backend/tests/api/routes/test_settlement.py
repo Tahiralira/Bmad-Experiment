@@ -30,6 +30,7 @@ from app.core.config import settings
 from app.features.expenses.models import (
     AuditActionType,
     AuditLog,
+    Expense,
     ExpenseSplit,
     ExpenseStatus,
     SettlementClaim,
@@ -71,17 +72,18 @@ def _create_confirmed_expense(
 
     # 3. Add second user to the group via invite
     invite_response = client.post(
-        f"{settings.API_V1_STR}/expense-groups/{group['id']}/invite",
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/invites",
         headers=user_headers,
         json={},
     )
-    assert invite_response.status_code == 200
-    invite_token = invite_response.json()["token"]
+    assert invite_response.status_code == 201
+    invite_token = invite_response.json()["invite"]["token"]
 
-    accept_response = client.post(
+    # NOTE: invite acceptance is currently a state-changing GET (S5-M4);
+    # becomes POST in WS8 — update this then.
+    accept_response = client.get(
         f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}",
         headers=second_user_headers,
-        json={},
     )
     assert accept_response.status_code == 200
 
@@ -197,48 +199,16 @@ def test_settle_expense_not_involved_returns_403(
     client: TestClient,
     normal_user_token_headers: dict[str, str],
     second_user_token_headers: dict[str, str],
+    superuser_token_headers: dict[str, str],
 ) -> None:
-    """Test that user not involved in expense gets 403 Forbidden."""
+    """Test that a user with no split in the expense gets 403 Forbidden."""
     data = _create_confirmed_expense(client, normal_user_token_headers, second_user_token_headers)
 
-    # Create a third user (not in the group) and try to settle
-    # We'll use the expense creator's settle attempt - the creator is also involved,
-    # so let's test with a fresh user by creating another group
-    third_group_response = client.post(
-        f"{settings.API_V1_STR}/expense-groups/",
-        headers=second_user_token_headers,
-        json={"name": "Third user group"},
-    )
-    # Actually, second user IS involved. Let's use a different approach:
-    # The first user (creator/payer) trying to settle should also work since they have a split.
-    # For a true "not involved" test, we'd need a third user.
-    # Since we only have 2 test users, we'll verify the 403 by settling a different user's expense.
-
-    # Use normal user to create their own separate expense in a different group
-    # and second user tries to settle it without being a member
-    other_group = client.post(
-        f"{settings.API_V1_STR}/expense-groups/",
-        headers=normal_user_token_headers,
-        json={"name": f"Other group {uuid.uuid4().hex[:8]}"},
-    )
-    assert other_group.status_code == 201
-
-    # Create expense in that group (only normal user is a member)
-    other_expense = client.post(
-        f"{settings.API_V1_STR}/expenses/",
-        headers=normal_user_token_headers,
-        json={
-            "group_id": other_group.json()["id"],
-            "amount": "30.00",
-            "description": "Other expense",
-        },
-    )
-    assert other_expense.status_code == 200
-
-    # Second user tries to settle expense they're not involved in
+    # The superuser is the third identity: not a group member, no split in the
+    # (confirmed) expense — settling must be rejected as "not involved".
     response = client.post(
-        f"{settings.API_V1_STR}/expenses/{other_expense.json()['id']}/settle",
-        headers=second_user_token_headers,
+        f"{settings.API_V1_STR}/expenses/{data['expense_id']}/settle",
+        headers=superuser_token_headers,
         json={},
     )
     assert response.status_code == 403
@@ -275,17 +245,17 @@ def test_settle_expense_group_member_no_split_returns_403(
 
     # Add second user to group
     invite_response = client.post(
-        f"{settings.API_V1_STR}/expense-groups/{group['id']}/invite",
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/invites",
         headers=normal_user_token_headers,
         json={},
     )
-    assert invite_response.status_code == 200
-    invite_token = invite_response.json()["token"]
+    assert invite_response.status_code == 201
+    invite_token = invite_response.json()["invite"]["token"]
 
-    accept_response = client.post(
+    # NOTE: GET-based acceptance per current API (S5-M4); becomes POST in WS8.
+    accept_response = client.get(
         f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}",
         headers=second_user_token_headers,
-        json={},
     )
     assert accept_response.status_code == 200
 
@@ -340,6 +310,9 @@ def test_settle_expense_group_member_no_split_returns_403(
         # Second user has no split → 403
         assert settle_response.status_code == 403
         assert "not involved" in settle_response.json()["detail"].lower()
+
+
+def test_settle_non_confirmed_expense_returns_400(
     client: TestClient,
     normal_user_token_headers: dict[str, str],
     second_user_token_headers: dict[str, str],
@@ -430,13 +403,14 @@ def test_get_pending_settlements(
     """Test GET /expenses/pending-settlements returns user's pending claims."""
     data = _create_confirmed_expense(client, normal_user_token_headers, second_user_token_headers)
 
-    # No pending settlements initially
+    # This endpoint returns ALL of the user's pending claims across groups and
+    # earlier tests in this module may have left some — assert relative change.
     response = client.get(
         f"{settings.API_V1_STR}/expenses/pending-settlements",
         headers=second_user_token_headers,
     )
     assert response.status_code == 200
-    assert len(response.json()) == 0
+    baseline_ids = {s["claim"]["id"] for s in response.json()}
 
     # Create a settlement claim
     settle_response = client.post(
@@ -446,17 +420,19 @@ def test_get_pending_settlements(
     )
     assert settle_response.status_code == 201
 
-    # Now pending settlements should contain the claim
+    # Now pending settlements should contain the new claim
     response = client.get(
         f"{settings.API_V1_STR}/expenses/pending-settlements",
         headers=second_user_token_headers,
     )
     assert response.status_code == 200
-    settlements = response.json()
-    assert len(settlements) >= 1
+    new_settlements = [
+        s for s in response.json() if s["claim"]["id"] not in baseline_ids
+    ]
+    assert len(new_settlements) == 1
 
     # Verify structure
-    settlement = settlements[0]
+    settlement = new_settlements[0]
     assert "expense" in settlement
     assert "split" in settlement
     assert "claim" in settlement
@@ -821,41 +797,44 @@ def test_get_pending_claims_for_owner(
     second_user_token_headers: dict[str, str],
 ) -> None:
     """Test GET /expenses/settlement-claims/pending-for-owner returns claims for owned expenses."""
-    # Initially no pending claims
+    # This endpoint returns ALL pending claims on the owner's expenses across
+    # groups; earlier tests may have left some — assert relative change.
     response = client.get(
         f"{settings.API_V1_STR}/expenses/settlement-claims/pending-for-owner",
         headers=normal_user_token_headers,
     )
     assert response.status_code == 200
-    assert len(response.json()) == 0
+    baseline_ids = {c["claim"]["id"] for c in response.json()}
 
     # Create a pending claim (normal_user is owner/payer, second_user is claimant)
     data = _create_pending_claim(client, normal_user_token_headers, second_user_token_headers)
 
-    # Now owner should see the claim
+    # Now owner should see the new claim
     response = client.get(
         f"{settings.API_V1_STR}/expenses/settlement-claims/pending-for-owner",
         headers=normal_user_token_headers,
     )
     assert response.status_code == 200
-    claims = response.json()
-    assert len(claims) >= 1
+    new_claims = [c for c in response.json() if c["claim"]["id"] not in baseline_ids]
+    assert len(new_claims) == 1
 
     # Verify structure
-    claim_data = claims[0]
+    claim_data = new_claims[0]
     assert "expense" in claim_data
     assert "split" in claim_data
     assert "claim" in claim_data
     assert claim_data["claim"]["status"] == "pending"
     assert claim_data["expense"]["description"] == "Test Expense"
 
-    # Claimant should NOT see claims in this endpoint (they're not the owner)
+    # Claimant should NOT see this claim in the owner endpoint (not the owner)
     response2 = client.get(
         f"{settings.API_V1_STR}/expenses/settlement-claims/pending-for-owner",
         headers=second_user_token_headers,
     )
     assert response2.status_code == 200
-    assert len(response2.json()) == 0
+    assert all(
+        c["expense"]["id"] != data["expense_id"] for c in response2.json()
+    )
 
 
 def test_confirm_settlement_unauthenticated_returns_401(

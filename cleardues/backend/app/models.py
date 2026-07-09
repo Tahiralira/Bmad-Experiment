@@ -71,3 +71,11 @@ __all__ = [
     "ItemsPublic",
     "ItemUpdate",
 ]
+
+# Register ALL feature models with SQLModel metadata. Prestart (initial_data),
+# alembic/env.py, and tests rely on "import app.models" loading the complete
+# schema — without these, mapper configuration fails on cross-feature
+# relationships (e.g. User.expense_splits -> ExpenseSplit) and Alembic
+# autogenerate is blind to every feature table.
+from app.features.groups import models as _groups_models  # noqa: E402,F401
+from app.features.expenses import models as _expenses_models  # noqa: E402,F401

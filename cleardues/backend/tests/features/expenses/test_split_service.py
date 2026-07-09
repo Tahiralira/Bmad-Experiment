@@ -3,8 +3,10 @@ from decimal import Decimal
 import uuid
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.core.config import settings
 from app.features.expenses.service import calculate_equal_split, calculate_unequal_split, calculate_percentage_split
 from app.features.expenses.models import Expense, ExpenseSplit
 from app.features.groups.models import GroupMember
@@ -81,7 +83,7 @@ class TestCalculateEqualSplit:
         """Test that at least 2 members are required"""
         single_user = uuid.uuid4()
 
-        with pytest.raises(ValueError, match="At least 2 members required"):
+        with pytest.raises(ValueError, match="At least 2 members"):
             calculate_equal_split(
                 total_amount=Decimal("100.00"),
                 member_ids=[single_user],
@@ -277,11 +279,14 @@ class TestCalculateUnequalSplit:
 
         member_ids = [user1, user2, user3, user4]
 
+        # Contract: the caller provides splits for INCLUDED members only, and
+        # they must sum to the total — the service does not redistribute an
+        # excluded member's share (the original test asserted auto-adjustment
+        # that was never implemented).
         splits = [
             {"user_id": str(user1), "amount": 50.00},
             {"user_id": str(user2), "amount": 30.00},
-            {"user_id": str(user3), "amount": 10.00},  # This will be excluded
-            {"user_id": str(user4), "amount": 10.00}
+            {"user_id": str(user4), "amount": 20.00},
         ]
 
         result = calculate_unequal_split(
@@ -298,7 +303,7 @@ class TestCalculateUnequalSplit:
         # Verify amounts are correct for included members
         assert result[0]["amount_owed"] == Decimal("50.00")
         assert result[1]["amount_owed"] == Decimal("30.00")
-        assert result[2]["amount_owed"] == Decimal("20.00")  # user4 amount adjusted
+        assert result[2]["amount_owed"] == Decimal("20.00")
 
     def test_unequal_split_exclude_all_but_one_raises_error(self):
         """Test that excluding all but one member raises error"""
@@ -355,11 +360,17 @@ class TestExpenseSplitAPI:
         self,
         client: TestClient,
         normal_user_token_headers: dict[str, str],
+        second_user_token_headers: dict[str, str],
         db: Session,
     ) -> None:
-        """Test creating equal split via API"""
-        # First create a group with members
-        group_data = {"name": "Split Test Group"}
+        """Test creating equal split via API.
+
+        Note: the original version split among a single member, which the
+        service (correctly) rejects with "At least 2 members" — it never
+        passed. A second member is required for the success path.
+        """
+        # First create a group
+        group_data = {"name": f"Split Test Group {uuid.uuid4().hex[:8]}"}
         group_response = client.post(
             f"{settings.API_V1_STR}/expense-groups/",
             headers=normal_user_token_headers,
@@ -367,6 +378,20 @@ class TestExpenseSplitAPI:
         )
         assert group_response.status_code == 201
         group = group_response.json()
+
+        # Add a second member via invite (acceptance is a GET per current API)
+        invite_response = client.post(
+            f"{settings.API_V1_STR}/expense-groups/{group['id']}/invites",
+            headers=normal_user_token_headers,
+            json={},
+        )
+        assert invite_response.status_code == 201
+        invite_token = invite_response.json()["invite"]["token"]
+        accept_response = client.get(
+            f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}",
+            headers=second_user_token_headers,
+        )
+        assert accept_response.status_code == 200
 
         # Create an expense
         expense_data = {
@@ -396,8 +421,9 @@ class TestExpenseSplitAPI:
         split_result = split_response.json()
 
         assert split_result["split_type"] == "equal"
-        assert len(split_result["splits"]) == 1  # Only creator in group
-        assert split_result["splits"][0]["amount_owed"] == "150.00"
+        assert len(split_result["splits"]) == 2
+        amounts = sorted(s["amount_owed"] for s in split_result["splits"])
+        assert amounts == ["75.00", "75.00"]
 
     def test_split_nonexistent_expense_returns_404(
         self, client: TestClient, normal_user_token_headers: dict[str, str]

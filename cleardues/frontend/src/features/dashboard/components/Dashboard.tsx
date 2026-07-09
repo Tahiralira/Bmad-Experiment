@@ -28,7 +28,7 @@ export function Dashboard() {
   if (error) {
     return (
       <div className="p-4 bg-surface border border-border rounded-md">
-        <p className="text-primary mb-3">
+        <p className="text-text-primary mb-3">
           Failed to load dashboard: {error.message}
         </p>
         <button
@@ -45,10 +45,10 @@ export function Dashboard() {
   if (!data?.groups.length) {
     return (
       <div className="text-center py-8 bg-surface border border-border rounded-md">
-        <h2 className="text-title font-medium text-primary mb-2">
+        <h2 className="text-title font-medium text-text-primary mb-2">
           No groups yet
         </h2>
-        <p className="text-secondary mb-4">
+        <p className="text-text-secondary mb-4">
           Create a group to start tracking expenses with friends
         </p>
         <Link
@@ -65,7 +65,7 @@ export function Dashboard() {
     <div className="space-y-6">
       {/* Total Balance Header */}
       <div className="bg-surface-elevated border border-border rounded-md p-6 shadow-sm">
-        <h1 className="text-heading font-medium text-secondary mb-2">
+        <h1 className="text-heading font-medium text-text-secondary mb-2">
           Total Balance
         </h1>
         <BalanceDisplay
@@ -78,7 +78,7 @@ export function Dashboard() {
 
       {/* Groups List */}
       <div className="space-y-3">
-        <h2 className="text-heading font-medium text-primary">Your Groups</h2>
+        <h2 className="text-heading font-medium text-text-primary">Your Groups</h2>
         {data.groups.map((group) => (
           <GroupCard key={group.group_id} group={group} />
         ))}
@@ -114,10 +114,10 @@ function GroupCard({ group }: GroupCardProps) {
       <Link to="/groups" className="block">
         <div className="flex justify-between items-center">
           <div className="min-w-0 flex-1 mr-4">
-            <h3 className="text-heading font-medium text-primary truncate">
+            <h3 className="text-heading font-medium text-text-primary truncate">
               {group.group_name}
             </h3>
-            <p className="text-body-small text-secondary">
+            <p className="text-body-small text-text-secondary">
               {group.member_count} member{group.member_count !== 1 ? "s" : ""}{" "}
               &bull; {formatLastActivity(group.last_activity)}
             </p>

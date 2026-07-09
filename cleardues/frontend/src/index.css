@@ -54,6 +54,34 @@
   --color-error: var(--error);
   --color-error-foreground: var(--error-foreground);
 
+  /* Text Hierarchy Colors — tokens are namespaced "text-*" so the generated
+     utilities are text-text-primary / text-text-secondary / text-text-muted.
+     Do NOT map these to --color-primary/secondary/muted: those are shadcn
+     SURFACE tokens (teal action / cream surfaces), not text colors. */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  /* Typography Scale — generates text-display, text-title, text-heading,
+     text-body, text-body-small, text-caption utilities (UX spec type scale) */
+  --text-display: 32px;
+  --text-display--line-height: 1.2;
+  --text-title: 24px;
+  --text-title--line-height: 1.3;
+  --text-heading: 18px;
+  --text-heading--line-height: 1.4;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-body-small: 14px;
+  --text-body-small--line-height: 1.5;
+  --text-caption: 12px;
+  --text-caption--line-height: 1.4;
+
+  /* Shadows — subtle depth per UX spec (overrides Tailwind defaults) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
   /* Chart Colors */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);

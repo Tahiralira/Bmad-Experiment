@@ -98,7 +98,7 @@ export function MemberChips({
               <span
                 className={cn(
                   "text-sm font-medium",
-                  isIncluded ? "text-primary" : "text-text-secondary line-through"
+                  isIncluded ? "text-text-primary" : "text-text-secondary line-through"
                 )}
               >
                 {member.full_name || member.email?.split("@")[0]}

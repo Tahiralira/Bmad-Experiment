@@ -57,8 +57,12 @@ export function useStreamingText({
     // Start streaming
     intervalRef.current = setInterval(() => {
       if (indexRef.current < textRef.current.length) {
-        setStreamedText((prev) => prev + textRef.current[indexRef.current])
+        // Capture the character NOW: the state updater runs later (at React's
+        // flush), by which time indexRef has already been incremented — reading
+        // the ref inside the updater skips the first char and appends undefined.
+        const nextChar = textRef.current[indexRef.current]
         indexRef.current++
+        setStreamedText((prev) => prev + nextChar)
       } else {
         // Streaming complete
         clearInterval(intervalRef.current!)

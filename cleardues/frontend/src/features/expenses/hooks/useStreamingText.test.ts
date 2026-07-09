@@ -8,22 +8,28 @@
  * - Returns correct state values
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { renderHook, act, waitFor } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { renderHook, act } from "@testing-library/react"
 import { useStreamingText } from "./useStreamingText"
 
+// Note on timing: the hook emits one character per interval tick; the tick
+// AFTER the last character clears the interval and sets isStreaming false.
+// So completion for N chars needs (N + 1) ticks. All assertions are
+// synchronous after advancing fake timers — waitFor polls real time and
+// deadlocks under fake timers.
 describe("useStreamingText", () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
   // ========== Basic Streaming ==========
   describe("Basic Streaming", () => {
-    it("streams text at specified speed (AC #9 - 30-50ms)", async () => {
+    it("streams text at specified speed (AC #9 - 30-50ms)", () => {
       const { result } = renderHook(() => useStreamingText({ speed: 30 }))
 
       act(() => {
@@ -37,33 +43,34 @@ describe("useStreamingText", () => {
       // Advance timers character by character
       // "Test" has 4 characters, so 4 intervals of 30ms
       act(() => {
-        vi.advanceTimersByTimeAsync(30) // "T"
+        vi.advanceTimersByTime(30) // "T"
       })
       expect(result.current.streamedText).toBe("T")
 
       act(() => {
-        vi.advanceTimersByTimeAsync(30) // "e"
+        vi.advanceTimersByTime(30) // "e"
       })
       expect(result.current.streamedText).toBe("Te")
 
       act(() => {
-        vi.advanceTimersByTimeAsync(30) // "s"
+        vi.advanceTimersByTime(30) // "s"
       })
       expect(result.current.streamedText).toBe("Tes")
 
       act(() => {
-        vi.advanceTimersByTimeAsync(30) // "t"
+        vi.advanceTimersByTime(30) // "t"
       })
       expect(result.current.streamedText).toBe("Test")
 
-      // Wait for completion
-      await waitFor(() => {
-        expect(result.current.streamedText).toBe("Test")
-        expect(result.current.isStreaming).toBe(false)
+      // One more tick completes the stream
+      act(() => {
+        vi.advanceTimersByTime(30)
       })
+      expect(result.current.streamedText).toBe("Test")
+      expect(result.current.isStreaming).toBe(false)
     })
 
-    it("uses default speed of 40ms when not specified", async () => {
+    it("uses default speed of 40ms when not specified", () => {
       const { result } = renderHook(() => useStreamingText())
 
       act(() => {
@@ -72,16 +79,18 @@ describe("useStreamingText", () => {
 
       // "Hi" has 2 characters, 2 intervals of 40ms = 80ms total
       act(() => {
-        vi.advanceTimersByTimeAsync(80)
+        vi.advanceTimersByTime(80)
       })
+      expect(result.current.streamedText).toBe("Hi")
 
-      await waitFor(() => {
-        expect(result.current.streamedText).toBe("Hi")
-        expect(result.current.isStreaming).toBe(false)
+      // Completion tick
+      act(() => {
+        vi.advanceTimersByTime(40)
       })
+      expect(result.current.isStreaming).toBe(false)
     })
 
-    it("streams text within AC #9 range (30-50ms)", async () => {
+    it("streams text within AC #9 range (30-50ms)", () => {
       // Test lower bound (30ms)
       const { result: resultLower } = renderHook(() => useStreamingText({ speed: 30 }))
 
@@ -90,12 +99,9 @@ describe("useStreamingText", () => {
       })
 
       act(() => {
-        vi.advanceTimersByTimeAsync(30)
+        vi.advanceTimersByTime(30)
       })
-
-      await waitFor(() => {
-        expect(resultLower.current.streamedText).toBe("A")
-      })
+      expect(resultLower.current.streamedText).toBe("A")
 
       // Test upper bound (50ms)
       const { result: resultUpper } = renderHook(() => useStreamingText({ speed: 50 }))
@@ -105,12 +111,9 @@ describe("useStreamingText", () => {
       })
 
       act(() => {
-        vi.advanceTimersByTimeAsync(50)
+        vi.advanceTimersByTime(50)
       })
-
-      await waitFor(() => {
-        expect(resultUpper.current.streamedText).toBe("B")
-      })
+      expect(resultUpper.current.streamedText).toBe("B")
     })
   })
 
@@ -149,13 +152,13 @@ describe("useStreamingText", () => {
 
       // Advance timers - should NOT update text since interval was cleared
       act(() => {
-        vi.advanceTimersByTimeAsync(100)
+        vi.advanceTimersByTime(100)
       })
 
       expect(result.current.streamedText).toBe("")
     })
 
-    it("starts new stream after reset", async () => {
+    it("starts new stream after reset", () => {
       const { result } = renderHook(() => useStreamingText({ speed: 30 }))
 
       // First stream
@@ -164,7 +167,7 @@ describe("useStreamingText", () => {
       })
 
       act(() => {
-        vi.advanceTimersByTimeAsync(30)
+        vi.advanceTimersByTime(30)
       })
 
       expect(result.current.streamedText).toBe("F")
@@ -176,7 +179,7 @@ describe("useStreamingText", () => {
       })
 
       act(() => {
-        vi.advanceTimersByTimeAsync(30)
+        vi.advanceTimersByTime(30)
       })
 
       expect(result.current.streamedText).toBe("S")
@@ -221,21 +224,22 @@ describe("useStreamingText", () => {
 
   // ========== Edge Cases ==========
   describe("Edge Cases", () => {
-    it("handles empty string", async () => {
+    it("handles empty string", () => {
       const { result } = renderHook(() => useStreamingText({ speed: 30 }))
 
       act(() => {
         result.current.startStream("")
       })
 
-      // Should complete immediately
-      await waitFor(() => {
-        expect(result.current.streamedText).toBe("")
-        expect(result.current.isStreaming).toBe(false)
+      // First tick finds nothing to emit and completes
+      act(() => {
+        vi.advanceTimersByTime(30)
       })
+      expect(result.current.streamedText).toBe("")
+      expect(result.current.isStreaming).toBe(false)
     })
 
-    it("handles single character", async () => {
+    it("handles single character", () => {
       const { result } = renderHook(() => useStreamingText({ speed: 30 }))
 
       act(() => {
@@ -243,16 +247,17 @@ describe("useStreamingText", () => {
       })
 
       act(() => {
-        vi.advanceTimersByTimeAsync(30)
+        vi.advanceTimersByTime(30) // emit "A"
       })
+      expect(result.current.streamedText).toBe("A")
 
-      await waitFor(() => {
-        expect(result.current.streamedText).toBe("A")
-        expect(result.current.isStreaming).toBe(false)
+      act(() => {
+        vi.advanceTimersByTime(30) // completion tick
       })
+      expect(result.current.isStreaming).toBe(false)
     })
 
-    it("handles long text", async () => {
+    it("handles long text", () => {
       const longText = "A".repeat(100)
       const { result } = renderHook(() => useStreamingText({ speed: 10 }))
 
@@ -260,33 +265,27 @@ describe("useStreamingText", () => {
         result.current.startStream(longText)
       })
 
-      // Advance all 100 characters
+      // Advance all 100 characters + the completion tick
       act(() => {
-        vi.advanceTimersByTimeAsync(10 * 100)
+        vi.advanceTimersByTime(10 * 101)
       })
-
-      await waitFor(() => {
-        expect(result.current.streamedText).toBe(longText)
-        expect(result.current.isStreaming).toBe(false)
-      })
+      expect(result.current.streamedText).toBe(longText)
+      expect(result.current.isStreaming).toBe(false)
     })
 
-    it("handles special characters", async () => {
+    it("handles special characters", () => {
       const { result } = renderHook(() => useStreamingText({ speed: 30 }))
 
       act(() => {
         result.current.startStream("Hello\nWorld\t!")
       })
 
-      // Stream all characters
+      // Stream all 13 characters + the completion tick
       act(() => {
-        vi.advanceTimersByTimeAsync(30 * 13)
+        vi.advanceTimersByTime(30 * 14)
       })
-
-      await waitFor(() => {
-        expect(result.current.streamedText).toBe("Hello\nWorld\t!")
-        expect(result.current.isStreaming).toBe(false)
-      })
+      expect(result.current.streamedText).toBe("Hello\nWorld\t!")
+      expect(result.current.isStreaming).toBe(false)
     })
   })
 
@@ -306,13 +305,13 @@ describe("useStreamingText", () => {
 
       // Advance timers - interval should be cleared
       act(() => {
-        vi.advanceTimersByTimeAsync(100)
+        vi.advanceTimersByTime(100)
       })
 
       // No errors should occur
     })
 
-    it("clears interval when starting new stream", async () => {
+    it("clears interval when starting new stream", () => {
       const { result } = renderHook(() => useStreamingText({ speed: 30 }))
 
       // Start first stream
@@ -326,14 +325,12 @@ describe("useStreamingText", () => {
       })
 
       act(() => {
-        vi.advanceTimersByTimeAsync(30 * 6) // Stream "Second" (6 chars)
+        vi.advanceTimersByTime(30 * 7) // "Second" (6 chars) + completion tick
       })
 
       // Should have "Second", not mix with "First"
-      await waitFor(() => {
-        expect(result.current.streamedText).toBe("Second")
-        expect(result.current.isStreaming).toBe(false)
-      })
+      expect(result.current.streamedText).toBe("Second")
+      expect(result.current.isStreaming).toBe(false)
     })
   })
 })

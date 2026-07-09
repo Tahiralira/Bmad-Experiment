@@ -64,7 +64,7 @@ export function ExpensePreviewCard({
           className
         )}
       >
-        <p className="text-text-muted body-small">
+        <p className="text-text-muted text-body-small">
           Enter expense above to see preview
         </p>
       </motion.div>

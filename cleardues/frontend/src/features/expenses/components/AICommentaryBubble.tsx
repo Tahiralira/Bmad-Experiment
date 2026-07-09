@@ -103,7 +103,7 @@ export function AICommentaryBubble({
         </div>
       ) : (
         // Streamed Text
-        <p className="body-small leading-relaxed">
+        <p className="text-body-small leading-relaxed">
           {text || "Processing your expense..."}
         </p>
       )}

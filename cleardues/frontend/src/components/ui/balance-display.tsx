@@ -153,7 +153,7 @@ export function BalanceDisplay({
       {/* Optional context label - above amount for display/title, inline for body */}
       {contextLabel && showLabelAbove && (
         <span
-          className="text-secondary text-sm font-normal mb-1"
+          className="text-text-secondary text-sm font-normal mb-1"
           aria-hidden="true"
         >
           {contextLabel}
@@ -167,14 +167,14 @@ export function BalanceDisplay({
           variantClasses[variant],
           // Amount styling - neutral color strategy (CRITICAL: never red/green)
           // Use proportional-nums for natural number flow (not tabular)
-          "text-primary font-variant-numeric proportional-nums tracking-tight"
+          "text-text-primary proportional-nums tracking-tight"
         )}
         aria-label={ariaLabel}
         role="text"
       >
         {/* Inline context label for body variant */}
         {contextLabel && variant === "body" && (
-          <span className="text-secondary mr-1" aria-hidden="true">
+          <span className="text-text-secondary mr-1" aria-hidden="true">
             {contextLabel}
           </span>
         )}

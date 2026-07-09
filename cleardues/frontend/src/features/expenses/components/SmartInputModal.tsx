@@ -324,13 +324,21 @@ export function SmartInputModal({
               "lg:border lg:border-border"
             )}
           >
-            {/* Focus trap wraps all focusable content */}
-            <FocusTrap active={open}>
-              {(focusTrapProps: React.HTMLAttributes<HTMLDivElement>) => (
-                <div
-                  {...focusTrapProps}
-                  className="flex flex-col h-full max-h-[80vh] p-6"
-                >
+            {/* Focus trap wraps all focusable content.
+                focus-trap-react requires a single element child (not a render prop). */}
+            <FocusTrap
+              active={open}
+              focusTrapOptions={{
+                allowOutsideClick: true,
+                // jsdom has no layout, so tabbable's display check finds zero
+                // tabbable nodes and focus-trap throws. Disabling the check in
+                // test mode is the workaround tabbable's docs recommend.
+                ...(import.meta.env.MODE === "test" && {
+                  tabbableOptions: { displayCheck: "none" as const },
+                }),
+              }}
+            >
+              <div className="flex flex-col h-full max-h-[80vh] p-6">
                   {/* Drag handle indicator - visual affordance for swipe gesture */}
                   <div
                     className={cn(
@@ -344,7 +352,7 @@ export function SmartInputModal({
 
                   {/* Header */}
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="title text-text-primary">
+                    <h2 className="text-title font-medium text-text-primary">
                       {entryPoint === "dashboard" ? "Add Expense" : "Add Expense to Group"}
                     </h2>
                     <DialogPrimitive.Close
@@ -457,8 +465,7 @@ export function SmartInputModal({
                       </div>
                     </>
                   )}
-                </div>
-              )}
+              </div>
             </FocusTrap>
           </motion.div>
         </DialogPrimitive.Content>

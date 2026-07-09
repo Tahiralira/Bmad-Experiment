@@ -15,13 +15,12 @@ export type { BalanceDisplayProps, BalanceDisplayVariant } from "./balance-displ
 export { SwipeableCard } from "./swipeable-card"
 export type { SwipeableCardProps } from "./swipeable-card"
 
-// Smart Input Modal (Story 2.5.4)
-export { SmartInputModal } from "./smart-input-modal"
-export type { SmartInputModalProps } from "./smart-input-modal"
+// Smart Input Modal lives in features/expenses/components (the ui/ copy was
+// an unused duplicate and has been removed)
 
-// Orbital Navigation (Story 2.5.3)
-export { OrbitalNav } from "./orbital-nav"
-export type { OrbitalNavProps } from "./orbital-nav"
+// Bottom Navigation (replaces Orbital Navigation from Story 2.5.3)
+export { BottomNav } from "./bottom-nav"
+export type { BottomNavProps } from "./bottom-nav"
 
 // Agent Orb (Story 2.5.2)
 export { AgentOrb } from "./agent-orb"

@@ -1,74 +1,146 @@
 # Project Context: ClearDues
 
-ClearDues is an AI-powered "Agentic Mediator" PWA designed to manage and settle shared expenses with "Progressive Urgency" notifications.
+ClearDues is an AI-powered "Agentic Mediator" PWA designed to manage and settle shared
+expenses with "Progressive Urgency" notifications. Target market: **global** (no
+hardcoded currency or market-specific rails — decided 2026-07-07).
+
+## 📊 Current Status
+
+**This file carries NO status of its own — hand-duplicated status rots.**
+Always read the live sources:
+
+1. `_bmad-output/implementation-artifacts/sprint-status.yaml` — epic/story progress
+2. `_bmad-output/session-context.md` — latest learnings and context
+3. `_bmad-output/product-review/10-execution-plan.md` — **the plan of record**: the
+   consolidated work-session tracker driving current development (WS1–WS13 → private
+   beta). The 9-session review behind it lives in `_bmad-output/product-review/`.
 
 ## CRITICAL: Session Startup Protocol
 
 **BMAD workflows automatically load tracking files via pre-hooks (Step 0).**
 
-When running `/bmad:bmm:workflows:dev-story` or `/bmad:bmm:workflows:code-review`, these files are auto-loaded:
+When running `/bmad:bmm:workflows:dev-story` or `/bmad:bmm:workflows:code-review`,
+these files are auto-loaded:
 
 | File | Purpose | Auto-Loaded | Auto-Updated |
 |------|---------|-------------|--------------|
-| `session-context.md` | Project status, key learnings | Yes (Step 0) | Yes (Post-hook) |
-| `sprint-status.yaml` | Epic/story progress | Yes (Step 1) | Yes (Step 9/5) |
-| `solution-patterns.yaml` | Known issues and fixes | Yes (Step 0) | Yes (Post-hook) |
-| `technical-debt-log.yaml` | Deferred LOW issues | Yes (Step 0) | Yes (code-review) |
+| `session-context.md` | Project status, key learnings | Yes | Yes (post-hook) |
+| `sprint-status.yaml` | Epic/story progress | Yes | Yes |
+| `solution-patterns.yaml` | Known issues and fixes | Yes | Yes (post-hook) |
+| `technical-debt-log.yaml` | Deferred LOW issues | Yes | Yes (code-review) |
 
-**For non-BMAD work**, manually load these files first:
-1. `_bmad-output/session-context.md` - Quick context
-2. `_bmad-output/implementation-artifacts/sprint-status.yaml` - Current progress
-3. `_bmad-output/implementation-artifacts/solution-patterns.yaml` - Debugging help
+**For non-BMAD work**, manually load `session-context.md`, `sprint-status.yaml`, and
+the execution plan (`10-execution-plan.md`) first.
 
-**Full setup guide:** `_bmad/bmm/docs/TRACKING-SETUP-GUIDE.md`
+## 🛠 Tech Stack (what actually exists in the code)
 
-## 📊 Current Status
-
-| Epic | Status | Progress |
-|------|--------|----------|
-| Epic 1: Auth | DONE | 6/6 |
-| Epic 2: Groups & Dashboard | DONE | 4/4 |
-| **Epic 2.5: UX Foundation** | **NEXT** | 0/7 |
-| Epic 3: Expenses | IN-PROGRESS | 1/8 |
-| Epic 4-7 | BACKLOG | 0/18 |
-| Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
-
-**Next:** Epic 2.5, Story 2.5.1 - Design System Token Migration
-
-## 🛠 Tech Stack
-
-- **Backend**: FastAPI (Python) + SQLModel (ORM)
-- **Frontend**: React + TypeScript + Vite + Redux Toolkit + TanStack Query
+- **Backend**: FastAPI (Python 3.10) + SQLModel (ORM) + Alembic
+- **Frontend**: React 19 + TypeScript + Vite + TanStack Router/Query
+  (NO Redux — local state + TanStack Query is the pattern)
 - **Database**: PostgreSQL
-- **Real-Time**: WebSockets + Redis Pub/Sub
-- **Worker**: Celery + Redis
-- **Infra**: Docker + Railway (Target)
+- **Infra**: Docker Compose (local dev); deployment target decided in WS9
+
+**Planned but NOT yet present** (do not assume these exist): WebSockets, Redis
+Pub/Sub, Celery workers (all arrive with the nudge engine in WS12), PWA service
+worker (WS11).
 
 ## 📐 Architectural Patterns
 
-- **Directory Structure**: Feature-based (`/backend/app/features/{name}`, `/frontend/src/features/{name}`)
-- **Naming Conventions**:
-  - API/DB: `snake_case`
-  - Frontend Code: `camelCase` (Components in `PascalCase`)
-- **State Management**: Redux for UI state; TanStack Query for server state.
-- **Communication**: Redis events named `domain.entity.action`.
-- **Boundaries**: Strictly use Service Layer for DB access.
+- **Directory Structure**: Feature-based (`/backend/app/features/{name}`,
+  `/frontend/src/features/{name}`)
+- **Naming**: API/DB `snake_case`; frontend `camelCase` (components `PascalCase`)
+- **State**: TanStack Query for server state; React local state for UI state
+- **Boundaries**: Service layer owns DB access
+- **Models**: `backend/app/models.py` imports ALL feature model modules — prestart,
+  alembic, and tests rely on it registering the complete schema. New feature model
+  modules MUST be added to its imports.
 
 ## 🚀 Commands
 
 ```bash
-# Start everything
+# Start everything (from cleardues/)
 docker compose up -d
 
-# Backend tests
-docker compose exec backend pytest -v
+# Backend tests — runs against a dedicated <db>_test database (auto-created);
+# refuses to run unless ENVIRONMENT=local
+docker compose exec backend pytest -q
 
-# Frontend type/build check
-cd cleardues/frontend && npm run typecheck && npm run build
+# Frontend checks (from cleardues/frontend/)
+npm run typecheck && npm run test && npm run build
+
+# Dependency lock must stay in sync (CI enforces this)
+docker compose exec backend uv lock --check
 
 # Alembic migrations
 docker compose exec backend alembic upgrade head
 ```
+
+CI (`.github/workflows/ci.yml` at the **repo root** — GitHub ignores nested
+`.github/` dirs) runs: backend pytest + lock check, frontend typecheck + unit tests
++ build, on pushes to `main` and all PRs.
+
+## ✅ Definition of Done v2 (every story, no exceptions)
+
+1. **CI green** — backend pytest, frontend typecheck + tests + build all pass. A
+   story cannot be "ready for review" with a red or skipped gate.
+2. **UI stories ship visual proof** — screenshots at 375px AND 1280px, both themes,
+   attached to the story/completion notes. (Epic 2.5 shipped invisible text and
+   offscreen navigation for 5 months because nobody looked.)
+3. **User-reachable = done** — a feature is complete only when a real user can reach
+   it from the app's entry point. Component-complete is NOT done (root failure of
+   Epics 2.5–5).
+4. **No epic closes past a live BLOCKER** — a BLOCKER note in sprint-status.yaml must
+   be resolved, deferred-with-link, or dropped-with-reason before its epic is `done`.
+5. **Known-bug tests stay honest** — use `it.fails`/`xfail`/`skip` with a reason
+   pointing at the fix's work session, never a green assertion of broken behavior.
+
+## Security Checklist for Story Acceptance Criteria
+
+For each new story, add a "### Security Considerations" section after Acceptance
+Criteria covering (mark [x] when implemented and tested):
+
+1. **Input Validation** — validated on frontend AND backend; typed schemas (no raw
+   `dict` bodies)
+2. **Authorization** — group membership / ownership checks on every action
+3. **SQL Injection** — parameterized queries only (SQLModel handles this; never
+   concatenate SQL)
+4. **XSS** — framework escaping; sanitize user content
+5. **Rate Limiting** — document if the endpoint needs it
+6. **Data Privacy** — expose only necessary fields; no sensitive data in logs
+7. **Error Messages** — generic in production; no stack traces to the frontend
+
+## Minimum Viable Story (MVS) Standard
+
+A story is NOT "done" unless ALL of:
+
+1. All acceptance criteria verified passing
+2. All tasks checked off
+3. Code review passed (no CRITICAL/HIGH blockers)
+4. Tests passing **in CI** (deferral requires documented rationale)
+5. Edge cases handled (null, boundary, error states)
+6. Clear user-facing error messages
+7. Loading states for async operations
+8. Basic accessibility (keyboard nav, ARIA, focus management)
+9. Type safety complete (no unjustified `any`)
+10. Code hygiene (no commented-out code, no placeholder logs)
+11. Documentation updated — **including human docs** (README/runbooks), not only
+    BMAD artifacts
+12. Core functionality included — not deferred to a "future story"
+13. NO scope creep — nothing enters that isn't in the story/work session without
+    removing something of equal size
+14. Definition of Done v2 (above) satisfied
+
+## Code Review Scoping
+
+| Level | Definition | Blocks | Action |
+|-------|------------|--------|--------|
+| **CRITICAL** | Security holes, data loss, broken user flows | Story completion | Fix before merge |
+| **HIGH** | Performance problems, anti-patterns, significant bugs | Next epic | Fix before next epic |
+| **MEDIUM** | UX-affecting but non-blocking | No | Log to technical-debt-log.yaml |
+| **LOW** | Polish, style | No | Optional suggestions |
+
+Reviews focus on AC violations and CRITICAL/HIGH issues. Do not review style,
+naming, or personal preferences unless they cause bugs or maintenance burden.
 
 ## Known Issues Quick Reference
 
@@ -79,272 +151,42 @@ docker compose exec backend alembic upgrade head
 | Circular import error | Import inside function or use TYPE_CHECKING |
 | Route not found 404 | Check TanStack Router file naming conventions |
 | Data not updating after mutation | Add `queryClient.invalidateQueries` |
+| Mapper "failed to locate a name" | Add the feature models module to `app/models.py` imports |
+| `PendingRollbackError` cascade in tests | Already handled by conftest's autouse rollback fixture |
+| jsdom: focus-trap "no tabbable node" | Handled via `tabbableOptions.displayCheck` in test mode |
 
-**Full solutions:** See `solution-patterns.yaml`
+**Full solutions:** `_bmad-output/implementation-artifacts/solution-patterns.yaml`
 
 ## Logging Requirements
 
-**BMAD workflows automatically update tracking files via post-hooks.**
-
-| Workflow | Auto-Updates |
-|----------|--------------|
-| `dev-story` | session-context.md, solution-patterns.yaml (if new issues solved) |
-| `code-review` | session-context.md, technical-debt-log.yaml (LOW items), solution-patterns.yaml (if patterns found) |
-
-**For non-BMAD work**, manually update when:
-1. **New issue solved** -> Add to `solution-patterns.yaml` (symptoms, cause, solution, prevention)
-2. **Critical learning** -> Update `session-context.md`
-3. **Deferred LOW issue** -> Add to `technical-debt-log.yaml`
-
-## Security Checklist for Story Acceptance Criteria
-
-**Note:** Security considerations must be explicitly documented in all story acceptance criteria going forward (from Epic 1 retrospective action item, completed in Epic 4 Priority 2).
-
-### Required Security Checks for All Stories
-
-When creating or reviewing stories, ensure the following security items are addressed:
-
-1. **Input Validation** ✅
-   - All user inputs validated on both frontend and backend
-   - Type checking for expected data types
-   - Length/format validation for strings and numbers
-   - Sanitization of user-provided data
-
-2. **Authorization Checks** ✅
-   - User must be member of group to perform action
-   - Only expense creator can modify/confirm expense (Epic 4)
-   - Only group creator/admin can manage group settings
-
-3. **SQL Injection Prevention** ✅
-   - Use parameterized queries (SQLModel/SQLAlchemy handles this)
-   - Never concatenate strings into SQL queries
-   - Validate user IDs before database operations
-
-4. **XSS Protection** ✅
-   - Sanitize all user-provided content before rendering
-   - Use framework-provided escaping for dynamic content
-   - Validate and restrict allowed HTML/markdown
-
-5. **Rate Limiting (if applicable)** ⚠️
-   - Document if story requires rate limiting
-   - Implement per-endpoint or per-user rate limits
-   - Prevent abuse of API endpoints
-
-6. **Data Privacy** ✅
-   - Only expose necessary user data in API responses
-   - Remove sensitive data from logs
-   - Validate data before storing in database
-
-7. **Error Message Security** ✅
-   - Generic error messages in production (no internal system details)
-   - Detailed errors only in development/debug mode
-   - Never expose stack traces to frontend
-
-### Applying Security Checklist
-
-For each new story:
-1. Add "### Security Considerations" section after Acceptance Criteria
-2. Include relevant items from above checklist
-3. Mark each item as [ ] (unchecked) and verify during implementation
-4. Update to [x] when implemented and tested
-
-### Examples
-
-**Backend Story Security Section Example:**
-```markdown
-### Security Considerations
-
-- [x] Input Validation - All API inputs validated with SQLModel models
-- [x] Authorization - `get_current_user_id` dependency ensures user is authenticated
-- [x] SQL Injection - SQLModel/SQLAlchemy prevents injection automatically
-- [ ] Rate Limiting - Not applicable for this endpoint
-```
-
-**Frontend Story Security Section Example:**
-```markdown
-### Security Considerations
-
-- [x] Input Validation - Zod schemas validate all form inputs
-- [x] XSS Protection - React and shadcn/ui components escape content by default
-- [ ] Rate Limiting - Not applicable for this component
-```
-
-## Minimum Viable Story (MVS) Standard
-
-**Note:** From Epic 2 retrospective - core functionality was being deferred as "enhancement." This standard prevents incomplete stories from being marked "done."
-
-### MVS Checklist (All Required for Story Completion)
-
-A story is NOT "done" unless ALL of the following are met:
-
-#### Functional Requirements
-1. ✅ **All Acceptance Criteria Met** - Every AC must be verified and passing
-2. ✅ **All Tasks Complete** - Every task in story file must have [x] marked
-
-#### Quality Requirements
-3. ✅ **Code Review Passed** - No CRITICAL/HIGH blockers; code review approved
-4. ✅ **Tests Passing** - Tests run successfully or documented as deferred (with rationale)
-5. ✅ **Edge Cases Handled** - Null handling, boundary conditions, error states
-6. ✅ **Error Messages Clear** - User-friendly error messages, not technical jargon
-7. ✅ **Loading States** - Proper loading indicators for async operations
-8. ✅ **Accessible** - Basic WCAG compliance (keyboard nav, ARIA labels, focus management)
-
-#### Technical Requirements
-9. ✅ **Type Safety** - TypeScript/Python types are complete, no `any` without justification
-10. ✅ **Code Hygiene** - No commented-out code, consistent formatting, no console.log placeholders
-11. ✅ **Documentation Updated** - Any code changes reflected in relevant documentation
-
-#### Scope Requirements
-12. ✅ **Core Functionality Included** - Main story feature complete, not deferred to "future story"
-13. ❌ **NO SCOPE CREEP** - Stories cannot add unrequested features
-14. ✅ **No Deferred Core Items** - Deferred items must be enhancements, not core functionality
-
-### Applying MVS Standard
-
-When creating stories:
-- Include "### Minimum Viable Story" section referencing this checklist
-- For each story, verify MVS items during code review
-
-When reviewing stories:
-- Reject stories with deferred core functionality
-- Ensure all MVS items are complete before approving "done"
-
-When implementing stories:
-- Dev must verify all MVS items before marking "ready for review"
-- Code review must verify all MVS items before marking "done"
-
-### MVS in Action - Example from Epic 3
-
-**Bad Example (Story 3.4):**
-- Complex split editing deferred to "future story"
-- Issue: Core functionality deferred as enhancement
-
-**Good Example (Story 3.5):**
-- Equal split with MemberChips fully implemented
-- All tasks marked complete
-- Code review approved
-
-## Code Review Scoping
-
-**Note:** From Epic 2 retrospective - unclear what "must fix" vs "nice to have." This standard clarifies review boundaries.
-
-**Status:** Completed in Epic 4 Priority 2 (documented for reference; full implementation via BMAD workflow updates to story templates recommended)
-
-### Severity Levels
-
-| Level | Definition | Blocks | Example | Tracking |
-|--------|------------|--------|---------|----------|
-| **CRITICAL** | Security vulnerabilities, data loss risks, blocking bugs | Yes (story completion) | Fix before merge |
-| **HIGH** | Performance issues, bad practices, significant bugs | Yes (next epic) | Fix before next epic |
-| **MEDIUM** | Affects user experience but not blocking | No | Log to technical-debt-log.yaml |
-| **LOW** | Polish, optimizations, style improvements | No | Optional improvements |
-
-### Code Review Scope
-
-**Code Review Focus:**
-- Review acceptance criteria violations (CRITICAL)
-- Review CRITICAL and HIGH severity issues only
-- MEDIUM issues tracked but not blocking completion
-- LOW issues noted as suggestions only
-
-**Code Review Must NOT Review:**
-- Code style (unless it affects maintainability)
-- Variable naming (unless it causes bugs)
-- Minor optimizations
-- Personal preferences
-
-### Review Decision Making
-
-**For Each Issue Found:**
-
-1. **Is it a CRITICAL bug?**
-   - Security vulnerability? → CRITICAL
-   - Data corruption risk? → CRITICAL
-   - Could crash system? → CRITICAL
-   - Breaks user flow completely? → CRITICAL
-
-2. **Is it a HIGH severity issue?**
-   - Significant performance problem? → HIGH
-   - Anti-pattern that causes maintenance burden? → HIGH
-   - Repeated code duplication? → HIGH
-   - Breaking architectural rule? → HIGH
-
-3. **Is it a MEDIUM issue?**
-   - Affects UX but workaround exists? → MEDIUM
-   - Missing error handling for edge case? → MEDIUM
-   - Unclear error message? → MEDIUM
-   - Inconsistent validation? → MEDIUM
-
-4. **Is it a LOW issue?**
-   - Minor optimization opportunity? → LOW
-   - Style preference? → LOW
-   - Cosmetic improvements? → LOW
-   - Code formatting suggestion? → LOW
-
-**Action Based on Severity:**
-
-- **CRITICAL:** Mark story "in-progress" and require fix before "review"
-- **HIGH:** Note as blocker for next epic, can complete story with fix in next epic
-- **MEDIUM:** Add to technical-debt-log.yaml with story ID, can continue
-- **LOW:** Mention in review comments, optional to address
-
-### Examples
-
-**CRITICAL Issue Example:**
-```
-CRITICAL-001: SQL Injection Vulnerability
-Severity: CRITICAL
-Action: Mark story in-progress, must fix before review completion
-```
-
-**HIGH Issue Example:**
-```
-HIGH-001: N+1 Query Problem
-Severity: HIGH
-Action: Note as blocker, fix in next epic or create follow-up story
-```
-
-**MEDIUM Issue Example:**
-```
-MEDIUM-001: Missing Error State for Loading
-Severity: MEDIUM
-Action: Add to technical-debt-log.yaml, story can complete
-```
-
-**LOW Issue Example:**
-```
-LOW-001: Variable Naming Convention Suggestion
-Severity: LOW
-Action: Noted in review, optional to address later
-```
-
-## Known Issues
-
-| Problem | Solution |
-|---------|----------|
-| ModuleNotFoundError in Docker | `docker compose build --no-cache` |
-| Connection refused localhost:5432 | Use service name `db` not `localhost` |
-| Circular import error | Import inside function or use TYPE_CHECKING |
-| Route not found 404 | Check TanStack Router file naming conventions |
-| Data not updating after mutation | Add `queryClient.invalidateQueries` |
-
-**Full solutions:** See `solution-patterns.yaml`
+BMAD workflows auto-update tracking files via post-hooks (dev-story →
+session-context/solution-patterns; code-review → technical-debt-log). For non-BMAD
+work: new issue solved → `solution-patterns.yaml`; critical learning →
+`session-context.md`; deferred LOW issue → `technical-debt-log.yaml`; work-session
+progress → check off in `10-execution-plan.md`.
 
 ## References
 
+### Plan of Record
+- [Execution Plan (WS1–WS13)](./_bmad-output/product-review/10-execution-plan.md)
+- [Review Findings 01–09](./_bmad-output/product-review/)
+
 ### Planning
 - [PRD](./_bmad-output/planning-artifacts/prd.md)
-- [Architecture](./_bmad-output/planning-artifacts/architecture.md)
+- [Architecture](./_bmad-output/planning-artifacts/architecture.md) — ⚠️ real-time/
+  Redux/PWA sections describe PLANNED, not current, state (rewrite lands in WS11)
 - [Epics](./_bmad-output/planning-artifacts/epics.md)
-- [UX Design Specification](./_bmad-output/planning-artifacts/ux-design-specification.md)
-- [Design Artifact Plan](./_bmad-output/planning-artifacts/design-artifact-plan.md)
+- [UX Design Spec v2 — "Quiet Ink"](./_bmad-output/planning-artifacts/ux-design-spec-v2.md)
+  — ADOPTED 2026-07-07 (WS2); supersedes
+  [v1](./_bmad-output/planning-artifacts/ux-design-specification.md), whose visual
+  system (warm-cream palette, orb, orbital nav) is void
 
-### Tracking (Auto-managed by BMAD)
+### Tracking (auto-managed by BMAD)
 - [Sprint Status](./_bmad-output/implementation-artifacts/sprint-status.yaml)
 - [Solution Patterns](./_bmad-output/implementation-artifacts/solution-patterns.yaml)
 - [Technical Debt](./_bmad-output/implementation-artifacts/technical-debt-log.yaml)
 - [Session Context](./_bmad-output/session-context.md)
 
 ### Guides
-- [BMAD Usage Guide](./_bmad/bmm/docs/BMAD-USAGE-GUIDE.md) - Complete workflow guide from planning to deployment
-- [Tracking Setup Guide](./_bmad/bmm/docs/TRACKING-SETUP-GUIDE.md) - Pre/post hooks and tracking files documentation
+- [BMAD Usage Guide](./_bmad/bmm/docs/BMAD-USAGE-GUIDE.md)
+- [Tracking Setup Guide](./_bmad/bmm/docs/TRACKING-SETUP-GUIDE.md)

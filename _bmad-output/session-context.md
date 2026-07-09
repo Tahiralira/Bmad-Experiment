@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-06-01 (Story 5.2 code review complete - Epic 5 in progress!)
+**Last Updated:** 2026-07-07 (WS2 done — Design Direction v2 "Quiet Ink" adopted)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -20,7 +20,12 @@
 
 **Current Progress:** 32 stories completed, 13 remaining (Story 5.2 done ✅)
 
-> **IMPORTANT:** Story 5.2 code review PASSED — 7 issues found and fixed (3 HIGH, 4 MEDIUM). Key fix: payer split auto-settle (expense could never transition to SETTLED without it). Pre-existing test suite issue (`GroupSettings | None` SQLAlchemy error) blocks pytest.
+> **IMPORTANT:** Work now runs from the execution plan
+> (`_bmad-output/product-review/10-execution-plan.md`), not story-by-story.
+> WS1 (gates) DONE 2026-07-07: pytest green (the `GroupSettings | None` blocker is
+> FIXED), frontend typecheck/tests/build green, root-level CI live.
+> WS2 (design direction) DONE 2026-07-07: **Direction A "Quiet Ink" adopted** —
+> see `_bmad-output/planning-artifacts/ux-design-spec-v2.md` (supersedes v1 spec).
 
 ---
 
@@ -51,11 +56,11 @@ Before starting ANY work, check these logs:
 ### Frontend Patterns
 - **TanStack Router**: Use `_layout` prefix, `$param.tsx` for dynamic routes
 - **TanStack Query**: Always `invalidateQueries` after mutations
-- **Framer Motion**: Use `TargetAndTransition` type, not `Variants` when passing animations to `animate` prop directly
+- **Framer Motion**: REMOVED in design v2 (WS3) — do not add it back; use CSS transitions/`tw-animate-css` utilities (see ws3-implementation-kit.md Task 6 recipe)
 - **Focus Management**: When managing refs for focus, use callback refs (`(el) => refsArray[index] = el`) rather than `useRef` alone
 - **Modal Animations**: When animating from a specific element position, use `originX` and `originY` to set transform origin
 - **Focus Return Timing**: Focus return timeout must be longer than exit animation duration (e.g., 250ms > 200ms animation)
-- **Typography for Numbers**: Use `proportional-nums` for inline text (natural flow), NOT `tabular-nums` (monospace). Only use tabular-nums for data tables where alignment matters.
+- **Typography for Numbers**: SUPERSEDED by design v2 — `tabular-nums` is MANDATORY on every monetary amount and digit column (ux-design-spec-v2.md §3.3). The old proportional-nums guidance is void.
 - **Streaming Text Effect**: Use `setInterval` with character-by-character string concatenation for natural reading pace (30-50ms per character). Cleanup intervals on unmount to prevent memory leaks. Use refs to avoid stale closure issues in setInterval callbacks.
 - **Feature-Specific Components**: Create feature-specific versions of generic UI components (e.g., `/features/expenses/components/SmartInputModal` vs `/components/ui/smart-input-modal`) for better separation of concerns.
 
@@ -127,14 +132,20 @@ cd cleardues/frontend && npm run build
 
 ## Next Up
 
-**Epic 4: Trust & Confirmation Workflow** ✅ COMPLETE! (5/5 done + retro)
+**Plan of record:** `_bmad-output/product-review/10-execution-plan.md` (WS1–WS13 → beta)
+- WS1 Gates & Truth ← **DONE** ✓ (2026-07-07; both suites green, CI live)
+- WS2 Design Direction v2 ← **DONE** ✓ (2026-07-07; "Quiet Ink" adopted →
+  `ux-design-spec-v2.md`: system fonts 0 KB, orb retired, ink-teal accent,
+  hairline ledger rows, perf budget main chunk ≤250 KB gz)
+- WS3 Design System Implementation ← **NEXT** — follow
+  `_bmad-output/planning-artifacts/ws3-implementation-kit.md` VERBATIM (every
+  decision pre-made: paste-ready files, find/replace tables, per-file
+  framer-motion purge recipe, copy deck, DoD checklist). No design thinking needed.
+- WS4 Ledger Integrity (backend) ← can run in parallel with WS3
 
-**Epic 5: Settlement & Payment Tracking** ← **IN-PROGRESS** (1/3)
-- Story 5.1: Mark Debt as Settled / Claim Payment ← **DONE** ✓ (code review passed)
-- Story 5.2: Owner Confirms Settlement ← **DONE** ✓ (code review passed)
-- Story 5.3: Settlement Audit Trail ← **NEXT**
-
-**Pre-existing Issue Found:** `GroupSettings | None` SQLAlchemy relationship error in `ExpenseGroup` model breaks ALL pytest tests. Backend server runs fine. Needs fix before tests can run.
+**Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
+components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one
+choreographed animation only (settle moment ≤400ms), Google Fonts @import removed.
 
 **Key Retro Agreement:** Fix issues as they appear — no deferred batch fixes.
 

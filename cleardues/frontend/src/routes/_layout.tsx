@@ -7,7 +7,8 @@ import {
 import { useCallback, useRef, useState } from "react"
 
 import { Footer } from "@/components/Common/Footer"
-import { OrbitalNav } from "@/components/ui/orbital-nav"
+import { AgentOrb } from "@/components/ui/agent-orb"
+import { BottomNav } from "@/components/ui/bottom-nav"
 import { SmartInputModal } from "@/features/expenses/components"
 import { isLoggedIn } from "@/hooks/useAuth"
 
@@ -45,19 +46,29 @@ function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Main content area - full width without sidebar */}
-      <main className="flex-1 p-6 md:p-8">
+      {/* Main content area - bottom padding clears the fixed nav + orb */}
+      <main className="flex-1 p-6 pb-28 md:p-8 md:pb-28">
         <div className="mx-auto max-w-7xl">
           <Outlet />
         </div>
       </main>
 
-      <Footer />
+      {/* Footer padded so the fixed bottom nav doesn't cover it */}
+      <div className="pb-16">
+        <Footer />
+      </div>
 
-      {/* OrbitalNav - wraps AgentOrb with orbital navigation */}
-      <OrbitalNav onLongPress={handleOpenSmartInput} orbRef={orbRef} />
+      {/* Agent Orb - floating action button, tap to add an expense */}
+      <AgentOrb
+        ref={orbRef}
+        onClick={handleOpenSmartInput}
+        className="fixed bottom-20 right-4 z-50"
+      />
 
-      {/* Smart Input Modal - triggered by long-press on Agent Orb */}
+      {/* Persistent bottom tab bar navigation */}
+      <BottomNav />
+
+      {/* Smart Input Modal - triggered by tapping the Agent Orb */}
       <SmartInputModal
         open={isSmartInputOpen}
         onOpenChange={(open) => !open && handleCloseSmartInput()}
