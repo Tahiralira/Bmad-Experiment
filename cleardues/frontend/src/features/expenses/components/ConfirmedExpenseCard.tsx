@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react"
 import { CheckCircle, Clock, Banknote } from "lucide-react"
 import { toast } from "sonner"
 
-import { SwipeableCard } from "@/components/ui/swipeable-card"
 import { BalanceDisplay } from "@/components/ui/balance-display"
 import { cn } from "@/lib/utils"
 import { useSettleExpense } from "../api/expenses"
@@ -34,15 +33,16 @@ const UNDO_TIMEOUT_MS = 3000
 // =============================================================================
 
 /**
- * Displays a confirmed expense card with swipe-to-settle functionality.
+ * Displays a confirmed expense card with a "Mark Paid" action.
  * Story 5.1: Mark Debt as Settled (Claim Payment)
  *
+ * Swipe-to-settle was removed with SwipeableCard (WS3); it returns in WS6 as a
+ * fresh CSS/pointer implementation. Until then the button is the only path,
+ * so it is always visible on every viewport.
+ *
  * Features:
- * - Swipe right to trigger "Mark Paid" action
  * - Optimistic UI showing "Awaiting confirmation" state immediately
  * - Undo toast with 3-second countdown
- * - Desktop fallback: "Mark Paid" button on hover
- * - Keyboard accessible (ArrowRight to reveal, Enter to trigger)
  */
 export function ConfirmedExpenseCard({
   expense,
@@ -97,20 +97,10 @@ export function ConfirmedExpenseCard({
   const isSettled = isOptimisticSettled || settleMutation.isSuccess
 
   return (
-    <SwipeableCard
-      rightAction={{
-        icon: Banknote,
-        label: "Mark Paid",
-        onTrigger: handleMarkPaid,
-        variant: "default",
-      }}
-      disabled={isSettled}
-      ariaLabel={`Expense: ${expense.description}`}
-      className={className}
-    >
+    <div className={className} aria-label={`Expense: ${expense.description}`}>
       <div
         className={cn(
-          "rounded-lg border p-4 transition-colors",
+          "border p-4 transition-colors",
           isSettled
             ? "border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30"
             : "border-border bg-surface-elevated"
@@ -159,19 +149,17 @@ export function ConfirmedExpenseCard({
           </div>
         )}
 
-        {/* Desktop fallback: Mark Paid button (visible on hover, hidden on settled) */}
+        {/* Mark Paid button — the sole settle path until swipe returns (WS6) */}
         {!isSettled && (
-          <div className="mt-3 hidden md:flex md:justify-end">
+          <div className="mt-3 flex justify-end">
             <button
               type="button"
               onClick={handleMarkPaid}
               className={cn(
-                "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium",
-                "bg-primary text-primary-foreground shadow-sm",
-                "opacity-0 transition-opacity duration-150",
-                "group-hover:opacity-100", // SwipeableCard wraps with group
-                "hover:bg-primary/90",
-                "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                "inline-flex min-h-11 items-center gap-2 rounded-md px-4 py-2 text-sm font-medium",
+                "bg-primary text-primary-foreground",
+                "transition-colors hover:bg-action-hover",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               )}
             >
               <Banknote className="h-4 w-4" />
@@ -180,6 +168,6 @@ export function ConfirmedExpenseCard({
           </div>
         )}
       </div>
-    </SwipeableCard>
+    </div>
   )
 }

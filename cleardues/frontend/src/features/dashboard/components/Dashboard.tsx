@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router"
-import { Check, Edit2 } from "lucide-react"
+
 import { BalanceDisplay } from "@/components/ui/balance-display"
-import { SwipeableCard } from "@/components/ui/swipeable-card"
+import { Button } from "@/components/ui/button"
 import { useDashboard } from "../api/dashboard"
 import type { GroupBalanceSummary } from "../types"
 
@@ -10,129 +10,119 @@ export function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-4">
-        {/* Total Balance skeleton */}
-        <div className="bg-surface-elevated border border-border rounded-md p-6 shadow-sm">
-          <div className="h-4 bg-border rounded w-24 mb-2" />
-          <div className="h-8 bg-border rounded w-32 mb-1" />
-          <div className="h-3 bg-border rounded w-20" />
+      <div className="animate-pulse space-y-6" aria-hidden="true">
+        {/* Balance hero skeleton */}
+        <div className="space-y-2 pt-2">
+          <div className="h-3 w-28 rounded bg-border" />
+          <div className="h-8 w-40 rounded bg-border" />
+          <div className="h-3 w-24 rounded bg-border" />
         </div>
-        {/* Group cards skeleton */}
-        <div className="h-5 bg-border rounded w-28" />
-        <div className="h-20 bg-surface border border-border rounded" />
-        <div className="h-20 bg-surface border border-border rounded" />
+        {/* Ledger row skeletons */}
+        <div className="border-y border-border divide-y divide-border">
+          <div className="h-16" />
+          <div className="h-16" />
+          <div className="h-16" />
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-4 bg-surface border border-border rounded-md">
-        <p className="text-text-primary mb-3">
-          Failed to load dashboard: {error.message}
+      <div className="space-y-4 py-8 text-center">
+        <p className="text-body text-text-primary">
+          Your balances didn't load.
         </p>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="px-4 py-2 bg-action text-background rounded hover:opacity-90 transition-opacity"
-        >
-          Try Again
-        </button>
+        <p className="text-body-small text-text-secondary">
+          Check your connection and try again — nothing has been lost.
+        </p>
+        <Button variant="outline" onClick={() => refetch()}>
+          Try again
+        </Button>
       </div>
     )
   }
 
   if (!data?.groups.length) {
     return (
-      <div className="text-center py-8 bg-surface border border-border rounded-md">
-        <h2 className="text-title font-medium text-text-primary mb-2">
-          No groups yet
+      <div className="space-y-4 py-12 text-center">
+        <h2 className="text-title font-semibold text-text-primary">
+          Nothing to keep score of yet
         </h2>
-        <p className="text-text-secondary mb-4">
-          Create a group to start tracking expenses with friends
+        <p className="text-body text-text-secondary">
+          Start a group and add one expense — ClearDues takes it from there.
         </p>
-        <Link
-          to="/groups"
-          className="inline-block px-4 py-2 bg-action text-background rounded hover:opacity-90 transition-opacity"
-        >
-          Create Group
-        </Link>
+        <Button asChild>
+          <Link to="/groups">Start a group</Link>
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Total Balance Header */}
-      <div className="bg-surface-elevated border border-border rounded-md p-6 shadow-sm">
-        <h1 className="text-heading font-medium text-text-secondary mb-2">
-          Total Balance
-        </h1>
+    <div className="space-y-8">
+      {/* Balance hero */}
+      <header className="pt-2">
+        <p className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted mb-1">
+          Total balance
+        </p>
         <BalanceDisplay
           amount={data.total_balance}
           variant="display"
-          contextLabel={`Across ${data.count} group${data.count !== 1 ? "s" : ""}`}
-          contextDescription="Your net balance across all expense groups"
+          contextDescription="across all groups"
         />
-      </div>
+        <p className="text-body-small text-text-secondary mt-1">
+          Across {data.count} group{data.count !== 1 ? "s" : ""}
+        </p>
+      </header>
 
-      {/* Groups List */}
-      <div className="space-y-3">
-        <h2 className="text-heading font-medium text-text-primary">Your Groups</h2>
-        {data.groups.map((group) => (
-          <GroupCard key={group.group_id} group={group} />
-        ))}
-      </div>
+      {/* Groups ledger */}
+      <section aria-label="Your groups">
+        <h2 className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted mb-2">
+          Your groups
+        </h2>
+        <ul className="border-y border-border divide-y divide-border">
+          {data.groups.map((group) => (
+            <GroupRow key={group.group_id} group={group} />
+          ))}
+        </ul>
+      </section>
     </div>
   )
 }
 
-interface GroupCardProps {
+interface GroupRowProps {
   group: GroupBalanceSummary
 }
 
-function GroupCard({ group }: GroupCardProps) {
-  // TODO: Update to `/groups/${group.group_id}` when group detail route is implemented
+function GroupRow({ group }: GroupRowProps) {
+  // TODO: Update to `/groups/${group.group_id}` when the group detail route lands (WS5)
   return (
-    <SwipeableCard
-      leftAction={{
-        icon: Edit2,
-        label: "Edit group",
-        onTrigger: () => {
-          // TODO: Implement edit group functionality (Epic 3)
-        },
-      }}
-      rightAction={{
-        icon: Check,
-        label: "Settle up",
-        onTrigger: () => {
-          // TODO: Implement settle up functionality (Epic 3)
-        },
-      }}
-      ariaLabel={`Group ${group.group_name}`}
-    >
-      <Link to="/groups" className="block">
-        <div className="flex justify-between items-center">
-          <div className="min-w-0 flex-1 mr-4">
-            <h3 className="text-heading font-medium text-text-primary truncate">
-              {group.group_name}
-            </h3>
-            <p className="text-body-small text-text-secondary">
-              {group.member_count} member{group.member_count !== 1 ? "s" : ""}{" "}
-              &bull; {formatLastActivity(group.last_activity)}
-            </p>
-          </div>
-          <div className="flex-shrink-0">
-            <BalanceDisplay
-              amount={group.net_balance}
-              variant="title"
-              contextLabel={group.net_balance < 0 ? "You owe" : "You're owed"}
-              contextDescription={`in ${group.group_name}`}
-            />
-          </div>
+    <li>
+      <Link
+        to="/groups"
+        className="flex min-h-14 items-center justify-between gap-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-accent transition-colors"
+        aria-label={`Group ${group.group_name}`}
+      >
+        <div className="min-w-0 flex-1">
+          <h3 className="text-body font-semibold text-text-primary truncate">
+            {group.group_name}
+          </h3>
+          <p className="text-body-small text-text-secondary">
+            {group.member_count} member{group.member_count !== 1 ? "s" : ""}{" "}
+            &bull; {formatLastActivity(group.last_activity)}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <BalanceDisplay
+            amount={group.net_balance}
+            variant="title"
+            contextLabel={group.net_balance < 0 ? "You owe" : "You're owed"}
+            contextDescription={`in ${group.group_name}`}
+          />
         </div>
       </Link>
-    </SwipeableCard>
+    </li>
   )
 }
 
