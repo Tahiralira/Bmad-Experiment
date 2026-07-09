@@ -570,3 +570,17 @@ epic_5:
         description: "Task 8.2 claims 'Wire up ConfirmedExpenseCard' but ConfirmedExpenseCard.tsx not in git changes — integration achieved via query invalidation alone"
         suggested_fix: "Update task description to clarify that query invalidation handles the state sync without direct component changes"
         effort: "small"
+
+  ws3_quiet_ink:
+    title: "WS3 - Design System Implementation & Brand Floor (Quiet Ink)"
+    reviewed: true
+    review_date: "2026-07-09"
+    items:
+      - id: "WS3-L1"
+        type: "code-quality"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx, SettlementClaimCard.tsx"
+        description: "Hardcoded tailwind amber-* classes remain on 'Pending' badges and awaiting-confirmation text (v1 remnants outside the WS3 kit's find/replace scope). Should use --warning/--success tokens."
+        suggested_fix: "Swap amber-100/800 etc. for warning/success token utilities when these cards are next touched (WS5/WS6 wire them to the group ledger)"
+        effort: "small"

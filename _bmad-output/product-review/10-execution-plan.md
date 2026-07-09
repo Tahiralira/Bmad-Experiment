@@ -137,7 +137,7 @@ this file breaks that merge into runnable units.
       via Vite dev server with auth-gate bypass; backend not needed.
       Status: DONE 2026-07-07 (spec adopted; WS3 is the implementation session)
 
-- [ ] **WS3 — Design System Implementation & Brand Floor** (≈3–4 days; likely less —
+- [x] **WS3 — Design System Implementation & Brand Floor** (≈3–4 days; likely less —
       see kit note below)
       Goal: implement the v2 tokens, restyle existing screens, and make the app look
       like ClearDues instead of the FastAPI template.
@@ -151,22 +151,51 @@ this file breaks that merge into runnable units.
       `ux-design-spec-v2.md` only for rationale; 08/04 only if something is ambiguous
       — the kit overrides both where they differ.
       Tasks:
-      - [ ] Implement v2 tokens in `index.css` `@theme` (correctly namespaced —
+      - [x] Implement v2 tokens in `index.css` `@theme` (correctly namespaced —
             the UX-C1 collision class must not recur); migrate the `text-text-*`
             usages to the v2 names
-      - [ ] Restyle Dashboard, Groups, Login/Register, SmartInputModal, bottom nav,
+      - [x] Restyle Dashboard, Groups, Login/Register, SmartInputModal, bottom nav,
             activity feed to the v2 system; eliminate the shadcn-vs-spec split
             (UX-M4) so one design language remains
-      - [ ] Brand floor: app name, logomark/favicon, page titles, login footer,
+      - [x] Brand floor: app name, logomark/favicon, page titles, login footer,
             dashboard greeting; delete FastAPI SVGs/branding
-      - [ ] Self-host the chosen font (variable, `font-display: swap`) — kill the
-            render-blocking Google Fonts import (UX-M2)
-      - [ ] Performance pass per WS2 budget: vendor chunking / lazy-load heavy libs
+      - [x] Self-host the chosen font — SUPERSEDED by kit: v2 spec chose the
+            SYSTEM font stack (0 KB download), so nothing to self-host; the
+            render-blocking Google Fonts import is deleted (UX-M2 closed)
+      - [x] Performance pass per WS2 budget: vendor chunking / lazy-load heavy libs
             (S4-M5, 1.48 MB main chunk), remove template deps that go with deleted UI
-      - [ ] Hide dead swipe gestures until wired (UX-M6)
-      Verification: screenshots both viewports/themes; axe smoke passes; bundle size
-      reported against budget.
-      Status: pending
+      - [x] Hide dead swipe gestures until wired (UX-M6) — SwipeableCard deleted;
+            SmartInputModal drag-to-dismiss + handle removed
+      Verification: DONE 2026-07-09 —
+      **Gates:** backend 192 passed/2 skipped; frontend typecheck green,
+      **83 passed / 1 expected-fail (S4-M1) / 2 skipped (WS7)** incl. new axe
+      smoke tests; build green.
+      **Bundle (gzip):** main chunk **170.6 kB** (was 435.6 kB; budget ≤250 kB ✓);
+      vendor-tanstack 49.2 + vendor-forms 27.1 + vendor-react 4.2; CSS 14.3;
+      total-first-paint ≈265 kB gz vs ~450 kB before. Fonts **0 KB** / 0
+      third-party requests (`fonts.googleapis` absent from dist ✓); no
+      framer-motion / react-icons / devtools in any chunk ✓.
+      **Screenshots:** 16 shots (login, dashboard-data, dashboard-empty,
+      smart-input × 375px/1280px × light/dark) →
+      `_bmad-output/implementation-artifacts/ws3-screenshots/`.
+      **Manual pass (Playwright-automated, 12/12):** all 5 bottom-nav
+      destinations land; FAB opens Smart Input, Escape closes, focus returns to
+      FAB; keyboard-only Tab→Enter opens modal; /items and /admin still render.
+      Notes / deviations:
+      - Kit gap: ConfirmedExpenseCard was an unlisted SwipeableCard consumer —
+        unwrapped; its Mark Paid button (was desktop-hover-only) is now always
+        visible since swipe was the only mobile path (gesture returns WS6).
+      - BONUS BUG FIXED: SplitPicker's `import * as Icons from "lucide-react"`
+        bundled the ENTIRE lucide set (≈580 kB min) — and its kebab-case lookups
+        never matched lucide's PascalCase exports, so split icons never rendered.
+        Explicit icon map fixed both (this was most of the bundle win).
+      - vitest-axe matcher doesn't register under vitest 4 → used the kit's
+        sanctioned fallback (assert on `.violations` directly).
+      - Devtools pinned to app's router version (1.142.11) — latest devtools
+        peer-requires router-core ≥1.170.
+      - Amber hardcodes on Pending badges (outside kit scope) → logged WS3-L1
+        in technical-debt-log.yaml.
+      Status: DONE 2026-07-09 (branch ws3/quiet-ink, 8 commits)
 
 ### PHASE 1 — Ledger Integrity & Core Loop (backend-heavy; WS4 can start in parallel with WS2)
 

@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-07 (WS2 done — Design Direction v2 "Quiet Ink" adopted)
+**Last Updated:** 2026-07-09 (WS3 done — Quiet Ink implemented, brand floor laid)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -26,6 +26,17 @@
 > FIXED), frontend typecheck/tests/build green, root-level CI live.
 > WS2 (design direction) DONE 2026-07-07: **Direction A "Quiet Ink" adopted** —
 > see `_bmad-output/planning-artifacts/ux-design-spec-v2.md` (supersedes v1 spec).
+> WS3 (design implementation) DONE 2026-07-09 on branch `ws3/quiet-ink`: v2
+> tokens live, brand floor laid (ClearDues name/favicon/logomark, FastAPI
+> branding deleted), orb → FAB, framer-motion + react-icons purged, main chunk
+> **435.6 → 170.6 kB gz** (budget ≤250 ✓), fonts 0 KB. Screenshots:
+> `_bmad-output/implementation-artifacts/ws3-screenshots/`. Key learnings:
+> (1) `import * as Icons from "lucide-react"` bundled the whole icon set AND
+> its kebab-case lookups silently rendered no icon — always import icons by
+> name; (2) `preview_screenshot` MCP tool times out against the Vite dev
+> server — use Playwright directly for visual proof; (3) devtools packages must
+> be version-pinned to the app's router (1.142.11), latest peer-conflicts.
+> **Next: WS4 (ledger integrity, backend) — can run parallel to design work.**
 
 ---
 
