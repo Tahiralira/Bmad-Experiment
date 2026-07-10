@@ -6,6 +6,15 @@ import FocusTrap from "focus-trap-react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useUserGroups } from "@/features/groups/api/groups"
+import { useAuth } from "@/hooks/useAuth"
 import { AICommentaryBubble } from "./AICommentaryBubble"
 import { ExpensePreviewCard } from "./ExpensePreviewCard"
 import { ExpenseForm } from "./ExpenseForm"
@@ -69,8 +78,19 @@ export function SmartInputModal({
   const [isProcessing, setIsProcessing] = useState(false)
   const [parsedData, setParsedData] = useState<ExpenseParseResponse | null>(null)
   const [previewStatus, setPreviewStatus] = useState<"placeholder" | "loading" | "ready" | "error">("placeholder")
-  // TODO: Get currentUserId from auth context
-  const [currentUserId] = useState<string>("user-123")
+
+  // The real signed-in user (WS5/S4-C1 — was a hardcoded "user-123" that the
+  // backend would have rejected as a non-UUID payer)
+  const { user: currentUser } = useAuth()
+  const currentUserId = currentUser?.id
+
+  // Group selection (WS5/S4-C1): with no groupId prop (global FAB entry),
+  // the user picks a group here; a per-group mount hides the selector
+  const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(
+    undefined,
+  )
+  const effectiveGroupId = groupId ?? selectedGroupId
+  const { data: groups } = useUserGroups()
 
   // Query client for cache invalidation
   const queryClient = useQueryClient()
@@ -89,23 +109,23 @@ export function SmartInputModal({
 
   // Handle smart input submission
   const handleSmartSubmit = async () => {
-    if (!inputText.trim() || !groupId) return
+    if (!inputText.trim() || !effectiveGroupId || !currentUserId) return
 
     setIsProcessing(true)
     setPreviewStatus("loading")
 
     // Story 3.3: Call AI parsing service
-    // For now: simulate parsing with mock data
-    // TODO: Replace with actual SSE endpoint call in Story 3.3 integration
+    // For now: simulate parsing with mock data — the REAL SSE integration
+    // lands in WS7; the payer is already the real signed-in user so
+    // confirming writes valid data
     startStream("Got it! Parsing that expense for you...")
 
     // Simulate AI parsing delay
     setTimeout(() => {
-      // Mock parsed data (replace with actual API response in Story 3.3)
       const mockParsedData: ExpenseParseResponse = {
         amount: 60.00,
         description: "Lunch with team",
-        payer_id: currentUserId || "user-123",
+        payer_id: currentUserId,
         confidence_score: 0.95,
         commentary: "Got it! Lunch for $60."
       }
@@ -118,7 +138,7 @@ export function SmartInputModal({
 
   // Handle confirm action from editable preview
   const handleConfirm = async (editedData: ExpenseCreate): Promise<string> => {
-    if (!groupId) {
+    if (!effectiveGroupId) {
       throw new Error("Group ID is required")
     }
 
@@ -127,8 +147,8 @@ export function SmartInputModal({
       const expense = await createExpenseMutation.mutateAsync(editedData)
 
       // Invalidate queries to refresh expense list and group balances
-      queryClient.invalidateQueries({ queryKey: ["expenses", groupId] })
-      queryClient.invalidateQueries({ queryKey: ["groups", groupId] })
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["groups", effectiveGroupId] })
 
       // Show success toast (split success toast is shown separately in EditableExpensePreview)
       toast.success("Expense added successfully!")
@@ -220,6 +240,7 @@ export function SmartInputModal({
       resetStream()
       setParsedData(null)
       setPreviewStatus("placeholder")
+      setSelectedGroupId(undefined)
     }
   }, [open, resetStream])
 
@@ -267,9 +288,12 @@ export function SmartInputModal({
               <div className="flex flex-col h-full max-h-[80vh] p-6">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-title font-medium text-text-primary">
-                      {entryPoint === "dashboard" ? "Add Expense" : "Add Expense to Group"}
-                    </h2>
+                    {/* Radix DialogTitle so screen readers announce the modal */}
+                    <DialogPrimitive.Title asChild>
+                      <h2 className="text-title font-medium text-text-primary">
+                        {entryPoint === "dashboard" ? "Add Expense" : "Add Expense to Group"}
+                      </h2>
+                    </DialogPrimitive.Title>
                     <DialogPrimitive.Close
                       className={cn(
                         "rounded opacity-70 transition-opacity hover:opacity-100",
@@ -280,6 +304,43 @@ export function SmartInputModal({
                       <span className="sr-only">Close</span>
                     </DialogPrimitive.Close>
                   </div>
+
+                  {/* Group selector — only for global entry points without
+                      a pre-selected group (WS5/S4-C1) */}
+                  {!groupId && (
+                    <div className="mb-4 space-y-1.5">
+                      <label
+                        htmlFor="smart-input-group"
+                        className="block text-xs font-medium text-text-secondary"
+                      >
+                        Group
+                      </label>
+                      <Select
+                        value={selectedGroupId ?? ""}
+                        onValueChange={(value) => setSelectedGroupId(value)}
+                      >
+                        <SelectTrigger
+                          id="smart-input-group"
+                          className="w-full"
+                          aria-label="Select group for this expense"
+                        >
+                          <SelectValue placeholder="Choose a group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(groups ?? []).map((group) => (
+                            <SelectItem key={group.id} value={group.id}>
+                              {group.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!effectiveGroupId && (
+                        <p className="text-xs text-text-muted">
+                          Pick which group this expense belongs to.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {mode === "smart" ? (
                     <>
@@ -325,15 +386,16 @@ export function SmartInputModal({
                         status={previewStatus}
                         onConfirm={handleConfirm}
                         onDiscard={handleDiscard}
-                        groupId={groupId}
+                        groupId={effectiveGroupId}
                         autoConfirmEnabled={false} // TODO: Add user preference setting
                       />
 
-                      {/* Submit Button */}
+                      {/* Submit Button — disabled (not silently no-op, S4-C1)
+                          until a group is chosen */}
                       <button
                         type="button"
                         onClick={handleSmartSubmit}
-                        disabled={!inputText.trim() || isProcessing}
+                        disabled={!inputText.trim() || isProcessing || !effectiveGroupId}
                         className={cn(
                           "mt-6 w-full py-3 rounded-lg font-medium",
                           "bg-action text-white",
@@ -352,15 +414,15 @@ export function SmartInputModal({
                         <p className="text-sm text-text-secondary">
                           Fill in the details below:
                         </p>
-                        {groupId ? (
+                        {effectiveGroupId ? (
                           <ExpenseForm
-                            groupId={groupId}
+                            groupId={effectiveGroupId}
                             onSuccess={handleManualSuccess}
                             onCancel={() => setMode("smart")}
                           />
                         ) : (
                           <p className="text-text-muted text-sm">
-                            Please select a group first
+                            Choose a group above to add an expense.
                           </p>
                         )}
 

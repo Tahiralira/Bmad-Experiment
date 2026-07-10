@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { BalanceDisplay } from "@/components/ui/balance-display"
 import { cn } from "@/lib/utils"
 import { useConfirmSettlement, useRejectSettlement } from "../api/expenses"
+import type { Expense, SettlementClaimPublic } from "../types"
 import { formatRelativeTime } from "../utils/timeFormat"
 
 // =============================================================================
@@ -13,17 +14,12 @@ import { formatRelativeTime } from "../utils/timeFormat"
 
 interface SettlementClaimCardProps {
   /** The settlement claim data */
-  claim: {
-    id: string
-    amount: number
-    claimed_at: string
-    user_name: string | null
-  }
+  claim: Pick<
+    SettlementClaimPublic,
+    "id" | "amount" | "claimed_at" | "user_name"
+  >
   /** The associated expense */
-  expense: {
-    description: string
-    amount: number
-  }
+  expense: Pick<Expense, "description" | "amount">
   /** Optional className for styling */
   className?: string
 }
@@ -128,12 +124,12 @@ export function SettlementClaimCard({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Amount claimed</p>
-            <BalanceDisplay amount={claim.amount} variant="title" />
+            <BalanceDisplay amount={Number(claim.amount)} variant="title" />
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Total expense</p>
             <p className="text-lg font-semibold">
-              Rs {expense.amount.toFixed(2)}
+              Rs {expense.amount}
             </p>
           </div>
         </div>

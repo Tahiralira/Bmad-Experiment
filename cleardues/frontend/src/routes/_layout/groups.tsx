@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { Plus, Users } from "lucide-react"
+import { createFileRoute, Link } from "@tanstack/react-router"
+import { ChevronRight, Plus, Users } from "lucide-react"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -11,8 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useUserGroups } from "@/features/groups/api/groups"
-import { CreateGroupForm, GroupDetail } from "@/features/groups/components"
-import type { ExpenseGroup } from "@/features/groups/types"
+import { CreateGroupForm } from "@/features/groups/components"
 
 export const Route = createFileRoute("/_layout/groups")({
   component: Groups,
@@ -27,7 +26,6 @@ export const Route = createFileRoute("/_layout/groups")({
 
 function Groups() {
   const { data: groups, isLoading, error } = useUserGroups()
-  const [selectedGroup, setSelectedGroup] = useState<ExpenseGroup | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
   if (isLoading) {
@@ -82,42 +80,29 @@ function Groups() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Groups List */}
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold">Your Groups</h2>
-            <div className="space-y-2">
-              {groups.map((group) => (
-                <button
-                  key={group.id}
-                  onClick={() => setSelectedGroup(group)}
-                  className={`w-full rounded-lg border p-4 text-left transition-colors hover:bg-accent ${
-                    selectedGroup?.id === group.id
-                      ? "border-primary bg-accent"
-                      : ""
-                  }`}
-                >
-                  <div className="font-medium">{group.name}</div>
+        /* Each group is a real URL now (WS5/S4-H3): deep-linkable,
+           refreshable, back-button friendly — no more ephemeral useState
+           snapshot detail panel */
+        <ul className="border-y border-border divide-y divide-border">
+          {groups.map((group) => (
+            <li key={group.id}>
+              <Link
+                to="/groups/$groupId"
+                params={{ groupId: group.id }}
+                className="flex min-h-14 items-center justify-between gap-4 py-4 hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{group.name}</div>
                   <div className="text-sm text-muted-foreground">
-                    {group.member_count || 1} member
-                    {(group.member_count || 1) !== 1 ? "s" : ""}
+                    {group.member_count ?? 1} member
+                    {(group.member_count ?? 1) !== 1 ? "s" : ""}
                   </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Group Detail Panel */}
-          <div className="rounded-lg border p-4">
-            {selectedGroup ? (
-              <GroupDetail group={selectedGroup} />
-            ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                Select a group to view details
-              </div>
-            )}
-          </div>
-        </div>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

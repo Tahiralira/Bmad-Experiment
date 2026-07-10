@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BalanceDisplay } from "@/components/ui/balance-display"
 import { usePendingSettlements } from "../api/expenses"
+import type { PendingSettlement } from "../types"
 import { formatRelativeTime } from "../utils/timeFormat"
 
 // =============================================================================
@@ -13,6 +14,8 @@ import { formatRelativeTime } from "../utils/timeFormat"
 interface PendingSettlementsListProps {
   /** Optional className for styling */
   className?: string
+  /** When set, only claims for expenses in this group are shown (WS5) */
+  groupId?: string
 }
 
 // =============================================================================
@@ -26,8 +29,14 @@ interface PendingSettlementsListProps {
  * Shows each expense where the user has submitted a settlement claim
  * that is still awaiting owner confirmation.
  */
-export function PendingSettlementsList({ className }: PendingSettlementsListProps) {
-  const { data: pendingSettlements, isLoading, error } = usePendingSettlements()
+export function PendingSettlementsList({
+  className,
+  groupId,
+}: PendingSettlementsListProps) {
+  const { data, isLoading, error } = usePendingSettlements()
+  const pendingSettlements = groupId
+    ? data?.filter((item) => item.expense.group_id === groupId)
+    : data
 
   if (isLoading) {
     return <PendingSettlementsSkeleton />
@@ -68,24 +77,7 @@ export function PendingSettlementsList({ className }: PendingSettlementsListProp
 // =============================================================================
 
 interface PendingSettlementCardProps {
-  item: {
-    expense: {
-      id: string
-      description: string
-      amount: number
-      payer_id: string
-      created_at: string
-    }
-    split: {
-      amount_owed: number
-    }
-    claim: {
-      id: string
-      amount: number
-      claimed_at: string
-      user_name: string | null
-    }
-  }
+  item: PendingSettlement
 }
 
 function PendingSettlementCard({ item }: PendingSettlementCardProps) {
@@ -107,12 +99,12 @@ function PendingSettlementCard({ item }: PendingSettlementCardProps) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Amount claimed</p>
-            <BalanceDisplay amount={claim.amount} variant="title" />
+            <BalanceDisplay amount={Number(claim.amount)} variant="title" />
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Total expense</p>
             <p className="text-lg font-semibold">
-              Rs {expense.amount.toFixed(2)}
+              Rs {expense.amount}
             </p>
           </div>
         </div>

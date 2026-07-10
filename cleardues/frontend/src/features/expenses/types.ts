@@ -7,7 +7,8 @@ export type ExpenseStatus =
 export interface Expense {
   id: string
   group_id: string
-  amount: number
+  /** Decimal on the wire (WS4/M1): exact string like "100.00" */
+  amount: string
   description: string
   payer_id: string
   created_by: string
@@ -32,6 +33,25 @@ export interface ExpenseUpdate {
 
 export interface ExpensesResponse {
   data: Expense[]
+  count: number
+}
+
+/**
+ * One row of a group's ledger (WS5/B-H7): the expense plus the current
+ * user's own split — null when they are not part of the split.
+ */
+export interface GroupExpenseItem {
+  expense: Expense
+  my_split: ExpenseSplit | null
+}
+
+export interface GroupExpensesResponse {
+  data: GroupExpenseItem[]
+  count: number
+}
+
+export interface ExpenseSplitsResponse {
+  data: ExpenseSplit[]
   count: number
 }
 
@@ -173,10 +193,13 @@ export interface ExpenseSplit {
   id: string
   expense_id: string
   user_id: string
-  amount_owed: number
+  /** Decimal on the wire (WS4/M1): exact string like "50.00" */
+  amount_owed: string
   status: SplitStatus
   confirmed_at: string | null
   created_at: string
+  /** Populated by GET /expenses/{id}/splits (WS5) */
+  user_name?: string | null
 }
 
 export interface ExpenseConfirmRequest {
@@ -237,7 +260,8 @@ export interface SettlementClaimPublic {
   id: string
   expense_split_id: string
   claimant_user_id: string
-  amount: number
+  /** Decimal on the wire (WS4/M1): exact string like "50.00" */
+  amount: string
   status: SettlementClaimStatus
   claimed_at: string
   confirmed_at: string | null

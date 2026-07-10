@@ -12,12 +12,68 @@ import type {
   PercentageSplitRequest,
   ExpenseSplitResponse,
   ExpenseSplit,
+  ExpenseSplitsResponse,
   ExpenseRejectResponse,
+  GroupExpensesResponse,
   PendingConfirmation,
   AuditLogsResponse,
   SettlementClaimPublic,
   PendingSettlement,
 } from "../types"
+
+
+// =============================================================================
+// WS5 (B-H7): Ledger read API
+// =============================================================================
+
+async function getGroupExpenses(
+  groupId: string,
+  limit = 50,
+  offset = 0,
+): Promise<GroupExpensesResponse> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expense-groups/${groupId}/expenses`,
+    query: { limit, offset },
+    errors: {
+      401: "Unauthorized",
+      403: "You are not a member of this group",
+      404: "Group not found",
+    },
+  })
+}
+
+export function useGroupExpenses(groupId: string, limit = 50, offset = 0) {
+  return useQuery<GroupExpensesResponse, Error>({
+    // Under the ["expenses"] prefix so every existing mutation invalidation
+    // (create/split/confirm/reject/settle) refreshes the ledger too
+    queryKey: ["expenses", "group", groupId, limit, offset],
+    queryFn: () => getGroupExpenses(groupId, limit, offset),
+    enabled: !!groupId,
+  })
+}
+
+async function getExpenseSplits(
+  expenseId: string,
+): Promise<ExpenseSplitsResponse> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expenses/${expenseId}/splits`,
+    errors: {
+      401: "Unauthorized",
+      403: "Not a member of this group",
+      404: "Expense not found",
+    },
+  })
+}
+
+export function useExpenseSplits(expenseId: string, enabled = true) {
+  return useQuery<ExpenseSplitsResponse, Error>({
+    queryKey: ["expenses", expenseId, "splits"],
+    queryFn: () => getExpenseSplits(expenseId),
+    enabled: enabled && !!expenseId,
+  })
+}
 
 
 // =============================================================================
@@ -408,19 +464,27 @@ export function useRejectSettlement() {
   })
 }
 
-async function getPendingSettlementClaims(): Promise<PendingSettlement[]> {
+async function getPendingSettlementClaims(
+  groupId?: string,
+): Promise<PendingSettlement[]> {
   return __request(OpenAPI, {
     method: "GET",
     url: "/api/v1/expenses/settlement-claims/pending-for-owner",
+    query: groupId ? { group_id: groupId } : undefined,
     errors: {
       401: "Unauthorized",
     },
   })
 }
 
-export function usePendingSettlementClaims() {
+/**
+ * Pending claims awaiting the current user's (owner's) confirmation.
+ * Pass groupId to scope to one group (WS5/S4-M6 — a group screen must not
+ * show other groups' claims).
+ */
+export function usePendingSettlementClaims(groupId?: string) {
   return useQuery<PendingSettlement[], Error>({
-    queryKey: ["pending-settlement-claims"],
-    queryFn: getPendingSettlementClaims,
+    queryKey: ["pending-settlement-claims", groupId ?? "all"],
+    queryFn: () => getPendingSettlementClaims(groupId),
   })
 }

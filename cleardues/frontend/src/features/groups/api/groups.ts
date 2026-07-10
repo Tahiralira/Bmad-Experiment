@@ -5,6 +5,7 @@ import { GroupsService, OpenAPI } from "@/shared/api"
 import type {
   ExpenseGroup,
   ExpenseGroupCreate,
+  ExpenseGroupDetail,
   GroupInviteResponse,
   GroupMembersListResponse,
 } from "../types"
@@ -26,6 +27,28 @@ export function useUserGroups() {
   return useQuery<ExpenseGroup[], Error>({
     queryKey: ["groups"],
     queryFn: GroupsService.listUserGroups,
+  })
+}
+
+// === Group Detail (WS5/B-H7 — backs the /groups/$groupId screen) ===
+
+async function getGroupDetail(groupId: string): Promise<ExpenseGroupDetail> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expense-groups/${groupId}`,
+    errors: {
+      401: "Unauthorized",
+      403: "You are not a member of this group",
+      404: "Group not found",
+    },
+  })
+}
+
+export function useGroupDetail(groupId: string) {
+  return useQuery<ExpenseGroupDetail, Error>({
+    queryKey: ["groups", groupId, "detail"],
+    queryFn: () => getGroupDetail(groupId),
+    enabled: !!groupId,
   })
 }
 

@@ -113,7 +113,7 @@ export function ConfirmedExpenseCard({
               {expense.description}
             </h3>
             <p className="text-sm text-muted-foreground">
-              Total: Rs {expense.amount.toFixed(2)}
+              Total: Rs {expense.amount}
             </p>
           </div>
 
@@ -134,7 +134,7 @@ export function ConfirmedExpenseCard({
         <div className="mt-3 flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Your share</p>
-            <BalanceDisplay amount={split.amount_owed} variant="title" />
+            <BalanceDisplay amount={Number(split.amount_owed)} variant="title" />
           </div>
         </div>
 

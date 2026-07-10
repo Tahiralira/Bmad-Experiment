@@ -7,6 +7,16 @@ export interface ExpenseGroup {
   member_count?: number
 }
 
+/**
+ * Group detail (WS5/B-H7): backing type for /groups/$groupId.
+ * net_balance is the current user's balance in this group — Decimal on the
+ * wire, e.g. "12.50" (positive = owed to the user).
+ */
+export interface ExpenseGroupDetail extends ExpenseGroup {
+  member_count: number
+  net_balance: string
+}
+
 export interface ExpenseGroupCreate {
   name: string
 }

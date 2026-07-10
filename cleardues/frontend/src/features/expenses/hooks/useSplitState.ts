@@ -117,24 +117,28 @@ export function useSplitState({
     }
 
     if (splitType === "equal") {
-      // Equal split calculation
-      const amountPerPerson = totalAmount / includedMembers.length
+      // Equal split calculation. The rounding remainder is absorbed by the
+      // payer REGARDLESS of their position in the members array (S4-M1: the
+      // old index check only balanced when the payer happened to be last —
+      // Rs 100 / 3 with the payer first displayed 33.33 × 3 = 99.99).
+      // When the payer is not part of the split, the last member absorbs it
+      // so the shares always sum to the total.
+      const share =
+        Math.round((totalAmount / includedMembers.length) * 100) / 100
+      const includedIds = includedMembers.map((m) => m.user_id || m.id)
+      const payerIncluded = !!payerId && includedIds.includes(payerId)
+      const absorberId = payerIncluded
+        ? payerId
+        : includedIds[includedIds.length - 1]
+
+      const absorberAmount =
+        Math.round((totalAmount - share * (includedIds.length - 1)) * 100) /
+        100
 
       const amounts = new Map<string, number>()
-      let runningTotal = 0
-
-      includedMembers.forEach((member, index) => {
-        let amount = Math.round(amountPerPerson * 100) / 100
-
-        // Payer absorbs rounding difference
-        const memberId = member.user_id || member.id
-        if (payerId && memberId === payerId && index === includedMembers.length - 1) {
-          amount = Math.round((totalAmount - runningTotal) * 100) / 100
-        }
-
-        amounts.set(memberId, amount)
-        runningTotal += amount
-      })
+      for (const memberId of includedIds) {
+        amounts.set(memberId, memberId === absorberId ? absorberAmount : share)
+      }
 
       return amounts
     }
@@ -263,14 +267,15 @@ export function useSplitState({
 
     // Additional validation for unequal split
     if (splitType === "unequal") {
-      // Count included members
-      const includedCount = members.filter(m => {
+      // EVERY included member must have an amount (S4-M2: comparing raw map
+      // sizes let stale amounts of since-excluded members stand in for
+      // included members who never got one — submitting a "split" that
+      // silently omitted someone)
+      const missingAmount = members.some((m) => {
         const memberId = m.user_id || m.id
-        return !excludedMembers.has(memberId)
-      }).length
-
-      // All included members must have amounts
-      if (customAmounts.size < includedCount) {
+        return !excludedMembers.has(memberId) && !customAmounts.has(memberId)
+      })
+      if (missingAmount) {
         return {
           isValid: false,
           validationError: "All included members must have an amount specified",
@@ -320,7 +325,9 @@ export function useSplitState({
       isValid: true,
       validationError: null,
     }
-  }, [members.length, excludedMembers.size, splitType, customAmounts.size, remainingAmount, totalAmount, percentages.size, totalPercentage])
+    // Map/Set identities (not .size) — the S4-M2 check depends on WHICH
+    // members have amounts, and state setters always produce new instances
+  }, [members, excludedMembers, splitType, customAmounts, remainingAmount, totalAmount, percentages, totalPercentage])
 
   return {
     splitType,

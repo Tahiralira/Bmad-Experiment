@@ -12,6 +12,10 @@ import { SettlementClaimCard } from "./SettlementClaimCard"
 interface SettlementClaimsListProps {
   /** Optional className for styling */
   className?: string
+  /** When set, only claims for this group are shown (WS5/S4-M6 — the old
+   * unscoped list attributed other groups' claims to whatever group screen
+   * it was mounted on) */
+  groupId?: string
 }
 
 // =============================================================================
@@ -30,8 +34,12 @@ interface SettlementClaimsListProps {
  * - Empty state: celebratory "All settled" with amber accent
  * - Skeleton loading state (3 skeleton cards)
  */
-export function SettlementClaimsList({ className }: SettlementClaimsListProps) {
-  const { data: pendingClaims, isLoading, error } = usePendingSettlementClaims()
+export function SettlementClaimsList({
+  className,
+  groupId,
+}: SettlementClaimsListProps) {
+  const { data: pendingClaims, isLoading, error } =
+    usePendingSettlementClaims(groupId)
 
   if (isLoading) {
     return <SettlementClaimsSkeleton />

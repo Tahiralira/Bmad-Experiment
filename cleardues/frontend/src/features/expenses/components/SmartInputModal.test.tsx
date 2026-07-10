@@ -221,14 +221,44 @@ describe("SmartInputModal", () => {
       expect(submitButton).toBeDisabled()
     })
 
-    it("enables submit button when input has text", () => {
-      render(<SmartInputModal open={true} onOpenChange={() => {}} />)
+    it("enables submit button when input has text and a group is set", () => {
+      render(
+        <SmartInputModal open={true} onOpenChange={() => {}} groupId="group-123" />
+      )
 
       const textarea = screen.getByPlaceholderText(/Paid 150 for dinner/)
       fireEvent.change(textarea, { target: { value: "Paid 60" } })
 
       const submitButton = screen.getByRole("button", { name: "Add Expense" })
       expect(submitButton).not.toBeDisabled()
+    })
+
+    // WS5/S4-C1: without a group the button used to be ENABLED and silently
+    // no-op — now it stays disabled until a group is chosen
+    it("keeps submit disabled without a group even when input has text", () => {
+      render(<SmartInputModal open={true} onOpenChange={() => {}} />)
+
+      const textarea = screen.getByPlaceholderText(/Paid 150 for dinner/)
+      fireEvent.change(textarea, { target: { value: "Paid 60" } })
+
+      const submitButton = screen.getByRole("button", { name: "Add Expense" })
+      expect(submitButton).toBeDisabled()
+    })
+
+    it("shows the group selector only when no groupId is provided", () => {
+      const { rerender } = render(
+        <SmartInputModal open={true} onOpenChange={() => {}} />
+      )
+      expect(
+        screen.getByLabelText("Select group for this expense")
+      ).toBeInTheDocument()
+
+      rerender(
+        <SmartInputModal open={true} onOpenChange={() => {}} groupId="group-123" />
+      )
+      expect(
+        screen.queryByLabelText("Select group for this expense")
+      ).not.toBeInTheDocument()
     })
   })
 
@@ -273,13 +303,15 @@ describe("SmartInputModal", () => {
       expect(screen.getByText("Fill in the details below:")).toBeInTheDocument()
     })
 
-    it("shows message when no groupId provided in manual mode", () => {
+    it("shows message when no group is selected in manual mode", () => {
       render(<SmartInputModal open={true} onOpenChange={() => {}} />)
 
       // Switch to manual
       fireEvent.click(screen.getByText(/Switch to Manual Form/))
 
-      expect(screen.getByText("Please select a group first")).toBeInTheDocument()
+      expect(
+        screen.getByText("Choose a group above to add an expense.")
+      ).toBeInTheDocument()
     })
   })
 

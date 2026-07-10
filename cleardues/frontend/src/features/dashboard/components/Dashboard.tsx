@@ -96,11 +96,11 @@ interface GroupRowProps {
 }
 
 function GroupRow({ group }: GroupRowProps) {
-  // TODO: Update to `/groups/${group.group_id}` when the group detail route lands (WS5)
   return (
     <li>
       <Link
-        to="/groups"
+        to="/groups/$groupId"
+        params={{ groupId: group.group_id }}
         className="flex min-h-14 items-center justify-between gap-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-accent transition-colors"
         aria-label={`Group ${group.group_name}`}
       >

@@ -209,23 +209,28 @@ export function EditableExpensePreview({
             excluded_user_ids: Array.from(excludedMembers),
           }
         } else if (splitType === "unequal") {
-          // Convert customAmounts Map to array format
+          // Convert customAmounts Map to array format — dropping stale
+          // entries of members excluded after their amount was set (S4-M2)
           splitData = {
             type: "unequal",
-            splits: Array.from(customAmounts.entries()).map(([user_id, amount]) => ({
-              user_id,
-              amount,
-            })),
+            splits: Array.from(customAmounts.entries())
+              .filter(([user_id]) => !excludedMembers.has(user_id))
+              .map(([user_id, amount]) => ({
+                user_id,
+                amount,
+              })),
             excluded_user_ids: Array.from(excludedMembers),
           }
         } else if (splitType === "percentage") {
-          // Convert percentages Map to array format
+          // Convert percentages Map to array format (same stale-entry filter)
           splitData = {
             type: "percentage",
-            splits: Array.from(percentages.entries()).map(([user_id, percentage]) => ({
-              user_id,
-              percentage,
-            })),
+            splits: Array.from(percentages.entries())
+              .filter(([user_id]) => !excludedMembers.has(user_id))
+              .map(([user_id, percentage]) => ({
+                user_id,
+                percentage,
+              })),
             excluded_user_ids: Array.from(excludedMembers),
           }
         } else {

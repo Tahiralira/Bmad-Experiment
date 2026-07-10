@@ -64,12 +64,9 @@ describe("useSplitState", () => {
     expect(result.current.validationError).toBe("At least 2 members required for split")
   })
 
-  // KNOWN BUG (S4-M1): the payer only absorbs the rounding remainder when they
-  // happen to be LAST in the members array; with the payer first, everyone gets
-  // 33.33 and the split sums to 99.99. This test correctly asserts the intended
-  // behavior and fails until the fix lands in WS5 (10-execution-plan.md).
-  // `it.fails` flips to an error once fixed — remove the marker then.
-  it.fails("handles rounding correctly", () => {
+  // S4-M1 (fixed in WS5): the payer absorbs the rounding remainder no matter
+  // where they sit in the members array
+  it("handles rounding correctly", () => {
     const { result } = renderHook(() =>
       useSplitState({
         totalAmount: 100,
@@ -82,5 +79,56 @@ describe("useSplitState", () => {
     expect(result.current.splitAmounts.get("1")).toBe(33.34) // Payer with adjustment
     expect(result.current.splitAmounts.get("2")).toBe(33.33)
     expect(result.current.splitAmounts.get("3")).toBe(33.33)
+  })
+
+  it("last member absorbs rounding when the payer is excluded", () => {
+    const { result } = renderHook(() =>
+      useSplitState({
+        totalAmount: 100,
+        members: mockMembers,
+        payerId: "1",
+      })
+    )
+
+    act(() => {
+      result.current.toggleMemberExclusion("1") // exclude the payer
+    })
+
+    // 100 / 2 = 50 each — and the shares must still sum to the total
+    const amounts = result.current.splitAmounts
+    expect(amounts.has("1")).toBe(false)
+    const sum = [...amounts.values()].reduce((a, b) => a + b, 0)
+    expect(Math.round(sum * 100) / 100).toBe(100)
+  })
+
+  // S4-M2 (fixed in WS5): a stale amount left behind by an excluded member
+  // must not stand in for an included member who never got one
+  it("invalidates unequal split when an included member has no amount", () => {
+    const { result } = renderHook(() =>
+      useSplitState({
+        totalAmount: 100,
+        members: mockMembers,
+        payerId: "1",
+      })
+    )
+
+    act(() => {
+      result.current.setSplitType("unequal")
+    })
+    act(() => {
+      // Alice covers the total; Charlie gets an amount then is excluded.
+      // Bob (included) never gets an amount — the old size-based check
+      // counted Charlie's stale entry and passed validation.
+      result.current.setCustomAmount("1", 100)
+      result.current.setCustomAmount("3", 50)
+    })
+    act(() => {
+      result.current.toggleMemberExclusion("3")
+    })
+
+    expect(result.current.isValid).toBe(false)
+    expect(result.current.validationError).toBe(
+      "All included members must have an amount specified"
+    )
   })
 })

@@ -112,13 +112,13 @@ function PendingConfirmationCard({
           <div>
             <p className="text-sm text-muted-foreground">Your share</p>
             <BalanceDisplay
-              amount={split.amount_owed}
+              amount={Number(split.amount_owed)}
               variant="title"
             />
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Total expense</p>
-            <p className="text-lg font-semibold">${expense.amount.toFixed(2)}</p>
+            <p className="text-lg font-semibold">Rs {expense.amount}</p>
           </div>
         </div>
 
