@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-09 (WS4 done — ledger integrity: consent revert, atomic audit, soft delete)
+**Last Updated:** 2026-07-10 (WS5 done — ledger API + group screen: core loop operable end-to-end)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -53,7 +53,37 @@
 > (email-validator special-use rejection → 500 on response serialization);
 > (2) compose `develop.watch` sync is NOT active on long-running containers —
 > `docker compose cp` before every in-container pytest run.
-> **Next: WS5 (Ledger API + Group Screen) — service semantics now settled.**
+> WS5 (Ledger API + Group Screen) DONE 2026-07-10 on branch `ws5/ledger-api`:
+> **the core loop is user-operable for the first time** — proven in the
+> browser: create → split → confirm → settle → view, all reachable from the
+> app entry point. (a) Ledger read API (B-H7): GET expense / expense splits
+> (with names) / group detail (member_count + caller's net_balance) / group
+> expenses (caller's split LEFT-JOINed per row); group-scoped
+> settlement-claims (S4-M6). (b) Split endpoint typed: discriminated-union
+> `SplitRequest` + one `apply_split()` service fn — malformed bodies 422, no
+> more 500s (B-H6). (c) **`alembic check` clean for the first time** (B-H9):
+> models pin sa_type aware timestamps + non-native enums + FK ondelete;
+> migration c4d5e6f7a8b9 fixed the stray naive/unbounded columns. (d)
+> `/groups/$groupId` deep-linkable GroupLedgerScreen (S4-H3/C4) mounting
+> ConfirmedExpenseCard / PendingSettlementsList / SettlementClaimsList /
+> AuditLogList; expense entry wired with group selector in SmartInputModal +
+> real auth user (S4-C1); 401-only logout, 403 → toast (S4-H1); split-math
+> fixes (S4-M1/M2). Dashboard last_activity now reflects expense writes
+> (B-M2). Backend **210 passed / 2 skipped**; frontend **88 passed / 2
+> skipped**, main chunk 172.3 kB gz.
+> Key learnings: (1) expense/split/claim amounts were ALWAYS strings on the
+> wire (pydantic Decimal) — the frontend `number` types + `.toFixed()` only
+> survived because those components were unmounted dead code; wire types are
+> now strings end-to-end. (2) TanStack Router: a child route under a parent
+> WITHOUT an `<Outlet/>` never renders — un-nest with a trailing underscore
+> (`groups_.$groupId.tsx` → /groups/$groupId). (3) SQLAlchemy enum columns
+> store NAMES ("DRAFT") not values — reconcile DDL with
+> `sa.Enum(native_enum=False, length=N)`, never switch to sa.String (silent
+> data mismatch). (4) SQLModel `Field(sa_type=..., ondelete=...)` is enough
+> to make autogenerate agree with hand-written migrations — no sa_column
+> rewrites needed.
+> **Next: WS6 (Aggregate Settle-Up + Confirmation Policy) — or WS7/WS8 per
+> dependency map (WS5 unblocked both).**
 
 ---
 
@@ -167,9 +197,13 @@ cd cleardues/frontend && npm run build
 - WS4 Ledger Integrity (backend) ← **DONE** ✓ (2026-07-09; branch
   ws4/ledger-integrity; consent revert, ARCH-001 transactions, soft delete,
   row locks, Decimal wire; backend 203 passed)
-- WS5 Ledger API + Group Screen ← **NEXT** (read endpoints, typed split
-  schemas, alembic env.py autogenerate reconcile, /groups/$groupId screen,
-  expense entry wiring)
+- WS5 Ledger API + Group Screen ← **DONE** ✓ (2026-07-10; branch
+  ws5/ledger-api; read endpoints, typed split schemas, alembic check clean,
+  /groups/$groupId ledger screen, expense entry wired — core loop operable
+  end-to-end in the browser; backend 210 passed, frontend 88 passed)
+- WS6 Aggregate Settle-Up + Confirmation Policy ← **NEXT** (settle-with-X
+  netting, 72h auto-confirm, per-group strict mode, pairwise balance view);
+  WS7 (real AI) is also unblocked and can run in parallel
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

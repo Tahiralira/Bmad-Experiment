@@ -253,30 +253,81 @@ this file breaks that merge into runnable units.
         the same soft-delete path rather than left as a hard-delete hole.
       Status: DONE 2026-07-09 (branch ws4/ledger-integrity)
 
-- [ ] **WS5 — Ledger API + Group Screen** (≈1 week)
+- [x] **WS5 — Ledger API + Group Screen** (≈1 week; done in 1 session)
       Goal: the app can display what it stores; the core loop becomes operable.
       Depends on: WS4 (service-layer semantics settled). Styling: use existing
       components; WS3 restyles globally via tokens.
       Inputs: 03 (H7, H6, H9, M2, M6), 04 (C1, C4, H1, H3, M6, M1, M2).
       Tasks:
-      - [ ] Backend read endpoints: GET expense, list group expenses, expense splits,
-            group detail; group-scoped settlement-claims variant (B-H7, S4-M6)
-      - [ ] Split endpoint: discriminated-union Pydantic schemas replace the raw
-            `dict` + 220 lines of hand-rolled validation (B-H6)
-      - [ ] Alembic env.py imports all feature models; autogenerate diff reconciled
-            (B-H9)
-      - [ ] `/groups/$groupId` route; detail derived from query cache (S4-H3);
-            dashboard last-activity fixed (B-M2)
-      - [ ] Group ledger screen: expense list + balances; mount ConfirmedExpenseCard /
-            PendingSettlementsList / AuditLogList (S4-C4)
-      - [ ] Wire expense entry: per-group entry point + group selector in
-            SmartInputModal; thread groupId (S4-C1)
-      - [ ] Global handler: logout on 401 only; 403 → toast via router (S4-H1)
-      - [ ] Frontend split-math fixes (S4-M1 payer-position rounding, M2 stale
-            excluded amounts)
-      Verification: a user can create → split → confirm → view an expense end-to-end
-      in the browser; screenshots attached.
-      Status: pending
+      - [x] Backend read endpoints: GET /expenses/{id}, GET /expense-groups/{id}
+            (member_count + user's net_balance), GET /expense-groups/{id}/expenses
+            (ledger with the caller's own split LEFT-JOINed per row), GET
+            /expenses/{id}/splits (with names); `?group_id=` scope on
+            settlement-claims/pending-for-owner (B-H7, S4-M6). B-M6 folded in:
+            pending-confirmations N+1 → JOIN; audit-log/ledger limits capped
+            via Query(ge/le).
+      - [x] Split endpoint: discriminated-union `SplitRequest` (Literal type
+            discriminator) replaces the raw `dict`; validation + calculation +
+            persistence live in one `apply_split()` service function; malformed
+            bodies (bad UUIDs, unknown types) 422 instead of 500 (B-H6)
+      - [x] Alembic reconciled (B-H9): env.py already saw all models via the WS1
+            app.models shim — the real work was making models render the exact
+            migration DDL (sa_type aware timestamps, sa.Enum(native_enum=False,
+            length) since enum columns store NAMES, Field(ondelete=...) matching
+            FK policy, oauth composite index, named unique constraint) +
+            migration c4d5e6f7a8b9 converting the stray naive columns
+            (audit_log, settlement_claim, expense.confirmed_at,
+            user.created_at/updated_at) and pinning unbounded status VARCHARs.
+            **`alembic check` is clean for the first time**; downgrade exercised.
+      - [x] `/groups/$groupId` route (file `groups_.$groupId.tsx` — trailing
+            underscore un-nests since the list route has no Outlet); detail from
+            query cache; dashboard + groups list link to it (S4-H3). Dashboard
+            last_activity = max(group.updated_at, MAX(expense.updated_at)),
+            ordering follows it (B-M2).
+      - [x] GroupLedgerScreen: balance hero, expense ledger with expandable rows
+            (splits + per-expense AuditLogList audit trail), ConfirmedExpenseCard
+            "Mark Paid" section, PendingSettlementsList + SettlementClaimsList
+            (both group-scoped), MembersList, ActivityFeed (S4-C4). GroupDetail
+            panel deleted.
+      - [x] Expense entry wired (S4-C1): per-group Add-expense button threads
+            groupId; global FAB gains a group selector; submit disabled until a
+            group is chosen (was a silent no-op); `"user-123"` replaced with the
+            real auth-context user id.
+      - [x] Global handler: logout on 401 only, router.navigate not hard
+            redirect; 403 → toast with server detail (query cache only —
+            mutations already toast) (S4-H1)
+      - [x] Split-math fixes: payer absorbs rounding regardless of position
+            (S4-M1 `it.fails` flipped to a real pass); unequal validation
+            requires an amount for every INCLUDED member + stale excluded
+            entries filtered from submissions (S4-M2)
+      Verification: DONE 2026-07-10 —
+      **Core loop proven in the browser end-to-end:** create (smart-input UI,
+      real payer) → equal split (complex-mode UI) → member confirm (API) +
+      owner confirm (/pending UI) → CONFIRMED with exact balances ("You are
+      owed 30 rupees" from the new detail endpoint) → member claims (API) →
+      owner confirms claim on the group screen → SETTLED badge, "All settled"
+      state; expanded row shows both splits + 8-entry audit history.
+      **Gates:** backend **210 passed / 2 skipped** (was 203; 8 new WS5 tests
+      in test_ledger_api.py + 422 split contract tests); frontend typecheck
+      green, **88 passed / 2 skipped** (S4-M1 expected-fail now passes; 4 new
+      tests), build green — main chunk **172.3 kB gz** (budget ≤250).
+      **Screenshots:** group ledger screen at 375px + 1280px in dark AND light,
+      dashboard 375px dark, smart-input modal (group-screen entry + FAB entry
+      with group selector) — captured via preview browser during the live run.
+      Notes / deviations:
+      - Decimal-to-the-wire (WS4/M1) was already the API's real behavior for
+        expense/split/claim amounts — the frontend types said `number` and the
+        `.toFixed()` consumers were unmounted dead code that would have crashed
+        on first render. Types are now `string` and the four consumer cards
+        fixed; caught only because WS5 mounts them.
+      - "user-123" deletion pulled forward from WS7: entry wiring is unusable
+        without a real payer UUID (confirm would 422 every time). The
+        setTimeout mock parse itself stays for WS7 as planned.
+      - Unknown split type now 422s (schema) instead of the hand-rolled 400;
+        one test updated to the new contract.
+      - a11y: SmartInputModal heading became a real Radix DialogTitle (console
+        error found during browser verification).
+      Status: DONE 2026-07-10 (branch ws5/ledger-api, 3 commits)
 
 - [ ] **WS6 — Aggregate Settle-Up + Confirmation Policy** (≈4–5 days)
       Goal: settlement matches human behavior; the friction ceremonies become opt-in.

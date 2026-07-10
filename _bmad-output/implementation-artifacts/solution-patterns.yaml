@@ -7,11 +7,11 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-01-12
+# Last Updated: 2026-07-10 (WS5: FE-005 route un-nesting, FE-006 string amounts, DB-003 alembic reconcile)
 
 metadata:
   version: "1.0"
-  total_patterns: 18
+  total_patterns: 21
   categories:
     - docker
     - database
@@ -129,6 +129,32 @@ database:
     prevention: "Always define both sides of relationships"
     stories_encountered: ["1.3", "2.1"]
     tokens_saved_estimate: "~400 per occurrence"
+
+  - id: "DB-003"
+    title: "Alembic autogenerate flags enum/timestamp/FK diffs on every table"
+    symptoms:
+      - "alembic check reports dozens of modify_type / remove_fk operations"
+      - "Detected type change from VARCHAR to Enum(...) on every status column"
+      - "Detected type change from TIMESTAMP(timezone=True) to DateTime()"
+    root_cause: |
+      SQLModel's default column rendering (naive DateTime, native sa.Enum, no
+      FK ondelete) doesn't match the hand-written migrations. The DB was
+      right; the models were lazy.
+    solution: |
+      Make models render the migrations' exact DDL (WS5, B-H9):
+      1. Timestamps: `Field(..., sa_type=sa.DateTime(timezone=True))`
+      2. Enum columns: `sa_type=sa.Enum(MyEnum, native_enum=False, length=N)`
+         - CRITICAL: SQLAlchemy enum columns store NAMES ("DRAFT"), so never
+           switch the model to sa.String — new rows would store values
+           ("draft") and silently mismatch existing data.
+      3. FK policy: `Field(foreign_key=..., ondelete="CASCADE"/"RESTRICT")`
+      4. Declare DB-only indexes/constraints in __table_args__
+         (ix_user_oauth_provider_id, uq_settlement_claim_split).
+      Verify with `docker compose exec backend alembic check` — it must say
+      "No new upgrade operations detected".
+    prevention: "Run `alembic check` before finishing any story that touches models; new datetime/enum/FK fields must use the sa_type/ondelete forms above"
+    stories_encountered: ["WS5"]
+    tokens_saved_estimate: "~1500 per occurrence"
 
 # =============================================================================
 # IMPORT / CIRCULAR DEPENDENCY PATTERNS
@@ -270,6 +296,42 @@ frontend:
     prevention: "Default to proportional-nums for all UI text. Use tabular-nums only for financial tables/spreadsheets."
     stories_encountered: ["2.5.6"]
     tokens_saved_estimate: "~50 per occurrence"
+
+  - id: "FE-005"
+    title: "TanStack Router child route never renders (blank page, no error)"
+    symptoms:
+      - "New $param route file exists but navigating to it renders the parent page"
+      - "Route appears in routeTree.gen.ts but component never mounts"
+    root_cause: |
+      File-based nesting: `groups.$groupId.tsx` becomes a CHILD of
+      `groups.tsx`, and children render inside the parent's <Outlet/>. If the
+      parent route has no <Outlet/>, the child silently never renders.
+    solution: |
+      Un-nest with a trailing underscore on the parent segment:
+      `groups_.$groupId.tsx` -> path /groups/$groupId as a standalone page
+      (route id "/_layout/groups_/$groupId"). Start the dev server (or vite
+      build) to regenerate routeTree.gen.ts before running typecheck.
+    prevention: "When adding a detail route next to a list route without an Outlet, use the trailing-underscore filename form"
+    stories_encountered: ["WS5"]
+    tokens_saved_estimate: "~400 per occurrence"
+
+  - id: "FE-006"
+    title: "API monetary amounts are strings, not numbers"
+    symptoms:
+      - "`.toFixed is not a function` at runtime"
+      - "TypeScript types say number but responses contain \"50.00\""
+    root_cause: |
+      Pydantic serializes Decimal as a JSON string (deliberately - WS4/M1
+      Decimal-to-the-wire). Hand-written frontend types that declare `number`
+      typecheck fine and explode only at runtime.
+    solution: |
+      Declare every wire amount as `string` (Expense.amount,
+      ExpenseSplit.amount_owed, SettlementClaimPublic.amount, net_balance,
+      total_balance). Convert at the display edge: `Number(x)` for
+      BalanceDisplay, or render the exact string directly ("Rs {amount}").
+    prevention: "Any new response type with money: string, never number. Requests may send numbers."
+    stories_encountered: ["WS4", "WS5"]
+    tokens_saved_estimate: "~300 per occurrence"
 
 # =============================================================================
 # TESTING PATTERNS
