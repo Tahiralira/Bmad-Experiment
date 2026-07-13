@@ -11,6 +11,7 @@ from app.features.expenses.models import (
     ExpenseSplitPublic,
     GroupExpenseItem,
     GroupExpensesPublic,
+    PairwiseBalancesPublic,
 )
 from app.features.groups import service
 from app.features.groups.models import (
@@ -22,6 +23,8 @@ from app.features.groups.models import (
     GroupInvitePublic,
     GroupInviteResponse,
     GroupMembersListResponse,
+    GroupSettingsPublic,
+    GroupSettingsUpdate,
 )
 
 router = APIRouter(prefix="/expense-groups", tags=["groups"])
@@ -100,6 +103,17 @@ def get_group_detail(
 
     group = _get_group_for_member(session, group_id, current_user)
 
+    # Lazy confirmation-policy sweeps (WS6) so the balance reflects expired
+    # objection/dispute windows
+    swept = expense_service.auto_confirm_expired_expenses(
+        session, group_id=group_id
+    )
+    swept += expense_service.auto_confirm_expired_settlement_claims(
+        session, group_id=group_id
+    )
+    if swept:
+        session.commit()
+
     return ExpenseGroupDetail(
         id=group.id,
         name=group.name,
@@ -131,6 +145,11 @@ def list_group_expenses(
 
     _get_group_for_member(session, group_id, current_user)
 
+    # Lazy confirmation-policy sweep (WS6): expenses past their objection
+    # window confirm before the ledger is built
+    if expense_service.auto_confirm_expired_expenses(session, group_id=group_id):
+        session.commit()
+
     rows, count = expense_service.get_group_expenses(
         session, group_id, current_user.id, limit=limit, offset=offset
     )
@@ -148,6 +167,92 @@ def list_group_expenses(
             for expense, split in rows
         ],
         count=count,
+    )
+
+
+# === WS6: Pairwise balances + group settings ===
+
+
+@router.get("/{group_id}/pairwise-balances", response_model=PairwiseBalancesPublic)
+def get_pairwise_balances(
+    group_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> PairwiseBalancesPublic:
+    """
+    Who owes whom, exactly (WS6/S2-F9): per group member, what they owe the
+    current user and what the current user owes them, with the net. The UI
+    prerequisite for "Settle with X". Only group members can view.
+    """
+    from app.features.expenses import service as expense_service
+
+    _get_group_for_member(session, group_id, current_user)
+
+    # Lazy confirmation-policy sweeps (WS6) so balances reflect expired
+    # objection/dispute windows
+    swept = expense_service.auto_confirm_expired_expenses(
+        session, group_id=group_id
+    )
+    swept += expense_service.auto_confirm_expired_settlement_claims(
+        session, group_id=group_id
+    )
+    if swept:
+        session.commit()
+
+    items = expense_service.get_pairwise_balances(
+        session, group_id, current_user.id
+    )
+    return PairwiseBalancesPublic(data=items, count=len(items))
+
+
+@router.get("/{group_id}/settings", response_model=GroupSettingsPublic)
+def get_group_settings(
+    group_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> GroupSettingsPublic:
+    """
+    Get a group's settings (WS6 — strict mode). Only group members can view.
+    """
+    _get_group_for_member(session, group_id, current_user)
+    settings_row = service.get_or_create_group_settings(session, group_id)
+    response = GroupSettingsPublic(
+        group_id=settings_row.group_id, strict_mode=settings_row.strict_mode
+    )
+    session.commit()  # persists the lazily-created defaults row
+    return response
+
+
+@router.patch("/{group_id}/settings", response_model=GroupSettingsPublic)
+def update_group_settings(
+    group_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+    settings_in: GroupSettingsUpdate,
+) -> GroupSettingsPublic:
+    """
+    Update a group's settings (WS6 — strict mode toggle). Owner only.
+
+    strict_mode ON: every participant must explicitly confirm each expense.
+    strict_mode OFF (default): confirmation is opt-in — expenses auto-confirm
+    after the objection window unless someone rejects first.
+    """
+    _get_group_for_member(session, group_id, current_user)
+
+    if not service.is_group_owner(session, group_id, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the group owner can change group settings",
+        )
+
+    settings_row = service.get_or_create_group_settings(session, group_id)
+    settings_row.strict_mode = settings_in.strict_mode
+    session.add(settings_row)
+    session.commit()
+    session.refresh(settings_row)
+
+    return GroupSettingsPublic(
+        group_id=settings_row.group_id, strict_mode=settings_row.strict_mode
     )
 
 

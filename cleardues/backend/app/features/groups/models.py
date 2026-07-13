@@ -160,12 +160,30 @@ INVITE_EXPIRATION_DAYS = 30
 # === AI Personality Settings ===
 
 
+class GroupSettingsPublic(SQLModel):
+    """Response schema for group settings (WS6 — strict mode toggle)."""
+
+    group_id: uuid.UUID
+    strict_mode: bool
+
+
+class GroupSettingsUpdate(SQLModel):
+    """Request schema for updating group settings (owner only)."""
+
+    strict_mode: bool
+
+
 class GroupSettings(SQLModel, table=True):
     """
     AI personality and other group-specific settings.
 
     Stores per-group configuration for AI features,
     such as personality mode for expense parsing commentary.
+
+    strict_mode (WS6): when True, every participant must explicitly confirm
+    an expense (the original Epic 4 workflow). When False (the default),
+    confirmation is opt-in — expenses auto-confirm after
+    EXPENSE_AUTO_CONFIRM_DAYS unless someone rejects first.
     """
 
     __tablename__ = "group_settings"
@@ -175,6 +193,7 @@ class GroupSettings(SQLModel, table=True):
         foreign_key="expense_group.id", unique=True, index=True, ondelete="CASCADE"
     )
     ai_personality: str = Field(default="friendly", index=True)
+    strict_mode: bool = Field(default=False)
     created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
     updated_at: datetime = Field(
         default_factory=utc_now,

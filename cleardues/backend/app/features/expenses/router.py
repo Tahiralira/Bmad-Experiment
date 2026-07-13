@@ -7,6 +7,7 @@ from sqlmodel import select
 from app.api.deps import CurrentUser, SessionDep
 from app.features.expenses import service as expense_service
 from app.features.expenses.models import (
+    AggregateSettleUpRequest,
     AuditLogsPublic,
     Expense,
     ExpenseCreate,
@@ -20,6 +21,7 @@ from app.features.expenses.models import (
     ExpenseRejectResponse,
     PendingConfirmationPublic,
     SettlementClaimPublic,
+    SettlementClaimsPublic,
     PendingSettlementPublic,
     SplitRequest,
 )
@@ -305,6 +307,13 @@ def get_pending_confirmations(
     Returns expenses where user has a split with status 'pending'
     and expense status is 'pending_confirmation'.
     """
+    # Lazy confirmation-policy sweep (WS6): in non-strict groups, expenses
+    # past their objection window auto-confirm before the list is built
+    if expense_service.auto_confirm_expired_expenses(
+        session, participant_user_id=current_user.id
+    ):
+        session.commit()
+
     # Use service layer for data retrieval
     pending_data = expense_service.get_pending_confirmations_for_user(
         session, current_user.id
@@ -332,6 +341,12 @@ def get_pending_settlements(
     Returns expenses where the user has submitted a settlement claim
     that is still awaiting owner confirmation (status: pending).
     """
+    # Lazy dispute-window sweep (WS6): expired claims confirm before listing
+    if expense_service.auto_confirm_expired_settlement_claims(
+        session, involving_user_id=current_user.id
+    ):
+        session.commit()
+
     pending_data = expense_service.get_pending_settlements_for_user(
         session, current_user.id
     )
@@ -362,6 +377,12 @@ def get_pending_claims_for_owner(
     list to one group (WS5/S4-M6 — group screens must not show other
     groups' claims).
     """
+    # Lazy dispute-window sweep (WS6): expired claims confirm before listing
+    if expense_service.auto_confirm_expired_settlement_claims(
+        session, involving_user_id=current_user.id, group_id=group_id
+    ):
+        session.commit()
+
     pending_data = get_claims_awaiting_owner_confirmation(
         session, current_user.id, group_id=group_id
     )
@@ -481,7 +502,7 @@ def settle_expense_endpoint(
 # =============================================================================
 
 
-def _handle_settlement_result(result):
+def _handle_settlement_result(result, session=None):
     """Translate service sentinel values to HTTPException for settlement endpoints."""
     if result is None:
         raise HTTPException(status_code=404, detail="Settlement claim not found")
@@ -494,6 +515,18 @@ def _handle_settlement_result(result):
         raise HTTPException(
             status_code=409,
             detail="Settlement claim has already been processed",
+        )
+    if result == "EXPIRED":
+        # WS6: the dispute window closed — the service confirmed the claim
+        # in this transaction; persist that before signalling the caller
+        if session is not None:
+            session.commit()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The dispute window has closed — this claim was "
+                "auto-confirmed after 72 hours"
+            ),
         )
     return result
 
@@ -538,13 +571,134 @@ def reject_settlement_claim_endpoint(
     Audit log preserves the rejection history.
 
     Error responses: 403 (not expense owner), 404 (claim not found),
-                     409 (claim already processed)
+                     409 (claim already processed, or the 72h dispute
+                     window closed — the claim auto-confirms instead)
     """
     result = _handle_settlement_result(
-        reject_settlement_claim(session, claim_id, current_user.id)
+        reject_settlement_claim(session, claim_id, current_user.id),
+        session=session,
     )
     session.commit()
     return result
+
+
+# =============================================================================
+# WS6: Aggregate settle-up ("Settle with X")
+# =============================================================================
+
+
+@router.post(
+    "/settlement-claims/aggregate",
+    response_model=SettlementClaimPublic,
+    status_code=201,
+)
+def create_aggregate_settlement_endpoint(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    body: AggregateSettleUpRequest,
+) -> SettlementClaimPublic:
+    """
+    Settle with one group member in a single move (WS6/S2 §4).
+
+    Nets every confirmed, unclaimed expense split between the caller and the
+    counterparty in the group into ONE claim ("I paid them the net amount"),
+    awaiting the counterparty's single confirmation. Confirming settles all
+    covered splits atomically. The per-expense settle path remains available
+    for partial payments.
+
+    Error responses: 400 (nothing to settle / wrong direction / bad
+    counterparty), 403 (not a member), 404 (group not found), 409 (a racing
+    settlement covered these expenses first)
+    """
+    group = session.get(ExpenseGroup, body.group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    if not is_group_member(
+        session, group_id=body.group_id, user_id=current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of the group to settle up",
+        )
+
+    if body.counterparty_user_id == current_user.id:
+        raise HTTPException(
+            status_code=400, detail="You cannot settle up with yourself"
+        )
+
+    if not is_group_member(
+        session, group_id=body.group_id, user_id=body.counterparty_user_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="That person is not a member of this group",
+        )
+
+    # Sweep first so expired claims/expenses resolve before netting — all in
+    # this request's single transaction (ARCH-001)
+    expense_service.auto_confirm_expired_expenses(
+        session, group_id=body.group_id
+    )
+    expense_service.auto_confirm_expired_settlement_claims(
+        session, group_id=body.group_id
+    )
+
+    result = expense_service.create_aggregate_settlement(
+        session,
+        group_id=body.group_id,
+        claimant_id=current_user.id,
+        counterparty_id=body.counterparty_user_id,
+    )
+
+    if result == "NOTHING":
+        raise HTTPException(
+            status_code=400,
+            detail="You're all settled with this member — nothing to net",
+        )
+    if result == "WRONG_DIRECTION":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "They owe you overall — settlement flows the other way, "
+                "so they should settle up with you"
+            ),
+        )
+    if result == "CONFLICT":
+        raise HTTPException(
+            status_code=409,
+            detail="A settlement is already in flight for these expenses",
+        )
+
+    session.commit()
+    return result
+
+
+@router.get(
+    "/settlement-claims/aggregate", response_model=SettlementClaimsPublic
+)
+def list_aggregate_settlement_claims(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    group_id: uuid.UUID | None = None,
+) -> SettlementClaimsPublic:
+    """
+    Pending aggregate settle-up claims involving the current user — as
+    claimant (waiting on the counterparty) or as counterparty (awaiting
+    the user's review). Pass ?group_id= to scope to one group.
+    """
+    # Lazy dispute-window sweep (WS6): expired claims confirm before listing
+    if expense_service.auto_confirm_expired_settlement_claims(
+        session, involving_user_id=current_user.id, group_id=group_id
+    ):
+        session.commit()
+
+    claims = expense_service.get_aggregate_claims(
+        session, current_user.id, group_id=group_id
+    )
+    return SettlementClaimsPublic(data=claims, count=len(claims))
 
 
 # =============================================================================

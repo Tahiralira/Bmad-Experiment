@@ -5,7 +5,7 @@
 # router (the request boundary) commits exactly once. See solution-patterns.yaml
 # ARCH-001.
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 
@@ -14,6 +14,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, delete, select
 
 from app.features.expenses.models import (
+    EXPENSE_AUTO_CONFIRM_DAYS,
+    SETTLEMENT_AUTO_CONFIRM_HOURS,
     AuditActionType,
     AuditLog,
     AuditLogPublic,
@@ -24,15 +26,17 @@ from app.features.expenses.models import (
     ExpenseSplitPublic,
     ExpenseStatus,
     ExpenseUpdate,
+    PairwiseBalanceItem,
     PercentageSplitRequest,
     SettlementClaim,
     SettlementClaimPublic,
+    SettlementClaimSplit,
     SettlementClaimStatus,
     SplitStatus,
     UnequalSplitRequest,
 )
 from app.features.auth.models import User
-from app.features.groups.models import GroupMember
+from app.features.groups.models import GroupMember, GroupSettings
 
 
 # =============================================================================
@@ -550,7 +554,9 @@ def check_all_splits_confirmed(session: Session, expense_id: uuid.UUID) -> bool:
     return all(split.status == SplitStatus.CONFIRMED for split in splits)
 
 
-def finalize_expense(session: Session, expense_id: uuid.UUID) -> Expense | None:
+def finalize_expense(
+    session: Session, expense_id: uuid.UUID, *, auto: bool = False
+) -> Expense | None:
     """
     Finalize an expense when all splits are confirmed.
 
@@ -560,6 +566,8 @@ def finalize_expense(session: Session, expense_id: uuid.UUID) -> Expense | None:
     Args:
         session: Database session
         expense_id: Expense ID
+        auto: True when the confirmation came from the non-strict-mode
+            timeout sweep (WS6) rather than every member confirming
 
     Returns:
         Finalized Expense with status CONFIRMED, or None if not all splits confirmed
@@ -586,13 +594,19 @@ def finalize_expense(session: Session, expense_id: uuid.UUID) -> Expense | None:
     # Create notification records for group members
     notify_group_of_finalized_expense(session, expense)
 
+    after_data: dict = {"status": "confirmed"}
+    if auto:
+        after_data["auto_confirmed"] = (
+            f"no objection within {EXPENSE_AUTO_CONFIRM_DAYS} days"
+        )
+
     # Audit entry is atomic with the finalization (same transaction)
     record_audit(
         session,
         expense_id=expense_id,
         user_id=expense.created_by,
         action_type=AuditActionType.CONFIRMED,
-        after_data={"status": "confirmed"},
+        after_data=after_data,
     )
     session.flush()
 
@@ -1056,6 +1070,22 @@ def get_group_audit_logs(
 # =============================================================================
 
 
+def _claim_auto_confirm_at(claim: SettlementClaim) -> datetime | None:
+    """When this pending claim auto-confirms; None once processed (WS6)."""
+    if claim.status != SettlementClaimStatus.PENDING:
+        return None
+    claimed = claim.claimed_at
+    if claimed.tzinfo is None:
+        claimed = claimed.replace(tzinfo=timezone.utc)
+    return claimed + timedelta(hours=SETTLEMENT_AUTO_CONFIRM_HOURS)
+
+
+def _is_claim_expired(claim: SettlementClaim) -> bool:
+    """True when the owner's 72h dispute window has closed (WS6)."""
+    deadline = _claim_auto_confirm_at(claim)
+    return deadline is not None and datetime.now(timezone.utc) >= deadline
+
+
 def _build_claim_public(
     claim: SettlementClaim, session: Session
 ) -> SettlementClaimPublic:
@@ -1063,9 +1093,33 @@ def _build_claim_public(
     Build a SettlementClaimPublic schema with user_name populated.
 
     Shared helper to avoid duplicating field mapping across service functions.
+    For aggregate claims (WS6), also resolves the counterparty name and the
+    covered split/expense counts.
     """
     user = session.get(User, claim.claimant_user_id)
     user_name = user.full_name or user.email if user else None
+
+    counterparty_name = None
+    covered_split_count = 1
+    covered_expense_count = 1
+    if claim.expense_split_id is None:
+        counterparty = session.get(User, claim.counterparty_user_id)
+        counterparty_name = (
+            counterparty.full_name or counterparty.email if counterparty else None
+        )
+        counts = session.exec(
+            select(
+                sa.func.count(),
+                sa.func.count(sa.distinct(ExpenseSplit.expense_id)),
+            )
+            .select_from(SettlementClaimSplit)
+            .join(
+                ExpenseSplit,
+                SettlementClaimSplit.expense_split_id == ExpenseSplit.id,
+            )
+            .where(SettlementClaimSplit.claim_id == claim.id)
+        ).one()
+        covered_split_count, covered_expense_count = counts
 
     return SettlementClaimPublic(
         id=claim.id,
@@ -1078,6 +1132,12 @@ def _build_claim_public(
         rejected_at=claim.rejected_at,
         created_at=claim.created_at,
         user_name=user_name,
+        group_id=claim.group_id,
+        counterparty_user_id=claim.counterparty_user_id,
+        counterparty_name=counterparty_name,
+        covered_split_count=covered_split_count,
+        covered_expense_count=covered_expense_count,
+        auto_confirm_at=_claim_auto_confirm_at(claim),
     )
 
 
@@ -1123,6 +1183,21 @@ def settle_expense_split(
     ).first()
 
     if existing_claim:
+        return "CONFLICT"  # Signal to router for 409
+
+    # WS6: a pending aggregate settle-up may already cover this split
+    covered = session.exec(
+        select(SettlementClaimSplit.id)
+        .join(
+            SettlementClaim,
+            SettlementClaimSplit.claim_id == SettlementClaim.id,
+        )
+        .where(
+            SettlementClaimSplit.expense_split_id == split.id,
+            SettlementClaim.status == SettlementClaimStatus.PENDING,
+        )
+    ).first()
+    if covered:
         return "CONFLICT"  # Signal to router for 409
 
     # Create SettlementClaim with status PENDING
@@ -1179,31 +1254,169 @@ def check_all_splits_settled(session: Session, expense_id: uuid.UUID) -> bool:
     return all(split.status == SplitStatus.SETTLED for split in splits)
 
 
+def _settle_expense_after_covered_splits(
+    session: Session, expense: Expense
+) -> None:
+    """Settle the payer's own split and flip the expense to SETTLED once
+    every split is. Shared tail of both confirmation shapes.
+
+    (The payer has no debt to settle — they're the one receiving payment, so
+    their own split resolves alongside the confirmed one.)
+    """
+    payer_split = session.exec(
+        select(ExpenseSplit)
+        .where(ExpenseSplit.expense_id == expense.id)
+        .where(ExpenseSplit.user_id == expense.payer_id)
+    ).first()
+    if payer_split and payer_split.status != SplitStatus.SETTLED:
+        payer_split.status = SplitStatus.SETTLED
+        session.add(payer_split)
+
+    # The split status changes must be flushed so the check sees them
+    session.flush()
+    if check_all_splits_settled(session, expense.id):
+        expense.status = ExpenseStatus.SETTLED
+        session.add(expense)
+
+
+def _confirm_per_expense_claim(
+    session: Session,
+    claim: SettlementClaim,
+    split: ExpenseSplit,
+    expense: Expense,
+    actor_user_id: uuid.UUID,
+    *,
+    auto: bool = False,
+) -> None:
+    """Core of a per-expense confirmation. Caller holds the claim → split →
+    expense locks and has validated auth + PENDING status."""
+    claim.status = SettlementClaimStatus.CONFIRMED
+    claim.confirmed_at = datetime.now(timezone.utc)
+    split.status = SplitStatus.SETTLED
+    session.add(claim)
+    session.add(split)
+
+    after_data: dict = {"status": "confirmed"}
+    if auto:
+        after_data["auto_confirmed"] = (
+            f"owner silent for {SETTLEMENT_AUTO_CONFIRM_HOURS}h"
+        )
+    record_audit(
+        session,
+        expense_id=expense.id,
+        user_id=actor_user_id,
+        action_type=AuditActionType.SETTLED,
+        before_data={"status": "pending", "amount": str(claim.amount)},
+        after_data=after_data,
+    )
+
+    _settle_expense_after_covered_splits(session, expense)
+    session.flush()
+
+
+def _get_aggregate_covered_rows(
+    session: Session, claim_id: uuid.UUID, *, lock: bool = False
+) -> list[tuple[ExpenseSplit, Expense]]:
+    """The (split, expense) rows an aggregate claim covers, split-id ordered
+    (deterministic lock order — WS4/M8 discipline)."""
+    stmt = (
+        select(ExpenseSplit, Expense)
+        .join(
+            SettlementClaimSplit,
+            SettlementClaimSplit.expense_split_id == ExpenseSplit.id,
+        )
+        .join(Expense, ExpenseSplit.expense_id == Expense.id)
+        .where(SettlementClaimSplit.claim_id == claim_id)
+        .order_by(ExpenseSplit.id)
+    )
+    if lock:
+        stmt = stmt.with_for_update(of=ExpenseSplit)
+    return list(session.exec(stmt).all())
+
+
+def _confirm_aggregate_claim(
+    session: Session,
+    claim: SettlementClaim,
+    actor_user_id: uuid.UUID,
+    *,
+    auto: bool = False,
+) -> None:
+    """Core of an aggregate settle-up confirmation (WS6): every covered split
+    settles atomically, each covered expense gets its audit entry (one
+    fan-out), and expenses flip to SETTLED where complete. Caller holds the
+    claim lock and has validated auth + PENDING status."""
+    claim.status = SettlementClaimStatus.CONFIRMED
+    claim.confirmed_at = datetime.now(timezone.utc)
+    session.add(claim)
+
+    covered = _get_aggregate_covered_rows(session, claim.id, lock=True)
+
+    # Lock the distinct expenses in id order (serializes the all-settled
+    # check against concurrent per-expense confirmations on shared expenses)
+    expense_ids = sorted({expense.id for _, expense in covered})
+    if expense_ids:
+        session.exec(
+            select(Expense)
+            .where(Expense.id.in_(expense_ids))
+            .order_by(Expense.id)
+            .with_for_update()
+        ).all()
+
+    by_expense: dict[uuid.UUID, list[ExpenseSplit]] = {}
+    expense_map: dict[uuid.UUID, Expense] = {}
+    for split, expense in covered:
+        by_expense.setdefault(expense.id, []).append(split)
+        expense_map[expense.id] = expense
+
+    after_data: dict = {
+        "status": "confirmed",
+        "settle_up": True,
+        "net_amount": str(claim.amount),
+    }
+    if auto:
+        after_data["auto_confirmed"] = (
+            f"owner silent for {SETTLEMENT_AUTO_CONFIRM_HOURS}h"
+        )
+
+    for expense_id in expense_ids:
+        expense = expense_map[expense_id]
+        for split in by_expense[expense_id]:
+            split.status = SplitStatus.SETTLED
+            session.add(split)
+        record_audit(
+            session,
+            expense_id=expense_id,
+            user_id=actor_user_id,
+            action_type=AuditActionType.SETTLED,
+            before_data={"status": "pending"},
+            after_data=after_data,
+        )
+        _settle_expense_after_covered_splits(session, expense)
+
+    session.flush()
+
+
 def confirm_settlement_claim(
     session: Session, claim_id: uuid.UUID, current_user_id: uuid.UUID
 ) -> SettlementClaimPublic | str | None:
     """
-    Owner confirms a settlement claim.
+    Owner confirms a settlement claim (per-expense or aggregate — WS6).
 
-    Validates: claim exists, user is expense owner, claim is pending.
-    Updates: claim.status → CONFIRMED, split.status → SETTLED.
-    Checks: if all splits settled → expense.status → SETTLED.
+    Validates: claim exists, user is the claim's owner (expense payer for
+    per-expense claims, counterparty for aggregate ones), claim is pending.
+    Updates: claim → CONFIRMED, covered split(s) → SETTLED; expenses whose
+    splits are all settled → SETTLED.
 
-    Concurrency (WS4/M8): locks claim → split → expense (always in that
-    order, shared with reject, so no deadlock). The claim lock serializes a
-    confirm/reject race on the same claim; the expense lock serializes the
-    "all splits settled?" check so exactly one of two concurrent
-    confirmations flips the expense to SETTLED.
-
-    Args:
-        session: Database session
-        claim_id: Settlement claim ID
-        current_user_id: User ID of the expense owner (payer)
+    Concurrency (WS4/M8): locks claim → split(s) → expense(s), always in
+    that order (shared with reject, so no deadlock). The claim lock
+    serializes a confirm/reject race on the same claim; the expense lock
+    serializes the "all splits settled?" check so exactly one of two
+    concurrent confirmations flips the expense to SETTLED.
 
     Returns:
         SettlementClaimPublic on success,
         None if claim not found,
-        "FORBIDDEN" if not the expense owner,
+        "FORBIDDEN" if not the claim's owner,
         "CONFLICT" if claim already processed
     """
     # 1. Load and lock claim
@@ -1215,7 +1428,17 @@ def confirm_settlement_claim(
     if not claim:
         return None  # Router: 404
 
-    # 2. Load and lock associated split → expense
+    # 2. Aggregate settle-up claims (WS6)
+    if claim.expense_split_id is None:
+        if current_user_id != claim.counterparty_user_id:
+            return "FORBIDDEN"  # Router: 403
+        if claim.status != SettlementClaimStatus.PENDING:
+            return "CONFLICT"  # Router: 409
+        _confirm_aggregate_claim(session, claim, current_user_id)
+        session.refresh(claim)
+        return _build_claim_public(claim, session)
+
+    # 3. Per-expense claims: load and lock associated split → expense
     split = session.exec(
         select(ExpenseSplit)
         .where(ExpenseSplit.id == claim.expense_split_id)
@@ -1230,54 +1453,15 @@ def confirm_settlement_claim(
     if not expense:
         return None  # Router: 404
 
-    # 3. Verify current_user is expense owner (payer)
+    # 4. Verify current_user is expense owner (payer)
     if current_user_id != expense.payer_id:
         return "FORBIDDEN"  # Router: 403
 
-    # 4. Verify claim is still PENDING
+    # 5. Verify claim is still PENDING
     if claim.status != SettlementClaimStatus.PENDING:
         return "CONFLICT"  # Router: 409
 
-    # 5. Update claim: status → CONFIRMED, confirmed_at → now
-    claim.status = SettlementClaimStatus.CONFIRMED
-    claim.confirmed_at = datetime.now(timezone.utc)
-
-    # 6. Update split: status → SETTLED
-    split.status = SplitStatus.SETTLED
-
-    # 6b. Also settle the payer's own split (payer has no debt to settle —
-    #     they're the one receiving payment, so their split is resolved too)
-    payer_split = session.exec(
-        select(ExpenseSplit)
-        .where(ExpenseSplit.expense_id == expense.id)
-        .where(ExpenseSplit.user_id == expense.payer_id)
-    ).first()
-    if payer_split and payer_split.status != SplitStatus.SETTLED:
-        payer_split.status = SplitStatus.SETTLED
-        session.add(payer_split)
-
-    session.add(claim)
-    session.add(split)
-
-    # 7. Record audit (SETTLED, before/after) — atomic with the confirmation
-    record_audit(
-        session,
-        expense_id=expense.id,
-        user_id=current_user_id,
-        action_type=AuditActionType.SETTLED,
-        before_data={"status": "pending", "amount": str(claim.amount)},
-        after_data={"status": "confirmed"},
-    )
-
-    # 8. Check if ALL expense splits are now SETTLED → expense.status = SETTLED
-    # (the split status changes above must be flushed so the check sees them)
-    session.flush()
-    if check_all_splits_settled(session, expense.id):
-        expense.status = ExpenseStatus.SETTLED
-        session.add(expense)
-
-    # 9. Flush + return (router commits the request transaction)
-    session.flush()
+    _confirm_per_expense_claim(session, claim, split, expense, current_user_id)
     session.refresh(claim)
 
     return _build_claim_public(claim, session)
@@ -1287,7 +1471,7 @@ def reject_settlement_claim(
     session: Session, claim_id: uuid.UUID, current_user_id: uuid.UUID
 ) -> SettlementClaimPublic | str | None:
     """
-    Owner rejects a settlement claim.
+    Owner rejects a settlement claim (per-expense or aggregate — WS6).
 
     Same auth/status guards as confirm.
     Updates (WS4/H4): claim.status → REJECTED and rejected_at → now, so the
@@ -1295,16 +1479,22 @@ def reject_settlement_claim(
     Deletes: the claim record (allows claimant to re-claim — the audit log
     preserves the rejection history).
 
+    Dispute window (WS6): once the claim's 72h auto-confirm deadline has
+    passed it is no longer rejectable — the claim is confirmed on the spot
+    (the lazy sweep just hadn't run yet) and "EXPIRED" is returned.
+
     Args:
         session: Database session
         claim_id: Settlement claim ID
-        current_user_id: User ID of the expense owner (payer)
+        current_user_id: User ID of the claim's owner (expense payer for
+            per-expense claims, counterparty for aggregate ones)
 
     Returns:
         SettlementClaimPublic with status "rejected" and rejected_at set,
         None if claim not found,
-        "FORBIDDEN" if not the expense owner,
-        "CONFLICT" if claim already processed
+        "FORBIDDEN" if not the claim's owner,
+        "CONFLICT" if claim already processed,
+        "EXPIRED" if the dispute window closed (claim is now confirmed)
     """
     # 1. Load and lock claim (serializes a confirm/reject race — WS4/M8)
     claim = session.exec(
@@ -1315,43 +1505,81 @@ def reject_settlement_claim(
     if not claim:
         return None  # Router: 404
 
-    # 2. Load associated split → expense
-    split = session.get(ExpenseSplit, claim.expense_split_id)
-    if not split:
-        return None  # Router: 404
+    is_aggregate = claim.expense_split_id is None
 
-    expense = session.get(Expense, split.expense_id)
-    if not expense:
-        return None  # Router: 404
+    # 2. Resolve the claim's owner; per-expense claims also need their
+    #    split → expense for the rejection audit entry
+    split: ExpenseSplit | None = None
+    expense: Expense | None = None
+    if is_aggregate:
+        owner_id = claim.counterparty_user_id
+    else:
+        split = session.get(ExpenseSplit, claim.expense_split_id)
+        if not split:
+            return None  # Router: 404
+        expense = session.get(Expense, split.expense_id)
+        if not expense:
+            return None  # Router: 404
+        owner_id = expense.payer_id
 
-    # 3. Verify current_user is expense owner (payer)
-    if current_user_id != expense.payer_id:
+    # 3. Verify current_user owns the claim
+    if current_user_id != owner_id:
         return "FORBIDDEN"  # Router: 403
 
     # 4. Verify claim is still PENDING
     if claim.status != SettlementClaimStatus.PENDING:
         return "CONFLICT"  # Router: 409
 
-    # 5. Record the rejection on the claim, THEN build the response from the
+    # 5. Dispute window closed → the claim auto-confirms instead (WS6)
+    if _is_claim_expired(claim):
+        if is_aggregate:
+            _confirm_aggregate_claim(session, claim, owner_id, auto=True)
+        else:
+            _confirm_per_expense_claim(
+                session, claim, split, expense, owner_id, auto=True
+            )
+        return "EXPIRED"  # Router: 409 with the dispute-window detail
+
+    # 6. Record the rejection on the claim, THEN build the response from the
     #    truthful state (WS4/H4)
     claim.status = SettlementClaimStatus.REJECTED
     claim.rejected_at = datetime.now(timezone.utc)
     response = _build_claim_public(claim, session)
 
-    # 6. Record audit (REJECTED, before/after) — atomic with the rejection
-    record_audit(
-        session,
-        expense_id=expense.id,
-        user_id=current_user_id,
-        action_type=AuditActionType.REJECTED,
-        before_data={"status": "pending"},
-        after_data={"status": "rejected"},
-    )
+    # 7. Record audit (REJECTED, before/after) — atomic with the rejection.
+    #    Aggregate claims fan out one entry per covered expense.
+    if is_aggregate:
+        covered = _get_aggregate_covered_rows(session, claim.id)
+        for expense_id in {exp.id for _, exp in covered}:
+            record_audit(
+                session,
+                expense_id=expense_id,
+                user_id=current_user_id,
+                action_type=AuditActionType.REJECTED,
+                before_data={"status": "pending"},
+                after_data={"status": "rejected", "settle_up": True},
+            )
+        # Link rows go with the claim (DB cascade would too; explicit keeps
+        # the ORM's view consistent)
+        session.exec(
+            delete(SettlementClaimSplit).where(
+                SettlementClaimSplit.claim_id == claim.id
+            )
+        )
+    else:
+        record_audit(
+            session,
+            expense_id=expense.id,
+            user_id=current_user_id,
+            action_type=AuditActionType.REJECTED,
+            before_data={"status": "pending"},
+            after_data={"status": "rejected"},
+        )
 
-    # 7. Delete the claim so the user can re-claim
+    # 8. Delete the claim so the user can re-claim
     session.delete(claim)
 
-    # 8. Flush + return (router commits the request transaction)
+    # 9. Flush + return (router commits the request transaction)
     session.flush()
 
     return response
@@ -1454,3 +1682,438 @@ def get_pending_settlements_for_user(
         })
 
     return result
+
+
+# =============================================================================
+# WS6: Aggregate settle-up + pairwise balances + confirmation policy
+# =============================================================================
+
+
+def get_pairwise_balances(
+    session: Session, group_id: uuid.UUID, user_id: uuid.UUID
+) -> list[PairwiseBalanceItem]:
+    """
+    'Who owes whom exactly' for one group member (S2-F9): per counterparty,
+    what they owe the caller and what the caller owes them, across confirmed
+    splits on confirmed expenses (same semantics as the net balance —
+    settled splits drop out; splits with in-flight claims still count until
+    the claim is confirmed).
+    """
+    from sqlalchemy import case, literal
+
+    counterparty_id = case(
+        (Expense.payer_id == user_id, ExpenseSplit.user_id),
+        else_=Expense.payer_id,
+    ).label("counterparty_id")
+
+    rows = session.exec(
+        select(
+            counterparty_id,
+            sa.func.sum(
+                case(
+                    (Expense.payer_id == user_id, ExpenseSplit.amount_owed),
+                    else_=literal(0),
+                )
+            ).label("they_owe_you"),
+            sa.func.sum(
+                case(
+                    (ExpenseSplit.user_id == user_id, ExpenseSplit.amount_owed),
+                    else_=literal(0),
+                )
+            ).label("you_owe_them"),
+        )
+        .select_from(Expense)
+        .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
+        .where(
+            Expense.group_id == group_id,
+            Expense.status == ExpenseStatus.CONFIRMED,
+            ExpenseSplit.status == SplitStatus.CONFIRMED,
+            sa.or_(
+                sa.and_(
+                    Expense.payer_id == user_id,
+                    ExpenseSplit.user_id != user_id,
+                ),
+                sa.and_(
+                    ExpenseSplit.user_id == user_id,
+                    Expense.payer_id != user_id,
+                ),
+            ),
+        )
+        .group_by("counterparty_id")
+    ).all()
+
+    ids = [row.counterparty_id for row in rows]
+    user_map: dict[uuid.UUID, User] = {}
+    if ids:
+        users = session.exec(select(User).where(User.id.in_(ids))).all()
+        user_map = {u.id: u for u in users}
+
+    zero = Decimal("0.00")
+    items = []
+    for row in rows:
+        they_owe_you = (row.they_owe_you or zero).quantize(Decimal("0.01"))
+        you_owe_them = (row.you_owe_them or zero).quantize(Decimal("0.01"))
+        user = user_map.get(row.counterparty_id)
+        items.append(
+            PairwiseBalanceItem(
+                user_id=row.counterparty_id,
+                user_name=(user.full_name or user.email) if user else None,
+                they_owe_you=they_owe_you,
+                you_owe_them=you_owe_them,
+                net=they_owe_you - you_owe_them,
+            )
+        )
+
+    items.sort(key=lambda i: (i.user_name or ""))
+    return items
+
+
+def _get_pair_coverable_splits(
+    session: Session,
+    *,
+    group_id: uuid.UUID,
+    user_a: uuid.UUID,
+    user_b: uuid.UUID,
+    lock: bool = False,
+) -> list[tuple[ExpenseSplit, Expense]]:
+    """
+    The splits an aggregate settle-up between a pair would cover: confirmed
+    splits on confirmed expenses in the group, in EITHER direction (A owes B
+    or B owes A), that aren't already claimed — per-expense or by another
+    pending aggregate claim.
+
+    Ordered by split id so concurrent settle-ups acquire row locks in the
+    same order (WS4/M8 discipline).
+    """
+    pending_per_expense = (
+        select(SettlementClaim.expense_split_id)
+        .where(
+            SettlementClaim.status == SettlementClaimStatus.PENDING,
+            SettlementClaim.expense_split_id.is_not(None),
+        )
+    )
+    pending_aggregate = (
+        select(SettlementClaimSplit.expense_split_id)
+        .join(
+            SettlementClaim,
+            SettlementClaimSplit.claim_id == SettlementClaim.id,
+        )
+        .where(SettlementClaim.status == SettlementClaimStatus.PENDING)
+    )
+
+    stmt = (
+        select(ExpenseSplit, Expense)
+        .join(Expense, ExpenseSplit.expense_id == Expense.id)
+        .where(
+            Expense.group_id == group_id,
+            Expense.status == ExpenseStatus.CONFIRMED,
+            ExpenseSplit.status == SplitStatus.CONFIRMED,
+            sa.or_(
+                sa.and_(
+                    Expense.payer_id == user_a, ExpenseSplit.user_id == user_b
+                ),
+                sa.and_(
+                    Expense.payer_id == user_b, ExpenseSplit.user_id == user_a
+                ),
+            ),
+            ExpenseSplit.id.not_in(pending_per_expense),
+            ExpenseSplit.id.not_in(pending_aggregate),
+        )
+        .order_by(ExpenseSplit.id)
+    )
+    if lock:
+        stmt = stmt.with_for_update(of=ExpenseSplit)
+    return list(session.exec(stmt).all())
+
+
+def create_aggregate_settlement(
+    session: Session,
+    *,
+    group_id: uuid.UUID,
+    claimant_id: uuid.UUID,
+    counterparty_id: uuid.UUID,
+) -> SettlementClaimPublic | str:
+    """
+    "Settle with X" (WS6/S2 §4): net every confirmed, unclaimed split between
+    the pair in this group into ONE claim awaiting ONE confirmation. The net
+    can be 0.00 when the pair is exactly even (the claim still clears both
+    directions). Covered splits settle atomically when the counterparty
+    confirms; the per-expense path remains for partial payments.
+
+    Returns:
+        SettlementClaimPublic on success,
+        "NOTHING" when there is nothing to settle between the pair,
+        "WRONG_DIRECTION" when the counterparty owes the claimant overall,
+        "CONFLICT" when a racing claim covered one of the splits first
+    """
+    covered = _get_pair_coverable_splits(
+        session,
+        group_id=group_id,
+        user_a=claimant_id,
+        user_b=counterparty_id,
+        lock=True,
+    )
+    if not covered:
+        return "NOTHING"
+
+    zero = Decimal("0.00")
+    claimant_owes = sum(
+        (split.amount_owed for split, _ in covered
+         if split.user_id == claimant_id),
+        zero,
+    )
+    counterparty_owes = sum(
+        (split.amount_owed for split, _ in covered
+         if split.user_id == counterparty_id),
+        zero,
+    )
+    net = (claimant_owes - counterparty_owes).quantize(Decimal("0.01"))
+    if net < zero:
+        return "WRONG_DIRECTION"
+
+    claim = SettlementClaim(
+        expense_split_id=None,
+        claimant_user_id=claimant_id,
+        group_id=group_id,
+        counterparty_user_id=counterparty_id,
+        amount=net,
+        status=SettlementClaimStatus.PENDING,
+        claimed_at=datetime.now(timezone.utc),
+    )
+    session.add(claim)
+    session.flush()
+
+    for split, _ in covered:
+        session.add(
+            SettlementClaimSplit(
+                claim_id=claim.id,
+                expense_split_id=split.id,
+                amount=split.amount_owed,
+            )
+        )
+    try:
+        session.flush()
+    except IntegrityError:
+        # Unique coverage guard: a racing claim covered one of these splits
+        session.rollback()
+        return "CONFLICT"
+
+    # Audit fan-out: one entry per covered expense, atomic with the claim
+    for expense_id in {expense.id for _, expense in covered}:
+        record_audit(
+            session,
+            expense_id=expense_id,
+            user_id=claimant_id,
+            action_type=AuditActionType.SETTLED,
+            after_data={
+                "status": "pending",
+                "settle_up": True,
+                "net_amount": str(net),
+            },
+        )
+    session.flush()
+    session.refresh(claim)
+
+    return _build_claim_public(claim, session)
+
+
+def get_aggregate_claims(
+    session: Session, user_id: uuid.UUID, group_id: uuid.UUID | None = None
+) -> list[SettlementClaimPublic]:
+    """Pending aggregate settle-up claims involving the user (either side),
+    optionally scoped to one group."""
+    stmt = (
+        select(SettlementClaim)
+        .where(
+            SettlementClaim.expense_split_id.is_(None),
+            SettlementClaim.status == SettlementClaimStatus.PENDING,
+            sa.or_(
+                SettlementClaim.claimant_user_id == user_id,
+                SettlementClaim.counterparty_user_id == user_id,
+            ),
+        )
+        .order_by(SettlementClaim.claimed_at.asc())
+    )
+    if group_id is not None:
+        stmt = stmt.where(SettlementClaim.group_id == group_id)
+    claims = session.exec(stmt).all()
+    return [_build_claim_public(claim, session) for claim in claims]
+
+
+def auto_confirm_expired_settlement_claims(
+    session: Session,
+    *,
+    group_id: uuid.UUID | None = None,
+    involving_user_id: uuid.UUID | None = None,
+) -> int:
+    """
+    Lazy sweep (WS6): confirm pending settlement claims whose 72h dispute
+    window has closed. Runs on the read/write paths that surface claims
+    until WS12's scheduler owns it. Filters keep the sweep scoped to what
+    the caller is about to see.
+
+    Returns the number of claims confirmed (caller commits when > 0).
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        hours=SETTLEMENT_AUTO_CONFIRM_HOURS
+    )
+
+    per_expense_stmt = (
+        select(SettlementClaim.id)
+        .join(ExpenseSplit, SettlementClaim.expense_split_id == ExpenseSplit.id)
+        .join(Expense, ExpenseSplit.expense_id == Expense.id)
+        .where(
+            SettlementClaim.status == SettlementClaimStatus.PENDING,
+            SettlementClaim.claimed_at <= cutoff,
+        )
+    )
+    aggregate_stmt = select(SettlementClaim.id).where(
+        SettlementClaim.expense_split_id.is_(None),
+        SettlementClaim.status == SettlementClaimStatus.PENDING,
+        SettlementClaim.claimed_at <= cutoff,
+    )
+    if group_id is not None:
+        per_expense_stmt = per_expense_stmt.where(Expense.group_id == group_id)
+        aggregate_stmt = aggregate_stmt.where(
+            SettlementClaim.group_id == group_id
+        )
+    if involving_user_id is not None:
+        per_expense_stmt = per_expense_stmt.where(
+            sa.or_(
+                SettlementClaim.claimant_user_id == involving_user_id,
+                Expense.payer_id == involving_user_id,
+            )
+        )
+        aggregate_stmt = aggregate_stmt.where(
+            sa.or_(
+                SettlementClaim.claimant_user_id == involving_user_id,
+                SettlementClaim.counterparty_user_id == involving_user_id,
+            )
+        )
+
+    claim_ids = list(session.exec(per_expense_stmt).all()) + list(
+        session.exec(aggregate_stmt).all()
+    )
+
+    confirmed = 0
+    for claim_id in claim_ids:
+        # Re-load under lock: a concurrent request may have processed it
+        claim = session.exec(
+            select(SettlementClaim)
+            .where(SettlementClaim.id == claim_id)
+            .with_for_update()
+        ).first()
+        if (
+            not claim
+            or claim.status != SettlementClaimStatus.PENDING
+            or not _is_claim_expired(claim)
+        ):
+            continue
+
+        if claim.expense_split_id is None:
+            _confirm_aggregate_claim(
+                session, claim, claim.counterparty_user_id, auto=True
+            )
+            confirmed += 1
+            continue
+
+        split = session.exec(
+            select(ExpenseSplit)
+            .where(ExpenseSplit.id == claim.expense_split_id)
+            .with_for_update()
+        ).first()
+        if not split:
+            continue
+        expense = session.exec(
+            select(Expense)
+            .where(Expense.id == split.expense_id)
+            .with_for_update()
+        ).first()
+        if not expense:
+            continue
+        _confirm_per_expense_claim(
+            session, claim, split, expense, expense.payer_id, auto=True
+        )
+        confirmed += 1
+
+    return confirmed
+
+
+def auto_confirm_expired_expenses(
+    session: Session,
+    *,
+    group_id: uuid.UUID | None = None,
+    participant_user_id: uuid.UUID | None = None,
+) -> int:
+    """
+    Lazy sweep (WS6 strict mode): in NON-strict groups (the default),
+    expenses still awaiting confirmation auto-confirm once their splits are
+    EXPENSE_AUTO_CONFIRM_DAYS old — silence is consent; members keep the
+    whole window to confirm early or reject. Strict-mode groups are
+    untouched (the original Epic 4 workflow). Re-splitting recreates the
+    splits, which restarts the window.
+
+    Returns the number of expenses confirmed (caller commits when > 0).
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        days=EXPENSE_AUTO_CONFIRM_DAYS
+    )
+
+    stmt = (
+        select(Expense.id)
+        .join(
+            GroupSettings,
+            GroupSettings.group_id == Expense.group_id,
+            isouter=True,
+        )
+        .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
+        .where(
+            Expense.status == ExpenseStatus.PENDING_CONFIRMATION,
+            sa.or_(
+                GroupSettings.strict_mode.is_(None),
+                GroupSettings.strict_mode == False,  # noqa: E712
+            ),
+        )
+        .group_by(Expense.id)
+        .having(sa.func.max(ExpenseSplit.created_at) <= cutoff)
+    )
+    if group_id is not None:
+        stmt = stmt.where(Expense.group_id == group_id)
+    if participant_user_id is not None:
+        # Alias: ExpenseSplit is already in the outer FROM, so a bare EXISTS
+        # subquery would auto-correlate itself away
+        participant_split = sa.orm.aliased(ExpenseSplit)
+        participant = select(participant_split.id).where(
+            participant_split.expense_id == Expense.id,
+            participant_split.user_id == participant_user_id,
+        )
+        stmt = stmt.where(participant.exists())
+
+    expense_ids = session.exec(stmt).all()
+
+    confirmed = 0
+    now = datetime.now(timezone.utc)
+    for expense_id in expense_ids:
+        # Lock the expense row: serializes against concurrent confirm/reject
+        expense = session.exec(
+            select(Expense).where(Expense.id == expense_id).with_for_update()
+        ).first()
+        if not expense or expense.status != ExpenseStatus.PENDING_CONFIRMATION:
+            continue
+
+        splits = session.exec(
+            select(ExpenseSplit).where(
+                ExpenseSplit.expense_id == expense_id,
+                ExpenseSplit.status == SplitStatus.PENDING,
+            )
+        ).all()
+        for split in splits:
+            split.status = SplitStatus.CONFIRMED
+            split.confirmed_at = now
+            session.add(split)
+        session.flush()
+
+        if finalize_expense(session, expense_id, auto=True):
+            confirmed += 1
+
+    return confirmed

@@ -13,6 +13,7 @@ from app.features.groups.models import (
     GroupInvite,
     GroupMember,
     GroupMemberPublic,
+    GroupSettings,
     GROUP_ROLE_MEMBER,
     GROUP_ROLE_OWNER,
 )
@@ -246,6 +247,25 @@ def get_group_invites(session: Session, group_id: uuid.UUID) -> list[GroupInvite
         .order_by(GroupInvite.created_at.desc())
     )
     return list(session.exec(statement).all())
+
+
+def get_or_create_group_settings(
+    session: Session, group_id: uuid.UUID
+) -> GroupSettings:
+    """
+    Load a group's settings row, creating the defaults lazily (WS6).
+
+    Flushes only — the router commits the request transaction (ARCH-001).
+    """
+    settings = session.exec(
+        select(GroupSettings).where(GroupSettings.group_id == group_id)
+    ).first()
+    if not settings:
+        settings = GroupSettings(group_id=group_id)
+        session.add(settings)
+        session.flush()
+        session.refresh(settings)
+    return settings
 
 
 def get_group_members_with_user_data(

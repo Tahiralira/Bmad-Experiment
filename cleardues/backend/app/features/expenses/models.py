@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum as PyEnum
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, Optional, Union
 
 import sqlalchemy as sa
 from pydantic import Field as PydanticField
@@ -43,6 +43,16 @@ class SettlementClaimStatus(str, PyEnum):
     PENDING = "pending"  # User marked as paid, awaiting owner confirmation
     CONFIRMED = "confirmed"  # Owner confirmed the payment
     REJECTED = "rejected"  # Owner rejected the claim
+
+
+# WS6 confirmation policy: a pending settlement claim auto-confirms after this
+# many hours — the owner's dispute window. Silence is consent (S1-W3).
+SETTLEMENT_AUTO_CONFIRM_HOURS = 72
+
+# WS6 strict mode: in non-strict groups (the default), an expense awaiting
+# confirmation auto-confirms this many days after its splits were assigned.
+# Members can still confirm early or reject within the window.
+EXPENSE_AUTO_CONFIRM_DAYS = 3
 
 
 # === Request/Response Schemas ===
@@ -220,10 +230,14 @@ class ExpenseRejectResponse(SQLModel):
 
 
 class SettlementClaimPublic(SQLModel):
-    """Response schema for a settlement claim."""
+    """Response schema for a settlement claim.
+
+    Covers both shapes (WS6): per-expense claims (expense_split_id set) and
+    aggregate settle-up claims (expense_split_id None; group_id,
+    counterparty_user_id and covered counts set instead)."""
 
     id: uuid.UUID
-    expense_split_id: uuid.UUID
+    expense_split_id: uuid.UUID | None = None
     claimant_user_id: uuid.UUID
     amount: Decimal
     status: SettlementClaimStatus
@@ -232,6 +246,50 @@ class SettlementClaimPublic(SQLModel):
     rejected_at: datetime | None = None
     created_at: datetime
     user_name: str | None = None
+    # WS6 — aggregate settle-up fields
+    group_id: uuid.UUID | None = None
+    counterparty_user_id: uuid.UUID | None = None
+    counterparty_name: str | None = None
+    covered_split_count: int = 1
+    covered_expense_count: int = 1
+    # When this pending claim auto-confirms (claimed_at + 72h); None once
+    # processed. The owner's dispute window ends here.
+    auto_confirm_at: datetime | None = None
+
+
+class SettlementClaimsPublic(SQLModel):
+    """Response schema for a list of settlement claims (WS6 aggregate list)."""
+
+    data: list[SettlementClaimPublic]
+    count: int
+
+
+class AggregateSettleUpRequest(SQLModel):
+    """Request schema for 'Settle with X' (WS6): net all confirmed expenses
+    between the caller and one counterparty in a group into a single claim."""
+
+    group_id: uuid.UUID
+    counterparty_user_id: uuid.UUID
+
+
+class PairwiseBalanceItem(SQLModel):
+    """One counterparty row of the 'who owes whom exactly' view (S2-F9).
+
+    Amounts are Decimal on the wire. net = they_owe_you - you_owe_them:
+    positive means the counterparty owes the caller."""
+
+    user_id: uuid.UUID
+    user_name: str | None = None
+    they_owe_you: Decimal
+    you_owe_them: Decimal
+    net: Decimal
+
+
+class PairwiseBalancesPublic(SQLModel):
+    """Response schema for a group's pairwise balances."""
+
+    data: list[PairwiseBalanceItem]
+    count: int
 
 
 class PendingSettlementPublic(SQLModel):
@@ -393,12 +451,19 @@ class AuditLog(SQLModel, table=True):
 
 class SettlementClaim(SQLModel, table=True):
     """
-    Settlement claim for an expense split.
+    Settlement claim — two shapes since WS6:
 
-    Created when a user marks their split as "settled" (paid).
-    The expense owner confirms or rejects the claim in Story 5.2.
+    - Per-expense (Story 5.1): expense_split_id set; group_id and
+      counterparty_user_id NULL. One claim per split (unique constraint).
+      Kept as the partial-payment path.
+    - Aggregate settle-up (WS6): expense_split_id NULL; group_id and
+      counterparty_user_id set; the covered splits live in
+      SettlementClaimSplit. amount is the NET across both directions of the
+      pair, so it can be 0.00 when the pair is exactly even.
 
-    Unique constraint on expense_split_id ensures one claim per split.
+    The expense owner (per-expense) or the counterparty (aggregate) confirms
+    or rejects; pending claims auto-confirm after
+    SETTLEMENT_AUTO_CONFIRM_HOURS (the dispute window).
     """
 
     __tablename__ = "settlement_claim"
@@ -407,11 +472,19 @@ class SettlementClaim(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    expense_split_id: uuid.UUID = Field(
-        foreign_key="expense_split.id", nullable=False, unique=True, index=True
+    expense_split_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="expense_split.id", nullable=True, unique=True, index=True
     )
     claimant_user_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, index=True
+    )
+    # WS6 — set only on aggregate claims
+    group_id: uuid.UUID | None = Field(
+        default=None, foreign_key="expense_group.id", nullable=True, index=True
+    )
+    counterparty_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True, index=True
     )
     amount: Decimal = Field(max_digits=10, decimal_places=2)
     status: SettlementClaimStatus = Field(
@@ -424,7 +497,37 @@ class SettlementClaim(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
 
     # Relationships
-    split: ExpenseSplit = Relationship()
+    split: Optional[ExpenseSplit] = Relationship()
     claimant: User = Relationship(
         sa_relationship_kwargs={"foreign_keys": "settlement_claim.c.claimant_user_id"}
     )
+
+
+class SettlementClaimSplit(SQLModel, table=True):
+    """
+    Link row: one confirmed split covered by an aggregate settlement claim.
+
+    The unique constraint on expense_split_id is the concurrency guard: two
+    racing settle-ups over the same pair cannot both cover a split (the loser
+    gets IntegrityError → 409). Rows are deleted with their claim on
+    rejection; confirmed claims keep them as the netting record.
+    """
+
+    __tablename__ = "settlement_claim_split"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "expense_split_id", name="uq_settlement_claim_split_split"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    claim_id: uuid.UUID = Field(
+        foreign_key="settlement_claim.id", nullable=False, index=True,
+        ondelete="CASCADE",
+    )
+    expense_split_id: uuid.UUID = Field(
+        foreign_key="expense_split.id", nullable=False
+    )
+    # The split's amount_owed at claim time (audit/netting record)
+    amount: Decimal = Field(max_digits=10, decimal_places=2)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
