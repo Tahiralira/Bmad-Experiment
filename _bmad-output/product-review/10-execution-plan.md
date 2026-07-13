@@ -329,24 +329,65 @@ this file breaks that merge into runnable units.
         error found during browser verification).
       Status: DONE 2026-07-10 (branch ws5/ledger-api, 3 commits)
 
-- [ ] **WS6 — Aggregate Settle-Up + Confirmation Policy** (≈4–5 days)
+- [x] **WS6 — Aggregate Settle-Up + Confirmation Policy** (≈4–5 days; done in 1 session)
       Goal: settlement matches human behavior; the friction ceremonies become opt-in.
       Depends on: WS5.
       Inputs: 02 §4, 09 §5 (strict mode, auto-confirm), 03 (settlement schema notes).
       Tasks:
-      - [ ] Aggregate settle-up: "Settle with X" nets all confirmed expenses between
+      - [x] Aggregate settle-up: "Settle with X" nets all confirmed expenses between
             the pair in a group → one claim → one confirmation → covered splits
             settled atomically, one audit fan-out; per-expense path kept for partial
-            payments
-      - [ ] Settlement auto-confirm after 72h with owner dispute window
-      - [ ] Per-group "strict mode" toggle: expense confirmation becomes opt-in;
-            default OFF with auto-confirm after N days (existing workflow = strict
-            mode implementation)
-      - [ ] Pairwise balance detail view ("who owes whom exactly" — S2-F9, the UI
-            prerequisite for settle-up)
-      Verification: 12-expense scenario settles in one claim + one confirm; tests
-      cover netting math.
-      Status: pending
+            payments. Schema: SettlementClaim.expense_split_id nullable + group_id/
+            counterparty_user_id; settlement_claim_split link table (UNIQUE per
+            split = the two-claims-race guard → 409). Netting covers BOTH
+            directions (net can be 0.00 — clears an even pair); wrong-direction
+            claims 400 ("they should settle up with you"). Per-expense settle on a
+            covered split 409s and vice versa (excluded from netting). Migration
+            d5e6f7a8b9c0; `alembic check` still clean; downgrade exercised.
+      - [x] Settlement auto-confirm after 72h with owner dispute window — lazy
+            sweeps on every claim-surfacing read/write path (commit-if-swept;
+            WS12's scheduler takes this over); reject after the window closes
+            confirms instead + 409 with the dispute-window message;
+            auto_confirm_at on the wire so the UI shows "auto-confirms in 2 days".
+      - [x] Per-group "strict mode" toggle (GroupSettings.strict_mode, default
+            OFF): confirmation opt-in — expenses auto-confirm 3 days after splits
+            are assigned (EXPENSE_AUTO_CONFIRM_DAYS; re-split restarts the
+            window); members can still confirm early or reject (reject → DRAFT
+            unchanged). GET/PATCH /expense-groups/{id}/settings (PATCH
+            owner-only, 403 for members); toggle UI in the group screen with
+            member-visible read-only state.
+      - [x] Pairwise balance detail view (S2-F9): GET /expense-groups/{id}/
+            pairwise-balances (per-counterparty they_owe_you / you_owe_them /
+            net, Decimal strings); "Between you and…" section on the group
+            screen with two-step inline "Settle up" confirm (manual only),
+            in-flight "Settle-up pending" state, AggregateClaimCard for both
+            roles (reviewer Confirm/Reject + countdown; claimant waiting).
+      Verification: DONE 2026-07-13 —
+      **12-expense scenario proven in the browser end-to-end:** Sam owed Alex
+      across 12 confirmed expenses (Rs 600) → pairwise row "You owe Rs 600.00"
+      → ONE settle-up (claim covers 12 splits/12 expenses) → Alex sees ONE
+      review card → ONE confirm → all 12 expenses SETTLED, balances Rs 0 both
+      sides, 12-entry audit fan-out in the activity feed. Strict-mode toggle
+      exercised live (PATCH 200, copy flips). Same scenario + netting math,
+      dispute window, and strict mode covered by tests.
+      **Gates:** backend **232 passed / 2 skipped** (was 210; 22 new tests in
+      test_settle_up.py); frontend typecheck green, **98 passed / 2 skipped**
+      (10 new), build green — main chunk **172.9 kB gz** (budget ≤250);
+      `uv lock --check` passes.
+      **Screenshots:** 8 shots (pairwise-owes, settle-up pending, review card,
+      all-settled × 375px/1280px × light/dark) →
+      `_bmad-output/implementation-artifacts/ws6-screenshots/`.
+      Notes / deviations:
+      - "Ready to settle" per-expense cards now hide while a settle-up with
+        that payer is pending (Mark Paid would always 409 — don't offer it).
+      - Confirm/reject endpoints are shared between claim shapes; the service
+        branches on expense_split_id IS NULL. Lock order claim → splits (id
+        order) → expenses (id order) keeps WS4/M8 discipline.
+      - Balances still count splits with in-flight claims as owed (consistent
+        with the dashboard); only confirmation settles them.
+      - No Celery yet by design: auto-confirm is lazy-swept on reads. The
+        sweep commits on read endpoints only when it changed rows.
+      Status: DONE 2026-07-13 (branch ws6/settle-up)
 
 - [ ] **WS7 — Real AI Path (hosted-first)** (≈1 week)
       Goal: FR1 exists for the first time; the premium gate exists.

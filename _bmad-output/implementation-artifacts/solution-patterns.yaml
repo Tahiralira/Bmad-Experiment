@@ -7,11 +7,11 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-07-10 (WS5: FE-005 route un-nesting, FE-006 string amounts, DB-003 alembic reconcile)
+# Last Updated: 2026-07-13 (WS6: BE-003 EXISTS auto-correlation, ARCH-001 lazy-sweep addendum)
 
 metadata:
   version: "1.0"
-  total_patterns: 21
+  total_patterns: 22
   categories:
     - docker
     - database
@@ -431,6 +431,32 @@ testing:
     stories_encountered: ["5.2"]
     tokens_saved_estimate: "~600 per occurrence"
 
+  - id: "BE-003"
+    title: "EXISTS subquery auto-correlates itself away when its table is already in the outer FROM"
+    symptoms:
+      - "sqlalchemy.exc.InvalidRequestError: Select statement returned no FROM clauses due to auto-correlation"
+      - "Query with .exists() works alone but fails once the outer query joins the same table"
+    root_cause: >
+      SQLAlchemy auto-correlates subqueries: any table that also appears in
+      the enclosing query is removed from the subquery's FROM list. If the
+      subquery selects FROM only that table, nothing is left (WS6: an
+      ExpenseSplit EXISTS filter inside a query that already joined
+      ExpenseSplit).
+    solution: |
+      Alias the table inside the subquery so it is a distinct FROM element:
+      ```python
+      participant_split = sa.orm.aliased(ExpenseSplit)
+      stmt = stmt.where(
+          select(participant_split.id).where(
+              participant_split.expense_id == Expense.id,
+              participant_split.user_id == user_id,
+          ).exists()
+      )
+      ```
+    prevention: "Any correlated subquery over a table the outer query already uses must alias that table"
+    stories_encountered: ["WS6"]
+    tokens_saved_estimate: "~400 per occurrence"
+
 # =============================================================================
 # ARCHITECTURE PATTERNS
 # =============================================================================
@@ -465,11 +491,16 @@ architecture:
          ```
       4. Row locks (select(...).with_for_update()) acquired inside the
          service hold until that single commit — check-then-act stays safe.
+      WS6 addendum — lazy sweeps on read endpoints: confirmation-policy
+      sweeps (auto_confirm_expired_*) run at the top of claim/expense
+      read endpoints and commit ONLY when they changed rows
+      (`if swept: session.commit()`), then the normal read proceeds. This
+      is the stand-in until WS12's scheduler owns expiry.
     prevention: >
       Never commit in a service function. If you see session.commit() below
       the router layer, it's a bug. New mutating endpoints copy the
       router-commits-once shape above.
-    stories_encountered: ["WS4"]
+    stories_encountered: ["WS4", "WS6"]
     tokens_saved_estimate: "~800 per occurrence"
 
 # =============================================================================

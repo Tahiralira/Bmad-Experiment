@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-10 (WS5 done — ledger API + group screen: core loop operable end-to-end)
+**Last Updated:** 2026-07-13 (WS6 done — aggregate settle-up + confirmation policy: settlement matches human behavior)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -82,8 +82,34 @@
 > data mismatch). (4) SQLModel `Field(sa_type=..., ondelete=...)` is enough
 > to make autogenerate agree with hand-written migrations — no sa_column
 > rewrites needed.
-> **Next: WS6 (Aggregate Settle-Up + Confirmation Policy) — or WS7/WS8 per
-> dependency map (WS5 unblocked both).**
+> WS6 (Aggregate Settle-Up + Confirmation Policy) DONE 2026-07-13 on branch
+> `ws6/settle-up`: **settlement now matches human behavior** — the
+> 12-expense scenario settles in ONE claim + ONE confirmation (proven in the
+> browser: Rs 600 across 12 expenses → one settle-up → one confirm → all
+> settled, balances 0, 12-entry audit fan-out). (a) Aggregate claims:
+> SettlementClaim.expense_split_id nullable + group_id/counterparty_user_id;
+> settlement_claim_split link table whose UNIQUE(expense_split_id) is the
+> concurrency guard (racing claims → 409); netting covers both directions,
+> net 0.00 clears an even pair, wrong direction 400; per-expense path kept
+> for partial payments (overlap 409s both ways). (b) 72h auto-confirm with
+> owner dispute window — LAZY SWEEPS on claim-surfacing reads (no Celery
+> until WS12), commit-only-if-swept; reject after the window confirms
+> instead + 409; auto_confirm_at on the wire. (c) strict_mode on
+> GroupSettings (default OFF): expenses auto-confirm 3 days after splits
+> assigned unless someone objects; strict = the original Epic 4 ceremony;
+> owner-only PATCH /expense-groups/{id}/settings. (d) Pairwise balances
+> (S2-F9): GET .../pairwise-balances + "Between you and…" section, two-step
+> inline Settle up, AggregateClaimCard both roles. Backend **232 passed / 2
+> skipped**; frontend **98 passed / 2 skipped**, main chunk 172.9 kB gz.
+> Key learnings: (1) an EXISTS subquery whose table is already in the outer
+> FROM auto-correlates itself away (InvalidRequestError: "no FROM clauses")
+> — alias the inner table (`sa.orm.aliased`); (2) shared confirm/reject
+> endpoints branching on a nullable discriminator column beat parallel
+> aggregate endpoints — the frontend reuses the same mutations; (3) UI must
+> not offer actions the backend will always 409 (Mark Paid hidden while a
+> settle-up covers the expense).
+> **Next: WS7 (real AI path) — WS8 (template purge + security) can follow;
+> both unblocked.**
 
 ---
 
@@ -201,9 +227,13 @@ cd cleardues/frontend && npm run build
   ws5/ledger-api; read endpoints, typed split schemas, alembic check clean,
   /groups/$groupId ledger screen, expense entry wired — core loop operable
   end-to-end in the browser; backend 210 passed, frontend 88 passed)
-- WS6 Aggregate Settle-Up + Confirmation Policy ← **NEXT** (settle-with-X
-  netting, 72h auto-confirm, per-group strict mode, pairwise balance view);
-  WS7 (real AI) is also unblocked and can run in parallel
+- WS6 Aggregate Settle-Up + Confirmation Policy ← **DONE** ✓ (2026-07-13;
+  branch ws6/settle-up; settle-with-X netting one-claim-one-confirm, 72h
+  auto-confirm dispute window via lazy sweeps, strict-mode toggle, pairwise
+  balance view; backend 232 passed, frontend 98 passed)
+- WS7 Real AI Path ← **NEXT** (hosted-first, B-C1 SSE test, quota,
+  encryption key, manual confirm); WS8 (template purge + security) also
+  unblocked
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

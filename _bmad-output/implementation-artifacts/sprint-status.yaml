@@ -119,6 +119,12 @@ development_status:
   epic-4-retrospective: done
 
   # Epic 5: Settlement & Payment Tracking (3 stories)
+  # WS6 (2026-07-13, branch ws6/settle-up) extended settlement beyond the
+  # epic's per-expense scope: aggregate settle-up ("Settle with X" nets a
+  # pair's confirmed expenses into ONE claim + ONE confirmation), 72h claim
+  # auto-confirm with owner dispute window, per-group strict-mode toggle
+  # (non-strict expenses auto-confirm after a 3-day objection window), and
+  # the pairwise "who owes whom" view. See 10-execution-plan.md WS6.
   epic-5: in-progress
   5-1-mark-debt-as-settled-claim-payment: done
   5-2-owner-confirms-settlement: done

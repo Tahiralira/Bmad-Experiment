@@ -93,23 +93,6 @@ export function GroupLedgerScreen({ groupId }: Props) {
 
   const items = ledger?.data ?? []
 
-  // Confirmed expenses where the user still owes their share and hasn't
-  // already claimed payment — the "Mark Paid" path (Story 5.1)
-  const claimedExpenseIds = new Set(
-    (myPendingClaims ?? []).map((item) => item.expense.id),
-  )
-  const readyToSettle = items.filter(
-    ({ expense, my_split }) =>
-      expense.status === "confirmed" &&
-      my_split?.status === "confirmed" &&
-      expense.payer_id !== user?.id &&
-      !claimedExpenseIds.has(expense.id),
-  )
-
-  const myGroupClaims = (myPendingClaims ?? []).filter(
-    (item) => item.expense.group_id === groupId,
-  )
-
   // Aggregate settle-ups (WS6), split by which side of them the user is on
   const settleUps = aggregateClaims?.data ?? []
   const settleUpsForMyReview = settleUps.filter(
@@ -122,6 +105,26 @@ export function GroupLedgerScreen({ groupId }: Props) {
     mySettleUps
       .map((claim) => claim.counterparty_user_id)
       .filter((id): id is string => id !== null),
+  )
+
+  // Confirmed expenses where the user still owes their share and hasn't
+  // already claimed payment — the "Mark Paid" path (Story 5.1). Expenses
+  // covered by a pending settle-up with their payer are spoken for (WS6):
+  // Mark Paid would always 409, so don't offer it.
+  const claimedExpenseIds = new Set(
+    (myPendingClaims ?? []).map((item) => item.expense.id),
+  )
+  const readyToSettle = items.filter(
+    ({ expense, my_split }) =>
+      expense.status === "confirmed" &&
+      my_split?.status === "confirmed" &&
+      expense.payer_id !== user?.id &&
+      !claimedExpenseIds.has(expense.id) &&
+      !pendingCounterpartyIds.has(expense.payer_id),
+  )
+
+  const myGroupClaims = (myPendingClaims ?? []).filter(
+    (item) => item.expense.group_id === groupId,
   )
 
   const isOwner = (membersData?.members ?? []).some(
