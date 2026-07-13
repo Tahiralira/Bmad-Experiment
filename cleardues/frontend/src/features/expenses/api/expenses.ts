@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { request as __request } from "@/client/core/request"
 import { OpenAPI } from "@/shared/api"
 import type {
+  AggregateSettleUpRequest,
   Expense,
   ExpenseCreate,
   ExpenseUpdate,
@@ -18,6 +19,7 @@ import type {
   PendingConfirmation,
   AuditLogsResponse,
   SettlementClaimPublic,
+  SettlementClaimsResponse,
   PendingSettlement,
 } from "../types"
 
@@ -420,6 +422,9 @@ export function useConfirmSettlement() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["pending-settlements"] })
       queryClient.invalidateQueries({ queryKey: ["pending-settlement-claims"] })
+      queryClient.invalidateQueries({ queryKey: ["aggregate-claims"] })
+      queryClient.invalidateQueries({ queryKey: ["pairwise-balances"] })
+      queryClient.invalidateQueries({ queryKey: ["groups"] })
       queryClient.invalidateQueries({ queryKey: ["audit-log"] })
       queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
       queryClient.invalidateQueries({ queryKey: ["group-balances"] })
@@ -453,6 +458,9 @@ export function useRejectSettlement() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["pending-settlements"] })
       queryClient.invalidateQueries({ queryKey: ["pending-settlement-claims"] })
+      queryClient.invalidateQueries({ queryKey: ["aggregate-claims"] })
+      queryClient.invalidateQueries({ queryKey: ["pairwise-balances"] })
+      queryClient.invalidateQueries({ queryKey: ["groups"] })
       queryClient.invalidateQueries({ queryKey: ["audit-log"] })
       queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
       queryClient.invalidateQueries({ queryKey: ["group-balances"] })
@@ -486,5 +494,76 @@ export function usePendingSettlementClaims(groupId?: string) {
   return useQuery<PendingSettlement[], Error>({
     queryKey: ["pending-settlement-claims", groupId ?? "all"],
     queryFn: () => getPendingSettlementClaims(groupId),
+  })
+}
+
+// =============================================================================
+// WS6: Aggregate settle-up ("Settle with X")
+// =============================================================================
+
+async function getAggregateClaims(
+  groupId?: string,
+): Promise<SettlementClaimsResponse> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: "/api/v1/expenses/settlement-claims/aggregate",
+    query: groupId ? { group_id: groupId } : undefined,
+    errors: {
+      401: "Unauthorized",
+    },
+  })
+}
+
+/**
+ * Pending aggregate settle-up claims involving the current user — as
+ * claimant (waiting on the counterparty) or counterparty (awaiting review).
+ */
+export function useAggregateClaims(groupId?: string) {
+  return useQuery<SettlementClaimsResponse, Error>({
+    queryKey: ["aggregate-claims", groupId ?? "all"],
+    queryFn: () => getAggregateClaims(groupId),
+  })
+}
+
+async function createAggregateSettlement(
+  data: AggregateSettleUpRequest,
+): Promise<SettlementClaimPublic> {
+  return __request(OpenAPI, {
+    method: "POST",
+    url: "/api/v1/expenses/settlement-claims/aggregate",
+    body: data,
+    errors: {
+      400: "Nothing to settle with this member",
+      403: "You are not a member of this group",
+      404: "Group not found",
+      409: "A settlement is already in flight for these expenses",
+    },
+  })
+}
+
+/**
+ * "Settle with X" (WS6): nets every confirmed expense between the caller
+ * and the counterparty into ONE claim awaiting ONE confirmation.
+ */
+export function useSettleUp() {
+  const queryClient = useQueryClient()
+
+  return useMutation<SettlementClaimPublic, Error, AggregateSettleUpRequest>({
+    mutationFn: createAggregateSettlement,
+    onSuccess: (claim) => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["aggregate-claims"] })
+      queryClient.invalidateQueries({ queryKey: ["pairwise-balances"] })
+      queryClient.invalidateQueries({ queryKey: ["audit-log"] })
+      queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
+      const who = claim.counterparty_name ?? "them"
+      toast.success(
+        `Settle-up recorded — Rs ${claim.amount} to ${who}, awaiting their confirmation`,
+      )
+    },
+    onError: (error) => {
+      toast.error(`Couldn't settle up: ${error.message}`)
+    },
   })
 }

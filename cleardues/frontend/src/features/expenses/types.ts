@@ -258,7 +258,8 @@ export type SettlementClaimStatus = "pending" | "confirmed" | "rejected"
 
 export interface SettlementClaimPublic {
   id: string
-  expense_split_id: string
+  /** null for aggregate settle-up claims (WS6) */
+  expense_split_id: string | null
   claimant_user_id: string
   /** Decimal on the wire (WS4/M1): exact string like "50.00" */
   amount: string
@@ -268,6 +269,27 @@ export interface SettlementClaimPublic {
   rejected_at: string | null
   created_at: string
   user_name: string | null
+  // WS6 — set on aggregate settle-up claims
+  group_id: string | null
+  counterparty_user_id: string | null
+  counterparty_name: string | null
+  covered_split_count: number
+  covered_expense_count: number
+  /** When this pending claim auto-confirms (end of the 72h dispute
+   * window); null once processed */
+  auto_confirm_at: string | null
+}
+
+export interface SettlementClaimsResponse {
+  data: SettlementClaimPublic[]
+  count: number
+}
+
+/** "Settle with X" (WS6): net all confirmed expenses between the caller and
+ * one counterparty in a group into a single claim. */
+export interface AggregateSettleUpRequest {
+  group_id: string
+  counterparty_user_id: string
 }
 
 export interface PendingSettlement {

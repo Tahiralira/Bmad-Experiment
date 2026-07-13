@@ -16,6 +16,9 @@ interface SettlementClaimsListProps {
    * unscoped list attributed other groups' claims to whatever group screen
    * it was mounted on) */
   groupId?: string
+  /** Skip the "All settled" empty state — used when the surrounding section
+   * already shows other pending items (WS6 aggregate settle-ups) */
+  suppressEmptyState?: boolean
 }
 
 // =============================================================================
@@ -37,6 +40,7 @@ interface SettlementClaimsListProps {
 export function SettlementClaimsList({
   className,
   groupId,
+  suppressEmptyState = false,
 }: SettlementClaimsListProps) {
   const { data: pendingClaims, isLoading, error } =
     usePendingSettlementClaims(groupId)
@@ -54,6 +58,9 @@ export function SettlementClaimsList({
   }
 
   if (!pendingClaims?.length) {
+    if (suppressEmptyState) {
+      return null
+    }
     return (
       <CelebratoryEmptyState />
     )

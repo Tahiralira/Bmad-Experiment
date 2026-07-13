@@ -46,6 +46,32 @@ export interface GroupInviteResponse {
   message: string
 }
 
+// === Pairwise Balances (WS6/S2-F9) ===
+
+/**
+ * One counterparty row of "who owes whom exactly". Decimal strings on the
+ * wire; net = they_owe_you - you_owe_them (positive = they owe the user).
+ */
+export interface PairwiseBalanceItem {
+  user_id: string
+  user_name: string | null
+  they_owe_you: string
+  you_owe_them: string
+  net: string
+}
+
+export interface PairwiseBalancesResponse {
+  data: PairwiseBalanceItem[]
+  count: number
+}
+
+// === Group Settings (WS6 — strict mode) ===
+
+export interface GroupSettings {
+  group_id: string
+  strict_mode: boolean
+}
+
 // === Member Types ===
 
 export interface GroupMemberPublic {

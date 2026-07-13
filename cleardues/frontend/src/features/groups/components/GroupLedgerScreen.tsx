@@ -5,12 +5,14 @@ import { useRef, useState } from "react"
 import { BalanceDisplay } from "@/components/ui/balance-display"
 import { Button } from "@/components/ui/button"
 import {
+  useAggregateClaims,
   useExpenseAuditLog,
   useExpenseSplits,
   useGroupExpenses,
   usePendingSettlements,
 } from "@/features/expenses/api/expenses"
 import { ActivityFeed } from "@/features/expenses/components/ActivityFeed"
+import { AggregateClaimCard } from "@/features/expenses/components/AggregateClaimCard"
 import { AuditLogList } from "@/features/expenses/components/AuditLogList"
 import { ConfirmedExpenseCard } from "@/features/expenses/components/ConfirmedExpenseCard"
 import { PendingSettlementsList } from "@/features/expenses/components/PendingSettlementsList"
@@ -21,7 +23,9 @@ import { useAuth } from "@/hooks/useAuth"
 
 import { useGroupDetail, useGroupMembers } from "../api/groups"
 import { GenerateInviteButton } from "./GenerateInviteButton"
+import { GroupSettingsPanel } from "./GroupSettingsPanel"
 import { MembersList } from "./MembersList"
+import { PairwiseBalances } from "./PairwiseBalances"
 
 interface Props {
   groupId: string
@@ -43,6 +47,7 @@ export function GroupLedgerScreen({ groupId }: Props) {
   const { data: ledger } = useGroupExpenses(groupId)
   const { data: myPendingClaims } = usePendingSettlements()
   const { data: membersData } = useGroupMembers(groupId)
+  const { data: aggregateClaims } = useAggregateClaims(groupId)
 
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
   const addExpenseRef = useRef<HTMLButtonElement>(
@@ -105,6 +110,24 @@ export function GroupLedgerScreen({ groupId }: Props) {
     (item) => item.expense.group_id === groupId,
   )
 
+  // Aggregate settle-ups (WS6), split by which side of them the user is on
+  const settleUps = aggregateClaims?.data ?? []
+  const settleUpsForMyReview = settleUps.filter(
+    (claim) => claim.counterparty_user_id === user?.id,
+  )
+  const mySettleUps = settleUps.filter(
+    (claim) => claim.claimant_user_id === user?.id,
+  )
+  const pendingCounterpartyIds = new Set(
+    mySettleUps
+      .map((claim) => claim.counterparty_user_id)
+      .filter((id): id is string => id !== null),
+  )
+
+  const isOwner = (membersData?.members ?? []).some(
+    (m) => m.user_id === user?.id && m.role === "owner",
+  )
+
   const netBalance = Number(group.net_balance)
 
   return (
@@ -151,6 +174,17 @@ export function GroupLedgerScreen({ groupId }: Props) {
         </div>
       </header>
 
+      {/* Who owes whom exactly (WS6/S2-F9) — the settle-up entry point */}
+      <section aria-label="Balances with members" className="space-y-2">
+        <h2 className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted">
+          Between you and…
+        </h2>
+        <PairwiseBalances
+          groupId={groupId}
+          pendingCounterpartyIds={pendingCounterpartyIds}
+        />
+      </section>
+
       {/* Ready to settle — confirmed shares the user can mark as paid */}
       {readyToSettle.length > 0 && (
         <section aria-label="Ready to settle" className="space-y-3">
@@ -194,27 +228,59 @@ export function GroupLedgerScreen({ groupId }: Props) {
         )}
       </section>
 
-      {/* Claims awaiting the owner's confirmation (Story 5.2) */}
+      {/* Claims awaiting the owner's confirmation (Story 5.2 + WS6
+          settle-ups) */}
       <section aria-label="Settlement claims" className="space-y-3">
         <h2 className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted">
           Awaiting your review
         </h2>
-        <SettlementClaimsList groupId={groupId} />
+        {settleUpsForMyReview.map((claim) => (
+          <AggregateClaimCard
+            key={claim.id}
+            claim={claim}
+            currentUserId={user?.id ?? ""}
+          />
+        ))}
+        <SettlementClaimsList
+          groupId={groupId}
+          suppressEmptyState={settleUpsForMyReview.length > 0}
+        />
       </section>
 
-      {/* The user's own claims awaiting the owner (Story 5.1) */}
-      {myGroupClaims.length > 0 && (
+      {/* The user's own claims awaiting the owner (Story 5.1 + WS6
+          settle-ups) */}
+      {(myGroupClaims.length > 0 || mySettleUps.length > 0) && (
         <section aria-label="Your pending claims" className="space-y-3">
           <h2 className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted">
             Your pending claims
           </h2>
-          <PendingSettlementsList groupId={groupId} />
+          {mySettleUps.map((claim) => (
+            <AggregateClaimCard
+              key={claim.id}
+              claim={claim}
+              currentUserId={user?.id ?? ""}
+            />
+          ))}
+          {myGroupClaims.length > 0 && (
+            <PendingSettlementsList groupId={groupId} />
+          )}
         </section>
       )}
 
       {/* Members */}
       <section aria-label="Members" className="border-t border-border pt-4">
         <MembersList groupId={groupId} />
+      </section>
+
+      {/* Group settings (WS6 — the confirmation social contract) */}
+      <section
+        aria-label="Group settings"
+        className="border-t border-border pt-4"
+      >
+        <h2 className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted mb-2">
+          Settings
+        </h2>
+        <GroupSettingsPanel groupId={groupId} isOwner={isOwner} />
       </section>
 
       {/* Group-level activity feed (was on the old detail panel) */}

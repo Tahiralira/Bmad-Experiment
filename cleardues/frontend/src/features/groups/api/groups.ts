@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
 import { GroupsService, OpenAPI } from "@/shared/api"
@@ -8,6 +9,8 @@ import type {
   ExpenseGroupDetail,
   GroupInviteResponse,
   GroupMembersListResponse,
+  GroupSettings,
+  PairwiseBalancesResponse,
 } from "../types"
 
 export function useCreateGroup() {
@@ -49,6 +52,87 @@ export function useGroupDetail(groupId: string) {
     queryKey: ["groups", groupId, "detail"],
     queryFn: () => getGroupDetail(groupId),
     enabled: !!groupId,
+  })
+}
+
+// === Pairwise Balances (WS6/S2-F9) ===
+
+async function getPairwiseBalances(
+  groupId: string,
+): Promise<PairwiseBalancesResponse> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expense-groups/${groupId}/pairwise-balances`,
+    errors: {
+      401: "Unauthorized",
+      403: "You are not a member of this group",
+      404: "Group not found",
+    },
+  })
+}
+
+export function usePairwiseBalances(groupId: string) {
+  return useQuery<PairwiseBalancesResponse, Error>({
+    queryKey: ["pairwise-balances", groupId],
+    queryFn: () => getPairwiseBalances(groupId),
+    enabled: !!groupId,
+  })
+}
+
+// === Group Settings (WS6 — strict mode) ===
+
+async function getGroupSettings(groupId: string): Promise<GroupSettings> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expense-groups/${groupId}/settings`,
+    errors: {
+      401: "Unauthorized",
+      403: "You are not a member of this group",
+      404: "Group not found",
+    },
+  })
+}
+
+export function useGroupSettings(groupId: string) {
+  return useQuery<GroupSettings, Error>({
+    queryKey: ["groups", groupId, "settings"],
+    queryFn: () => getGroupSettings(groupId),
+    enabled: !!groupId,
+  })
+}
+
+async function updateGroupSettings(
+  groupId: string,
+  data: { strict_mode: boolean },
+): Promise<GroupSettings> {
+  return __request(OpenAPI, {
+    method: "PATCH",
+    url: `/api/v1/expense-groups/${groupId}/settings`,
+    body: data,
+    errors: {
+      401: "Unauthorized",
+      403: "Only the group owner can change group settings",
+      404: "Group not found",
+    },
+  })
+}
+
+export function useUpdateGroupSettings(groupId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<GroupSettings, Error, { strict_mode: boolean }>({
+    mutationFn: (data) => updateGroupSettings(groupId, data),
+    onSuccess: (settings) => {
+      queryClient.setQueryData(["groups", groupId, "settings"], settings)
+      toast.success(
+        settings.strict_mode
+          ? "Strict mode on — every share needs an explicit confirmation"
+          : "Strict mode off — expenses confirm quietly unless someone objects",
+      )
+    },
+    onError: (error) => {
+      toast.error(`Couldn't update settings: ${error.message}`)
+    },
   })
 }
 
