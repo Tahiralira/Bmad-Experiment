@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-13 (WS6 done — aggregate settle-up + confirmation policy: settlement matches human behavior)
+**Last Updated:** 2026-07-14 (WS7 done — the real AI path: FR1 exists for the first time)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -108,8 +108,41 @@
 > aggregate endpoints — the frontend reuses the same mutations; (3) UI must
 > not offer actions the backend will always 409 (Mark Paid hidden while a
 > settle-up covers the expense).
-> **Next: WS7 (real AI path) — WS8 (template purge + security) can follow;
-> both unblocked.**
+> WS7 (Real AI Path, hosted-first) DONE 2026-07-14 on branch `ws7/real-ai`:
+> **FR1 exists for the first time** — the review had found every layer of
+> the AI slice was fiction (B-C1 broken endpoint, S4-C2 setTimeout mock,
+> B-C2 no key write path). Proven in the browser: type "Paid 450 for
+> biryani lunch with the team" → SSE commentary streams → editable preview
+> → manual Confirm → Rs 450.00 in the ledger. (a) Hosted-first: server
+> `GEMINI_API_KEY`, resolution `user_key if set else server_key`, `ai_usage`
+> per-user monthly quota (20 free, FOR UPDATE + unique-race fallback, 429),
+> BYOK demoted to PUT/DELETE /users/me/api-key (encrypted, quota-exempt,
+> no onboarding UI). (b) B-C5/S5-C1: dedicated `ENCRYPTION_KEY` (fail-fast
+> outside local) + HKDF-SHA256 domain-separated derivation; false AES-256
+> claims corrected; no key migration needed (nothing ever stored). (c)
+> B-H8: async `client.aio` + 30s timeout, JSON response_mime_type,
+> word-level commentary chunks, honest contract — pre-stream = real
+> 403/422/429/503, mid-stream = error events on 200. (d) Frontend: real
+> fetch-stream SSE client + AbortController, mock deleted, error/
+> low-confidence mediator states; auto-confirm machinery deleted (UX-H6
+> — manual confirm only). (e) ai_personality write path via WS6's settings
+> PATCH, capped professional/friendly/funny (f3-pbs REMOVED, UX-H5);
+> "Mediator tone" select in group settings (Epic 8.1 shipped early).
+> Backend **259 passed / 0 skipped** (first zero-skip run); frontend **86
+> passed**, main chunk 172.5 kB gz. Screenshots →
+> `_bmad-output/implementation-artifacts/ws7-screenshots/`.
+> Key learnings: (1) SSE endpoints must do auth/quota/settings work (and
+> COMMIT) before returning StreamingResponse — the generator runs after
+> dependency teardown, so snapshot ORM attrs first (expired instance access
+> mid-stream = phantom generic error); (2) real HTTP status codes
+> pre-stream beat error-events-on-200 for everything that can fail before
+> headers are sent; (3) EventSource can't POST — read response.body with a
+> buffered frame parser; (4) to E2E without a vendor key, point the SDK at
+> a wire-compatible local fake via `GEMINI_BASE_URL` (google-genai
+> HttpOptions.base_url). Going live with real Gemini = set GEMINI_API_KEY
+> in .env, nothing else.
+> **Next: WS8 (template purge + security hardening) — unblocked. WS9
+> (deploy) depends on it.**
 
 ---
 
@@ -145,7 +178,7 @@ Before starting ANY work, check these logs:
 - **Modal Animations**: When animating from a specific element position, use `originX` and `originY` to set transform origin
 - **Focus Return Timing**: Focus return timeout must be longer than exit animation duration (e.g., 250ms > 200ms animation)
 - **Typography for Numbers**: SUPERSEDED by design v2 — `tabular-nums` is MANDATORY on every monetary amount and digit column (ux-design-spec-v2.md §3.3). The old proportional-nums guidance is void.
-- **Streaming Text Effect**: Use `setInterval` with character-by-character string concatenation for natural reading pace (30-50ms per character). Cleanup intervals on unmount to prevent memory leaks. Use refs to avoid stale closure issues in setInterval callbacks.
+- **Streaming AI text (WS7)**: SUPERSEDED — the setInterval typing effect (and its useStreamingText hook) was deleted with the AI mock. Real commentary streams over SSE; consume with a fetch body reader (EventSource can't POST) and append chunks to state. Abort in-flight parses with AbortController on modal close/unmount.
 - **Feature-Specific Components**: Create feature-specific versions of generic UI components (e.g., `/features/expenses/components/SmartInputModal` vs `/components/ui/smart-input-modal`) for better separation of concerns.
 
 ### Testing
@@ -231,9 +264,15 @@ cd cleardues/frontend && npm run build
   branch ws6/settle-up; settle-with-X netting one-claim-one-confirm, 72h
   auto-confirm dispute window via lazy sweeps, strict-mode toggle, pairwise
   balance view; backend 232 passed, frontend 98 passed)
-- WS7 Real AI Path ← **NEXT** (hosted-first, B-C1 SSE test, quota,
-  encryption key, manual confirm); WS8 (template purge + security) also
-  unblocked
+- WS7 Real AI Path ← **DONE** ✓ (2026-07-14; branch ws7/real-ai;
+  hosted-first Gemini + 20-parse monthly quota, BYOK demoted, dedicated
+  ENCRYPTION_KEY + HKDF, async client + honest SSE contract, real frontend
+  SSE consumption, manual-confirm only, Mediator-tone setting capped at
+  funny; backend 259 passed / 0 skipped, frontend 86 passed. Live Gemini
+  needs only GEMINI_API_KEY in .env)
+- WS8 Template Purge & Security Hardening ← **NEXT** (delete password-auth
+  stack + /items + /admin, OAuth token delivery, rate limiting, headers,
+  dep bumps)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

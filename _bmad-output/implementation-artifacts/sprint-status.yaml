@@ -95,6 +95,12 @@ development_status:
   #   - Create Deferred Task Tracking Standard (this week)
   # Total prep effort: ~15-17 hours before Epic 4 can start
   #
+  # WS7 (2026-07-14, branch ws7/real-ai): story 3.3 became REAL for the
+  # first time — the review found it was a Potemkin slice (B-C1 swapped-args
+  # membership check + frontend setTimeout mock + no key write path). Now:
+  # hosted-first Gemini (server key + 20 free parses/user/month, BYOK
+  # escape hatch), async client + timeout, honest SSE contract, real
+  # frontend SSE consumption, manual confirm only. See 10-execution-plan.md WS7.
   epic-3: done
   3-1-create-expense-model-and-basic-entry: done
   3-2-natural-language-input-interface: done
@@ -150,8 +156,11 @@ development_status:
   epic-7-retrospective: optional
 
   # Epic 8: UX Polish & Advanced Features (4 stories) - Post-MVP
+  # 8-1: WS7 shipped the core of this early — owner-only "Mediator tone"
+  # selector in group settings, capped at professional/friendly/funny
+  # (f3-pbs roast mode REMOVED per UX-H5; it will not return).
   epic-8: backlog
-  8-1-ai-personality-selector: backlog
+  8-1-ai-personality-selector: done
   8-2-desktop-power-features: backlog
   8-3-animation-polish: backlog
   8-4-accessibility-audit-and-fixes: backlog

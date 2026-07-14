@@ -389,29 +389,82 @@ this file breaks that merge into runnable units.
         sweep commits on read endpoints only when it changed rows.
       Status: DONE 2026-07-13 (branch ws6/settle-up)
 
-- [ ] **WS7 — Real AI Path (hosted-first)** (≈1 week)
+- [x] **WS7 — Real AI Path (hosted-first)** (≈1 week; done in 1 session)
       Goal: FR1 exists for the first time; the premium gate exists.
       Depends on: WS5 (expense create path works).
       Inputs: 03 (C1, C2, C5, H8), 04 (C2), 01 §6 (hosted-AI model), 05 (C1 key notes).
       Tasks:
-      - [ ] Fix the swapped-args membership check (B-C1) + a real SSE-payload test
-      - [ ] Hosted AI default: server-side key, resolution order
-            `user_key if set else server_key`; per-user monthly quota counter
-            (~20 free parses)
-      - [ ] BYOK demoted: `PUT/DELETE /users/me/api-key` as a hidden advanced
-            setting; never in onboarding
-      - [ ] Dedicated `ENCRYPTION_KEY` (fail-fast outside local) + proper derivation;
-            fix the false "AES-256" claim; migration plan for existing keys (B-C5)
-      - [ ] Async Gemini client + timeout; chunk commentary by word/sentence; honest
-            SSE error contract (B-H8)
-      - [ ] Frontend: real SSE/EventSource consumption, auth-context user ID, delete
-            the setTimeout mock and `"user-123"` (S4-C2); error/low-confidence states
-      - [ ] Manual confirm only (no 3s auto-confirm — UX-H6)
-      - [ ] Group `ai_personality` write path (owner-only PATCH) capped at Funny, or
-            explicitly defer with the default documented (B-C2, UX-H5)
-      Verification: type a real sentence → parsed by a real model → confirmed →
-      correct expense in the ledger. Demo recording/screenshots.
-      Status: pending
+      - [x] B-C1 was already mechanically fixed by WS4's keyword-only helper;
+            this session added what actually catches it: a real SSE-payload
+            test with real group membership asserting the `complete` event
+            (amount/description/payer/confidence). The 2 skipped tests are
+            rewritten; test_ai_parsing.py 10 → 37 tests, 0 skips.
+      - [x] Hosted AI default: `GEMINI_API_KEY` setting; resolution
+            `user_key if set else server_key` (neither → 503); per-user
+            monthly quota — `ai_usage` table (UNIQUE user+period, FOR UPDATE
+            + IntegrityError-race fallback), `AI_FREE_MONTHLY_PARSES=20`,
+            429 with mediator-voice copy when exhausted; BYOK exempt
+      - [x] BYOK demoted: `PUT/DELETE /users/me/api-key` (min-length 422,
+            encrypted at rest, never returned, quota bypass); no onboarding
+            UI by design — endpoints only until a power-user settings screen
+      - [x] Dedicated `ENCRYPTION_KEY` (fail-fast validator outside local;
+            "changethis" guard) + HKDF-SHA256 derivation with domain-separated
+            salt/info; false "AES-256" claims corrected (Fernet = AES-128-CBC
+            + HMAC); migration plan: NONE NEEDED — B-C2 proved no write path
+            ever shipped, so no real key was ever stored under the old scheme
+      - [x] Async Gemini (`client.aio`) + `AI_PARSE_TIMEOUT_SECONDS=30` via
+            HttpOptions; `response_mime_type: application/json` on the parse
+            call (+ code-fence tolerance); commentary chunked by WORD; honest
+            error contract: pre-stream failures are real HTTP codes
+            (403/422/429/503), mid-stream failures are `error` events on a
+            200 — docstring now says exactly that (B-H8)
+      - [x] Frontend: `api/parse.ts` fetch-stream SSE client (EventSource
+            can't POST) with buffered frame parsing + AbortController;
+            setTimeout mock deleted; error/low-confidence states show the
+            server's mediator-voice message (`role="alert"`); dead
+            useStreamingText + useAutoConfirm hooks deleted with their tests
+      - [x] Manual confirm only (UX-H6): auto-confirm countdown machinery
+            removed end-to-end (EditableExpensePreview / ExpensePreviewCard
+            props gone) — financial records never commit on a timer
+      - [x] `ai_personality` write path: folded into WS6's
+            PATCH /expense-groups/{id}/settings (owner-only, partial
+            updates); Literal-capped at professional/friendly/funny — f3-pbs
+            REMOVED from the enum and prompts (UX-H5), stored unknowns fall
+            back to friendly; "Mediator tone" select in group settings UI
+            (member-visible, owner-editable) — Epic 8.1 effectively shipped
+      Verification: DONE 2026-07-14 —
+      **Full flow in the browser:** typed "Paid 450 for biryani lunch with
+      the team" → SSE commentary streamed into the bubble → Review Expense
+      preview (450 / "Biryani lunch with the team" / real payer) → manual
+      Confirm → expense in the group ledger (Rs 450.00, Draft) + activity
+      feed entry. Low-confidence sentence → mediator error card. NOTE: run
+      against a local Gemini-wire-compatible fake (`GEMINI_BASE_URL`) because
+      no real GEMINI_API_KEY exists in this environment — the entire
+      HTTP/SSE/parse/quota path is real; putting a key in .env is the only
+      step left for live Gemini.
+      **Gates:** backend **259 passed / 0 skipped** (was 232/2 — first
+      zero-skip run); frontend typecheck green, **86 passed** (98 → 86: 14
+      dead-hook tests deleted, 7 added), build green — main chunk
+      **172.5 kB gz** (budget ≤250); `uv lock --check` passes; migration
+      af5ea3c202c0 applied, `alembic check` clean, downgrade exercised.
+      **Screenshots:** 7 shots (smart-input parsed × 375/1280 × light/dark,
+      group screen w/ Mediator tone × 2, parse-error 375) →
+      `_bmad-output/implementation-artifacts/ws7-screenshots/`.
+      Notes / deviations:
+      - FOUND+FIXED during verification: modal content taller than its
+        `max-h-[80vh]` had no `overflow-y-auto` — Confirm was unreachable on
+        short viewports once real commentary+preview filled the modal.
+      - `session.commit()` happens in the router BEFORE streaming starts
+        (quota unit + lazy settings row) — once SSE begins there is no
+        "after" to commit in; ARCH-001's one-commit rule is kept with the
+        commit relocated, documented in the router.
+      - Gotcha for future SSE endpoints: the response generator runs AFTER
+        the session dependency tears down — snapshot ORM values (payer_id)
+        before returning StreamingResponse, or the expired instance raises
+        mid-stream (surfaced as a phantom generic error event).
+      - Frontend `ExpenseParseResponse.amount` stays `number` (edit-buffer
+        type); the wire's Decimal string is converted once in parse.ts.
+      Status: DONE 2026-07-14 (branch ws7/real-ai)
 
 ### PHASE 2 — Launch Blockers
 

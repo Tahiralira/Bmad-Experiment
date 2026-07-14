@@ -7,11 +7,11 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-07-13 (WS6: BE-003 EXISTS auto-correlation, ARCH-001 lazy-sweep addendum)
+# Last Updated: 2026-07-14 (WS7: BE-004 streaming generators vs session lifetime)
 
 metadata:
   version: "1.0"
-  total_patterns: 22
+  total_patterns: 23
   categories:
     - docker
     - database
@@ -456,6 +456,37 @@ testing:
     prevention: "Any correlated subquery over a table the outer query already uses must alias that table"
     stories_encountered: ["WS6"]
     tokens_saved_estimate: "~400 per occurrence"
+
+  - id: "BE-004"
+    title: "SSE/StreamingResponse generators outlive the request's session and ORM instances"
+    symptoms:
+      - "Streaming endpoint emits a generic error event on the success path"
+      - "DetachedInstanceError / lazy-load exception raised mid-stream"
+      - "Works in unit tests of the service, fails through the endpoint"
+    root_cause: >
+      A StreamingResponse generator runs AFTER the endpoint function returns
+      and FastAPI dependency teardown closes the DB session. Any expired ORM
+      attribute access inside the generator (e.g. current_user.id after a
+      commit expired the instance) tries to refresh against a dead session
+      (WS7: the parse endpoint's complete event).
+    solution: |
+      Do ALL DB work in the endpoint body before returning StreamingResponse:
+      membership/authz checks, quota reservation, settings reads — and COMMIT
+      there (once streaming starts there is no "after" to commit in; ARCH-001
+      one-commit rule holds with the commit relocated). Snapshot every ORM
+      value the generator needs into plain locals first:
+      ```python
+      payer_id = current_user.id   # BEFORE session.commit()/return
+      session.commit()
+      async def event_generator():
+          ...  # uses payer_id, never current_user
+      return StreamingResponse(event_generator(), ...)
+      ```
+      Bonus honesty: pre-stream failures can then be real HTTP errors
+      (403/429/503) instead of error events inside a 200.
+    prevention: "Streaming generators touch no session and no ORM instances — plain values only, captured before return"
+    stories_encountered: ["WS7"]
+    tokens_saved_estimate: "~800 per occurrence"
 
 # =============================================================================
 # ARCHITECTURE PATTERNS
