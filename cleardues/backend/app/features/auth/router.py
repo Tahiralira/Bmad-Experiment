@@ -22,6 +22,7 @@ from app.core import security
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
 from app.features.auth.models import (
+    ApiKeyUpdate,
     Item,
     Message,
     NewPassword,
@@ -266,6 +267,36 @@ def read_user_me(current_user: CurrentUser) -> Any:
     Get current user.
     """
     return current_user
+
+
+@users_router.put("/me/api-key", response_model=Message)
+def set_my_api_key(
+    *, session: SessionDep, body: ApiKeyUpdate, current_user: CurrentUser
+) -> Message:
+    """
+    Store the user's own Gemini API key (BYOK — WS7).
+
+    Advanced escape hatch, deliberately absent from onboarding: hosted AI is
+    the default. Parses with a stored key bypass the monthly free quota.
+    The key is Fernet-encrypted at rest and never returned by any endpoint.
+    """
+    current_user.gemini_api_key_encrypted = security.encrypt_api_key(body.api_key)
+    session.add(current_user)
+    session.commit()
+    return Message(message="API key saved. Your parses now use your own key.")
+
+
+@users_router.delete("/me/api-key", response_model=Message)
+def delete_my_api_key(
+    *, session: SessionDep, current_user: CurrentUser
+) -> Message:
+    """
+    Remove the user's stored Gemini API key (back to hosted AI).
+    """
+    current_user.gemini_api_key_encrypted = None
+    session.add(current_user)
+    session.commit()
+    return Message(message="API key removed. Your parses now use the free tier.")
 
 
 @users_router.get("/me/dashboard", response_model=DashboardResponse)

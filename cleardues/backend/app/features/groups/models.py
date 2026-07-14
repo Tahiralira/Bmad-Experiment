@@ -3,7 +3,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
 import sqlalchemy as sa
 from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
@@ -160,17 +160,28 @@ INVITE_EXPIRATION_DAYS = 30
 # === AI Personality Settings ===
 
 
+# AI personalities a group may choose. Capped at "funny" (WS7/UX-H5): the
+# f3-pbs roast mode was removed before it ever had a write path — an
+# "agentic mediator" that mocks users about money is a brand liability.
+ALLOWED_AI_PERSONALITIES = ("professional", "friendly", "funny")
+
+
 class GroupSettingsPublic(SQLModel):
-    """Response schema for group settings (WS6 — strict mode toggle)."""
+    """Response schema for group settings (WS6 strict mode + WS7 personality)."""
 
     group_id: uuid.UUID
     strict_mode: bool
+    ai_personality: str
 
 
 class GroupSettingsUpdate(SQLModel):
-    """Request schema for updating group settings (owner only)."""
+    """Request schema for updating group settings (owner only).
 
-    strict_mode: bool
+    All fields optional — send only what changes (exclude_unset semantics).
+    """
+
+    strict_mode: bool | None = None
+    ai_personality: Literal["professional", "friendly", "funny"] | None = None
 
 
 class GroupSettings(SQLModel, table=True):

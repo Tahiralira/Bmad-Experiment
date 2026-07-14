@@ -79,3 +79,4 @@ __all__ = [
 # autogenerate is blind to every feature table.
 from app.features.groups import models as _groups_models  # noqa: E402,F401
 from app.features.expenses import models as _expenses_models  # noqa: E402,F401
+from app.features.ai import models as _ai_models  # noqa: E402,F401

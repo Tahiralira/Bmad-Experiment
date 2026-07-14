@@ -217,7 +217,9 @@ def get_group_settings(
     _get_group_for_member(session, group_id, current_user)
     settings_row = service.get_or_create_group_settings(session, group_id)
     response = GroupSettingsPublic(
-        group_id=settings_row.group_id, strict_mode=settings_row.strict_mode
+        group_id=settings_row.group_id,
+        strict_mode=settings_row.strict_mode,
+        ai_personality=settings_row.ai_personality,
     )
     session.commit()  # persists the lazily-created defaults row
     return response
@@ -231,11 +233,15 @@ def update_group_settings(
     settings_in: GroupSettingsUpdate,
 ) -> GroupSettingsPublic:
     """
-    Update a group's settings (WS6 — strict mode toggle). Owner only.
+    Update a group's settings. Owner only. Fields are optional — send only
+    what changes.
 
-    strict_mode ON: every participant must explicitly confirm each expense.
-    strict_mode OFF (default): confirmation is opt-in — expenses auto-confirm
+    strict_mode (WS6) ON: every participant must explicitly confirm each
+    expense. OFF (default): confirmation is opt-in — expenses auto-confirm
     after the objection window unless someone rejects first.
+
+    ai_personality (WS7): commentary tone for AI expense parsing —
+    professional | friendly | funny (capped at funny, UX-H5).
     """
     _get_group_for_member(session, group_id, current_user)
 
@@ -246,13 +252,17 @@ def update_group_settings(
         )
 
     settings_row = service.get_or_create_group_settings(session, group_id)
-    settings_row.strict_mode = settings_in.strict_mode
+    updates = settings_in.model_dump(exclude_unset=True, exclude_none=True)
+    for field, value in updates.items():
+        setattr(settings_row, field, value)
     session.add(settings_row)
     session.commit()
     session.refresh(settings_row)
 
     return GroupSettingsPublic(
-        group_id=settings_row.group_id, strict_mode=settings_row.strict_mode
+        group_id=settings_row.group_id,
+        strict_mode=settings_row.strict_mode,
+        ai_personality=settings_row.ai_personality,
     )
 
 

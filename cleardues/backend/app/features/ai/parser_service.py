@@ -1,33 +1,40 @@
 """
-AI Parser Service
+AI Parser Service (WS7 — hosted-first)
 
-Core AI-powered expense parsing logic using Google Gemini 3 API.
-Provides natural language to structured expense data conversion
-with personality-flavored commentary.
+Natural language -> structured expense data via Google Gemini, with
+personality-flavored commentary.
+
+Key resolution order (01 §6): the user's own BYOK key if stored, else the
+server's GEMINI_API_KEY. Hosted (server-key) parses are metered per user per
+calendar month by consume_free_parse(); BYOK parses are unmetered.
+
+All model calls are async (client.aio) with a hard timeout so a slow
+upstream cannot stall the event loop or hold SSE connections open (B-H8).
 """
-import uuid
 import json
-from decimal import Decimal
+import re
+import uuid
+from collections.abc import Iterator
+from decimal import Decimal, InvalidOperation
 
-from fastapi import HTTPException
 from google import genai
+from google.genai import types as genai_types
 from sqlmodel import Session, select
 
-from app.features.ai.models import (
-    AIPersonality,
-    ExpenseParseResponse,
-)
+from app.core.config import settings
+from app.features.ai.models import AIPersonality, AIUsage
+from app.features.auth.models import User
 from app.features.groups.models import GroupSettings
 
 # Constants
 MODEL = "gemini-3-flash"
 
-# Personality system prompts for commentary generation
+# Personality system prompts for commentary generation.
+# Capped at "funny" (UX-H5) — no roast mode; the mediator never attacks.
 PERSONALITY_PROMPTS = {
     "professional": "You are a professional financial assistant. Parse expenses accurately and provide clear, concise commentary.",
     "friendly": "You are a friendly expense tracking buddy. Parse expenses and give cheerful, helpful commentary.",
-    "funny": "You are a humorous expense companion. Parse expenses accurately but add witty, lighthearted commentary.",
-    "f3-pbs": "You are an unhinged roast comic. Parse expenses correctly and savage the user's spending with dark humor. No boundaries.",
+    "funny": "You are a humorous expense companion. Parse expenses accurately but add witty, lighthearted commentary. Never mock the user or other people.",
 }
 
 # Prompt template for expense extraction
@@ -43,167 +50,221 @@ Text: {text}
 """
 
 
-def get_gemini_client(api_key_encrypted: str) -> genai.Client:
+class AIParseError(Exception):
     """
-    Create Gemini client with user's decrypted API key.
+    A parse failure with a user-safe, mediator-voice message.
 
-    Each user provides their own Gemini API key (stored encrypted).
-    This function decrypts the key and creates a client instance.
+    Raised after SSE streaming has begun (headers already sent), so the
+    router forwards `message` as an error event rather than an HTTP status.
+    """
 
-    Args:
-        api_key_encrypted: User's encrypted Gemini API key from database
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
 
-    Returns:
-        genai.Client: Configured Gemini API client
+
+def resolve_api_key(user: User) -> tuple[str, bool] | None:
+    """
+    Pick the Gemini key for this request: BYOK first, else the server key.
+
+    Returns (api_key, is_byok), or None when neither exists (hosted AI not
+    configured on this deployment and the user stored no key).
     """
     from app.core.security import decrypt_api_key
 
-    api_key = decrypt_api_key(api_key_encrypted)
-    return genai.Client(api_key=api_key)
+    if user.gemini_api_key_encrypted:
+        return decrypt_api_key(user.gemini_api_key_encrypted), True
+    if settings.GEMINI_API_KEY:
+        return settings.GEMINI_API_KEY, False
+    return None
+
+
+def get_gemini_client(api_key: str) -> genai.Client:
+    """
+    Build a Gemini client with a hard per-call timeout (B-H8).
+
+    GEMINI_BASE_URL, when set, redirects calls to a proxy or test double.
+    """
+    http_options = genai_types.HttpOptions(
+        timeout=settings.AI_PARSE_TIMEOUT_SECONDS * 1000,  # milliseconds
+    )
+    if settings.GEMINI_BASE_URL:
+        http_options.base_url = settings.GEMINI_BASE_URL
+    return genai.Client(api_key=api_key, http_options=http_options)
 
 
 def get_group_personality(session: Session, group_id: uuid.UUID) -> AIPersonality:
     """
     Get AI personality setting for a group. Default to friendly.
 
-    If the group has no settings record, creates default settings
-    with ai_personality="friendly".
-
-    Args:
-        session: Database session
-        group_id: Group UUID to get personality for
-
-    Returns:
-        AIPersonality: The personality enum value for this group
+    Creates the default settings row if missing (flush only — the router
+    commits, ARCH-001). Unknown stored values fall back to friendly rather
+    than erroring: the enum shrank in WS7 when roast mode was removed.
     """
-    settings = session.exec(
+    group_settings = session.exec(
         select(GroupSettings).where(GroupSettings.group_id == group_id)
     ).first()
 
-    if not settings:
-        # Create default settings
-        settings = GroupSettings(group_id=group_id, ai_personality="friendly")
-        session.add(settings)
-        session.commit()
+    if not group_settings:
+        group_settings = GroupSettings(group_id=group_id, ai_personality="friendly")
+        session.add(group_settings)
+        session.flush()
 
-    return AIPersonality(settings.ai_personality)
+    try:
+        return AIPersonality(group_settings.ai_personality)
+    except ValueError:
+        return AIPersonality.FRIENDLY
 
 
-def generate_commentary(
+def consume_free_parse(session: Session, user_id: uuid.UUID) -> bool:
+    """
+    Reserve one hosted parse from the user's monthly free quota.
+
+    Locks the (user, month) counter row (FOR UPDATE — WS4/M8 discipline) so
+    concurrent requests serialize instead of overshooting the limit, then
+    increments it. Flushes only; the router commits BEFORE streaming starts,
+    so a reserved unit persists even if the model call later fails (the unit
+    is spent — model calls cost money whether or not they parse well).
+
+    Returns False when the quota is exhausted.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    from app.features.auth.models import utc_now
+
+    period = utc_now().strftime("%Y-%m")
+
+    def _locked_row() -> AIUsage | None:
+        return session.exec(
+            select(AIUsage)
+            .where(AIUsage.user_id == user_id, AIUsage.period == period)
+            .with_for_update()
+        ).first()
+
+    usage = _locked_row()
+    if usage is None:
+        usage = AIUsage(user_id=user_id, period=period, parse_count=0)
+        session.add(usage)
+        try:
+            session.flush()
+        except IntegrityError:
+            # Concurrent first parse of the month created the row between our
+            # select and insert (uq_ai_usage_user_period) — take theirs.
+            session.rollback()
+            usage = _locked_row()
+            if usage is None:  # pragma: no cover - row must exist post-conflict
+                return False
+
+    if usage.parse_count >= settings.AI_FREE_MONTHLY_PARSES:
+        return False
+
+    usage.parse_count += 1
+    session.add(usage)
+    session.flush()
+    return True
+
+
+def _extract_json(raw: str) -> dict:
+    """Parse the model's JSON, tolerating a ```json ... ``` fence."""
+    text = raw.strip()
+    fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, flags=re.DOTALL)
+    if fence:
+        text = fence.group(1)
+    parsed = json.loads(text)
+    if not isinstance(parsed, dict):
+        raise json.JSONDecodeError("expected a JSON object", text, 0)
+    return parsed
+
+
+async def parse_expense_text(text: str, client: genai.Client) -> dict:
+    """
+    Extract {amount, description, confidence} from natural language.
+
+    Raises AIParseError (user-safe message) when the model output is not
+    usable: unparseable JSON, invalid amount, or confidence below 0.7.
+    """
+    response = await client.aio.models.generate_content(
+        model=MODEL,
+        contents=[
+            {
+                "role": "user",
+                "parts": [{"text": PARSING_PROMPT_TEMPLATE.format(text=text)}],
+            }
+        ],
+        config={"response_mime_type": "application/json"},
+    )
+
+    try:
+        parsed = _extract_json(response.text or "")
+    except json.JSONDecodeError:
+        raise AIParseError(
+            "I couldn't understand that expense. Please try rephrasing it."
+        )
+
+    if parsed.get("confidence", 0.0) < 0.7:
+        raise AIParseError(
+            "I couldn't quite understand that expense. Could you rephrase it? "
+            "Try including the amount and a brief description."
+        )
+
+    try:
+        amount = Decimal(str(parsed["amount"]))
+    except (KeyError, InvalidOperation):
+        amount = None
+    if amount is None or amount <= 0 or not str(parsed.get("description", "")).strip():
+        raise AIParseError(
+            "I couldn't quite understand that expense. Could you rephrase it? "
+            "Try including the amount and a brief description."
+        )
+
+    return {
+        "amount": amount,
+        "description": str(parsed["description"]).strip(),
+        "confidence": float(parsed["confidence"]),
+    }
+
+
+async def generate_commentary(
     original_text: str,
     parsed_data: dict,
     personality: AIPersonality,
     client: genai.Client,
 ) -> str:
     """
-    Generate personality-flavored commentary based on parsed expense.
+    Generate personality-flavored commentary for the parsed expense.
 
-    Uses the Gemini API with personality-specific system prompts
-    to generate witty, friendly, professional, or roast-style commentary.
-
-    Args:
-        original_text: User's original expense description
-        parsed_data: Parsed expense data (amount, description, confidence)
-        personality: AI personality mode
-        client: Gemini API client (reused for efficiency)
-
-    Returns:
-        str: Generated commentary text (1-2 sentences)
+    Falls back to a plain restatement if the model returns nothing usable —
+    commentary is garnish, never worth failing the parse over.
     """
     commentary_prompt = f"""
     Based on this expense data, generate a short (1-2 sentences) personality-driven commentary:
 
     Original: "{original_text}"
-    Parsed: {parsed_data["description"]} for ${parsed_data["amount"]}
+    Parsed: {parsed_data["description"]} for {parsed_data["amount"]}
     Confidence: {parsed_data["confidence"]}
 
     Personality: {personality.value}
     """
 
-    response = client.models.generate_content(
+    response = await client.aio.models.generate_content(
         model=MODEL,
         contents=commentary_prompt,
         config={"system_instruction": PERSONALITY_PROMPTS[personality.value]},
     )
 
-    return response.text.strip()
+    commentary = (response.text or "").strip()
+    if not commentary:
+        commentary = (
+            f"Got it — {parsed_data['description']} for {parsed_data['amount']}."
+        )
+    return commentary
 
 
-def parse_expense_text(
-    text: str,
-    personality: AIPersonality,
-    current_user_id: uuid.UUID,
-    api_key_encrypted: str | None,
-) -> ExpenseParseResponse:
+def chunk_commentary(commentary: str) -> Iterator[str]:
     """
-    Parse natural language expense text using Gemini API.
-
-    This is the core parsing function that:
-    1. Validates user has configured their API key
-    2. Calls Gemini API with personality-specific prompts
-    3. Validates confidence score (must be >= 0.7)
-    4. Generates personality-flavored commentary
-    5. Returns structured expense data
-
-    Args:
-        text: Natural language expense description
-        personality: AI personality mode
-        current_user_id: Current user's UUID (defaults as payer)
-        api_key_encrypted: User's encrypted Gemini API key
-
-    Returns:
-        ExpenseParseResponse with parsed data
-
-    Raises:
-        HTTPException: If parsing fails or confidence < 0.7
-        HTTPException: If user has no API key configured
+    Split commentary into word-level SSE chunks (B-H8 — the old
+    one-event-per-character stream sent hundreds of events per sentence).
     """
-    # 0. Validate user has API key
-    if not api_key_encrypted:
-        raise HTTPException(
-            status_code=400,
-            detail="Please add your Gemini API key in settings to use AI expense parsing. Get your free key at: https://ai.google.dev/gemini-api/docs/quickstart",
-        )
-
-    # 1. Create client with user's API key
-    client = get_gemini_client(api_key_encrypted)
-
-    # 2. Generate system prompt based on personality
-    system_prompt = PERSONALITY_PROMPTS[personality.value]
-
-    # 3. Call Gemini API for expense parsing
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=[
-            {"role": "user", "parts": [{"text": PARSING_PROMPT_TEMPLATE.format(text=text)}]}
-        ],
-        config={"system_instruction": system_prompt},
-    )
-
-    # 4. Parse JSON response
-    try:
-        parsed = json.loads(response.text)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=400,
-            detail="I couldn't understand that expense. Please try rephrasing it.",
-        )
-
-    # 5. Validate confidence score
-    if parsed.get("confidence", 0.0) < 0.7:
-        raise HTTPException(
-            status_code=400,
-            detail="I couldn't quite understand that expense. Could you rephrase it? Try including the amount and a brief description.",
-        )
-
-    # 6. Generate personality-flavored commentary
-    commentary = generate_commentary(text, parsed, personality, client)
-
-    # 7. Return response
-    return ExpenseParseResponse(
-        amount=Decimal(str(parsed["amount"])),
-        description=parsed["description"],
-        payer_id=current_user_id,
-        confidence_score=parsed["confidence"],
-        commentary=commentary,
-    )
+    words = commentary.split(" ")
+    for i, word in enumerate(words):
+        yield word if i == len(words) - 1 else word + " "

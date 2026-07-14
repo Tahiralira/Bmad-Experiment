@@ -107,6 +107,27 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
 
+    # === AI parsing (WS7 — hosted-first, 01 §6) ===
+    # Server-side Gemini key: the DEFAULT path for every user. Empty means
+    # hosted AI is unavailable (parse endpoint returns 503 unless the user
+    # has a BYOK key stored).
+    GEMINI_API_KEY: str = ""
+    # Override the Gemini API base URL (proxy or test double). None = Google.
+    GEMINI_BASE_URL: str | None = None
+    # Free-tier quota: hosted parses per user per calendar month. BYOK users
+    # are exempt (their key, their bill).
+    AI_FREE_MONTHLY_PARSES: int = 20
+    # Hard timeout for each model call — without it a slow upstream would
+    # hold the SSE connection open indefinitely (B-H8).
+    AI_PARSE_TIMEOUT_SECONDS: int = 30
+
+    # Dedicated key for encrypting stored user API keys (B-C5/S5-C1):
+    # any non-empty secret string works — the Fernet key is derived via HKDF.
+    # MUST be set outside local (enforced below); rotating SECRET_KEY then no
+    # longer bricks stored credentials, and rotating ENCRYPTION_KEY is an
+    # explicit, documented decision.
+    ENCRYPTION_KEY: str = ""
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
             message = (
@@ -125,7 +146,22 @@ class Settings(BaseSettings):
         self._check_default_secret(
             "FIRST_SUPERUSER_PASSWORD", self.FIRST_SUPERUSER_PASSWORD
         )
+        self._check_default_secret("ENCRYPTION_KEY", self.ENCRYPTION_KEY)
 
+        return self
+
+    @model_validator(mode="after")
+    def _require_encryption_key_outside_local(self) -> Self:
+        # Fail fast (B-C5): a missing ENCRYPTION_KEY in staging/production
+        # would silently fall back to SECRET_KEY-derived encryption, and a
+        # later SECRET_KEY rotation would permanently brick every stored
+        # user API key. Local dev may fall back for convenience.
+        if self.ENVIRONMENT != "local" and not self.ENCRYPTION_KEY:
+            raise ValueError(
+                "ENCRYPTION_KEY must be set when ENVIRONMENT is not 'local'. "
+                "Generate one with: python -c \"import secrets; "
+                'print(secrets.token_urlsafe(32))"'
+            )
         return self
 
 

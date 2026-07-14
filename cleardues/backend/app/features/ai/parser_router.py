@@ -1,18 +1,25 @@
 """
-AI Parser Router - SSE Streaming Endpoint
+AI Parser Router - SSE Streaming Endpoint (WS7 — hosted-first)
 
-Provides Server-Sent Events (SSE) streaming endpoint for real-time
-AI expense parsing. Streams commentary chunks character-by-character
-for the "typing" effect, then sends final parsed data.
+POST /expenses/parse streams the parse over Server-Sent Events: word-level
+commentary chunks, then one `complete` event with the structured expense.
+
+Honest error contract (B-H8 — the old docstring advertised 400s that never
+happened):
+- BEFORE the stream starts, failures are real HTTP errors:
+  401 unauthenticated, 403 not a group member, 422 malformed body,
+  429 monthly free quota exhausted, 503 hosted AI not configured.
+- AFTER streaming begins (headers already sent, always HTTP 200), failures
+  arrive as `{"type": "error", "error": "..."}` events: model timeout,
+  unusable model output, low confidence.
 """
-import uuid
-
+import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, SessionDep
 from app.features.ai import parser_service
-from app.features.ai.models import ExpenseParseRequest, ParseStreamEvent
+from app.features.ai.models import ExpenseParseRequest, ExpenseParseResponse, ParseStreamEvent
 from app.features.groups.service import is_group_member
 
 router = APIRouter()
@@ -30,13 +37,12 @@ async def parse_expense(
     """
     Parse natural language expense text using AI.
 
-    Streams commentary chunks via SSE, then sends final parsed data.
+    Hosted-first (WS7): requests run on the server's Gemini key with a
+    monthly free quota per user; users with a stored BYOK key use their own
+    key, unmetered. Streams word-level commentary chunks via SSE, then the
+    final parsed data.
 
-    **Authentication**: Requires valid JWT token
-    **API Key**: User must have Gemini API key configured in their profile
-    **Streaming**: Response uses Server-Sent Events (SSE) format
-
-    **Example Request**:
+    **Example request**:
     ```json
     {
         "text": "Paid 60 for lunch with the team",
@@ -45,80 +51,110 @@ async def parse_expense(
     }
     ```
 
-    **Response Format** (SSE Stream):
-    - Commentary events: `{"type":"commentary","data":{"text":"G"}}`
-    - Complete event: `{"type":"complete","data":{...}}`
-    - Error event: `{"type":"error","error":"..."}`
+    **SSE events** (HTTP 200):
+    - `{"type":"commentary","data":{"text":"Got "}}` — word-level chunks
+    - `{"type":"complete","data":{...ExpenseParseResponse...}}`
+    - `{"type":"error","error":"..."}` — mid-stream failure only
 
-    **Personality Modes**:
-    - `professional`: Clear, concise commentary
-    - `friendly`: Cheerful, helpful tone (default)
-    - `funny`: Witty, lighthearted commentary
-    - `f3-pbs`: Dark humor roast mode (no boundaries)
+    **HTTP errors (before any streaming)**:
+    - 401 not authenticated / 422 malformed body
+    - 403 not a member of the group
+    - 429 monthly free-parse quota exhausted
+    - 503 hosted AI not configured and no BYOK key stored
 
-    **Error Cases**:
-    - 400: No API key configured - "Please add your Gemini API key..."
-    - 400: Low confidence - "I couldn't quite understand that expense..."
-    - 400: Invalid JSON - "I couldn't understand that expense..."
+    **Personality modes**: `professional`, `friendly` (default), `funny`.
     """
+    # --- Pre-flight: real HTTP errors while we still can (before streaming) ---
+    if not is_group_member(
+        session, group_id=expense_in.group_id, user_id=current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of this group to parse expenses.",
+        )
+
+    resolved = parser_service.resolve_api_key(current_user)
+    if resolved is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "AI parsing isn't available right now. "
+                "You can still add the expense manually."
+            ),
+        )
+    api_key, is_byok = resolved
+
+    if not is_byok and not parser_service.consume_free_parse(
+        session, current_user.id
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "You've used all your free AI parses for this month — "
+                "they reset next month. Manual entry is always free."
+            ),
+        )
+
+    personality = expense_in.personality or parser_service.get_group_personality(
+        session, expense_in.group_id
+    )
+
+    # Snapshot before commit: the generator below runs AFTER this function
+    # returns, when the session dependency has torn down — touching the
+    # (expired) ORM user there would raise mid-stream.
+    payer_id = current_user.id
+
+    # The one commit for this request (ARCH-001): persists the reserved quota
+    # unit and any default settings row. It must happen here — once streaming
+    # starts there is no router "after" to commit in.
+    session.commit()
+
+    client = parser_service.get_gemini_client(api_key)
+
     async def event_generator():
         try:
-            # 1. Validate user is member of group
-            # (WS4/M10: keyword-only helper replaces the twin whose positional
-            # args were transposed here for months — review B-C1)
-            if not is_group_member(
-                session, group_id=expense_in.group_id, user_id=current_user.id
-            ):
-                event = ParseStreamEvent(
-                    type="error",
-                    error="You must be a member of this group to parse expenses.",
-                )
-                yield f"data: {event.model_dump_json()}\n\n"
-                return
-
-            # 2. Check user has API key
-            if not current_user.gemini_api_key_encrypted:
-                event = ParseStreamEvent(
-                    type="error",
-                    error="Please add your Gemini API key in settings to use AI expense parsing. Get your free key at: https://ai.google.dev/gemini-api/docs/quickstart",
-                )
-                yield f"data: {event.model_dump_json()}\n\n"
-                return
-
-            # 3. Get group personality if not specified
-            if not expense_in.personality:
-                expense_in.personality = parser_service.get_group_personality(
-                    session, expense_in.group_id
-                )
-
-            # 4. Parse expense (generates commentary internally)
-            parsed_response = parser_service.parse_expense_text(
-                text=expense_in.text,
-                personality=expense_in.personality,
-                current_user_id=current_user.id,
-                api_key_encrypted=current_user.gemini_api_key_encrypted,
+            parsed = await parser_service.parse_expense_text(
+                text=expense_in.text, client=client
             )
 
-            # 5. Stream commentary character-by-character
-            commentary = parsed_response.commentary
-            for char in commentary:
-                event = ParseStreamEvent(type="commentary", data={"text": char})
+            commentary = await parser_service.generate_commentary(
+                original_text=expense_in.text,
+                parsed_data=parsed,
+                personality=personality,
+                client=client,
+            )
+
+            for chunk in parser_service.chunk_commentary(commentary):
+                event = ParseStreamEvent(type="commentary", data={"text": chunk})
                 yield f"data: {event.model_dump_json()}\n\n"
 
-            # 6. Send complete event
+            parsed_response = ExpenseParseResponse(
+                amount=parsed["amount"],
+                description=parsed["description"],
+                payer_id=payer_id,
+                confidence_score=parsed["confidence"],
+                commentary=commentary,
+            )
             event = ParseStreamEvent(
-                type="complete", data=parsed_response.model_dump()
+                type="complete", data=parsed_response.model_dump(mode="json")
             )
             yield f"data: {event.model_dump_json()}\n\n"
 
-        except HTTPException as e:
-            # Forward HTTP exceptions as error events
-            event = ParseStreamEvent(type="error", error=e.detail)
+        except parser_service.AIParseError as e:
+            event = ParseStreamEvent(type="error", error=e.message)
             yield f"data: {event.model_dump_json()}\n\n"
-        except Exception as e:
-            # Unexpected errors
+        except (TimeoutError, httpx.TimeoutException):
             event = ParseStreamEvent(
-                type="error", error="An unexpected error occurred. Please try again."
+                type="error",
+                error="The AI took too long to respond. Please try again.",
+            )
+            yield f"data: {event.model_dump_json()}\n\n"
+        except Exception:
+            # No str(e) to the client — model/library errors can leak
+            # internals (S5-M2 pattern).
+            event = ParseStreamEvent(
+                type="error",
+                error="An unexpected error occurred. Please try again.",
             )
             yield f"data: {event.model_dump_json()}\n\n"
 

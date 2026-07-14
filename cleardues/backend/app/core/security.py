@@ -29,23 +29,36 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-# === API Key Encryption (NFR4 Compliance - AES-256) ===
+# === API key encryption at rest ===
+#
+# Fernet = AES-128-CBC + HMAC-SHA256. (The old "AES-256 / NFR4" claims were
+# false — review B-C5/S5-C1; NFR4 should be read as "encrypted at rest".)
+#
+# The Fernet key is derived with HKDF-SHA256 from a dedicated ENCRYPTION_KEY
+# setting, with a fixed salt + info label for domain separation — a leaked
+# JWT-signing secret no longer compromises stored API keys, and rotating
+# SECRET_KEY no longer bricks them. In local dev ENCRYPTION_KEY may be unset;
+# we fall back to deriving from SECRET_KEY (config fails fast outside local).
+#
+# Migration note (B-C5): no production data exists under the old
+# truncate-pad-SECRET_KEY scheme — the review confirmed no write path ever
+# shipped (B-C2), so encrypted keys only ever existed inside test runs.
+# There is deliberately no legacy-decrypt fallback.
 
 
 def get_encryption_key() -> bytes:
-    """
-    Get encryption key from SECRET_KEY.
+    """Derive the Fernet key (urlsafe-b64, 32 bytes) via HKDF-SHA256."""
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-    Derives a Fernet-compatible encryption key from the app's SECRET_KEY.
-    Uses base64 URL-safe encoding to create a 32-byte key suitable for Fernet.
-
-    Returns:
-        bytes: 32-byte encryption key
-    """
-    # Use SECRET_KEY as base for encryption key
-    # Pad or truncate to 32 bytes for Fernet compatibility
-    key_bytes = settings.SECRET_KEY.encode()[:32].ljust(32, b"0")
-    return base64.urlsafe_b64encode(key_bytes)
+    secret = settings.ENCRYPTION_KEY or settings.SECRET_KEY
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=b"cleardues.fernet.v1",
+        info=b"api-key-encryption",
+    )
+    return base64.urlsafe_b64encode(hkdf.derive(secret.encode()))
 
 
 # Initialize Fernet instance with derived key

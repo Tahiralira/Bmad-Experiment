@@ -52,6 +52,12 @@ class UpdatePassword(SQLModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class ApiKeyUpdate(SQLModel):
+    """BYOK (WS7): the user's own Gemini API key. Never returned by any API."""
+
+    api_key: str = Field(min_length=20, max_length=200)
+
+
 # Helper function for UTC timestamp
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -73,11 +79,13 @@ class User(UserBase, table=True):
     # OAuth fields
     oauth_provider: str | None = Field(default=None, max_length=50)
     oauth_provider_id: str | None = Field(default=None, max_length=255)
-    # AI API key field (encrypted at rest per NFR4)
+    # BYOK Gemini key (WS7: hidden power-user escape hatch — hosted AI is
+    # the default). Encrypted at rest with Fernet (AES-128-CBC + HMAC) under
+    # the dedicated ENCRYPTION_KEY — see app/core/security.py.
     gemini_api_key_encrypted: str | None = Field(
         default=None,
         max_length=512,
-        description="Encrypted Gemini API key for this user (AES-256)",
+        description="User's own Gemini API key, Fernet-encrypted at rest",
     )
     # Soft-delete marker (WS4/C4): users with financial history are never
     # hard-deleted — PII is anonymized and login disabled, financial rows stay.

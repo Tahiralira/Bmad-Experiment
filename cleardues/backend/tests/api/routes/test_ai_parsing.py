@@ -1,26 +1,75 @@
 """
-AI Parsing Service Tests
+AI Parsing Tests (rewritten in WS7 — the real AI path)
 
-Comprehensive unit and integration tests for AI-powered expense parsing.
-Tests cover service logic, router endpoints, and error handling.
+Covers:
+- SSE endpoint with REAL group membership and a full payload assertion on the
+  `complete` event (the assertion whose absence hid B-C1 for months)
+- hosted-first key resolution (user BYOK key, else server key, else 503)
+- monthly free-parse quota (429 when exhausted; BYOK exempt; period rollover)
+- honest error contract: pre-stream HTTP errors vs mid-stream error events
+- BYOK endpoints PUT/DELETE /users/me/api-key (encrypted at rest)
+- group ai_personality write path, capped at funny (UX-H5)
+- ENCRYPTION_KEY-derived Fernet key (B-C5)
 """
+import asyncio
+import json
 import uuid
-from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
+import httpx
 import pytest
-from fastapi import HTTPException
-from sqlmodel import select
+from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
-from app.core.security import encrypt_api_key, decrypt_api_key
+from app import crud
+from app.core.config import settings
+from app.core.security import decrypt_api_key, encrypt_api_key, get_encryption_key
 from app.features.ai import parser_service
-from app.features.ai.models import AIPersonality
-from app.features.auth.models import User
+from app.features.ai.models import AIPersonality, AIUsage
+from app.features.auth.models import User, UserCreate
 from app.features.groups.models import ExpenseGroup, GroupSettings
+from tests.utils.utils import random_email, random_lower_string
+
+PARSE_JSON = '{"amount": 60.0, "description": "Lunch", "confidence": 0.95}'
+COMMENTARY = "Got it! Lunch for 60."
 
 
-def _create_group(db) -> uuid.UUID:
-    """Create a real group row (group_settings.group_id is FK-enforced)."""
+# ---------------------------------------------------------------------------
+# Helpers (same shape as test_settle_up.py)
+# ---------------------------------------------------------------------------
+
+
+def _make_authed_user(
+    client: TestClient, db: Session
+) -> tuple[dict[str, str], uuid.UUID, str]:
+    """Create a fresh user and log in; returns (headers, user_id, email)."""
+    email = random_email()
+    password = random_lower_string()
+    user = crud.create_user(
+        session=db, user_create=UserCreate(email=email, password=password)
+    )
+    r = client.post(
+        f"{settings.API_V1_STR}/login/access-token",
+        data={"username": email, "password": password},
+    )
+    assert r.status_code == 200
+    return (
+        {"Authorization": f"Bearer {r.json()['access_token']}"},
+        user.id,
+        email,
+    )
+
+
+def _create_group(client: TestClient, headers: dict[str, str], name: str) -> dict:
+    r = client.post(
+        f"{settings.API_V1_STR}/expense-groups/", headers=headers, json={"name": name}
+    )
+    assert r.status_code == 201
+    return r.json()
+
+
+def _create_group_row(db: Session) -> uuid.UUID:
+    """Bare group row for service-level tests (group_settings FK needs it)."""
     user = db.exec(select(User)).first()
     group = ExpenseGroup(
         name=f"AI Test Group {uuid.uuid4().hex[:6]}", created_by=user.id
@@ -31,277 +80,573 @@ def _create_group(db) -> uuid.UUID:
     return group.id
 
 
+def _mock_gemini_client(
+    parse_json: str = PARSE_JSON, commentary: str = COMMENTARY
+) -> Mock:
+    """A genai.Client double: first aio call parses, second is commentary."""
+    client = Mock()
+    client.aio.models.generate_content = AsyncMock(
+        side_effect=[Mock(text=parse_json), Mock(text=commentary)]
+    )
+    return client
+
+
+def _sse_events(body: str) -> list[dict]:
+    return [
+        json.loads(line[len("data: "):])
+        for line in body.splitlines()
+        if line.startswith("data: ")
+    ]
+
+
+def _parse_request(group_id: str, text: str = "Paid 60 for lunch") -> dict:
+    return {"text": text, "group_id": group_id, "personality": "friendly"}
+
+
 # =============================================================================
-# Unit Tests - Parser Service
+# Unit tests — parser service
 # =============================================================================
 
 
 class TestParserService:
-    """Unit tests for AI parser service functions."""
+    def test_parse_expense_success(self):
+        client = _mock_gemini_client()
+        parsed = asyncio.run(
+            parser_service.parse_expense_text(text="Paid 60 for lunch", client=client)
+        )
+        assert str(parsed["amount"]) == "60.0"
+        assert parsed["description"] == "Lunch"
+        assert parsed["confidence"] == 0.95
 
-    def test_parse_expense_success(self, db):
-        """Test successful expense parsing with high confidence."""
-        # Mock Gemini API response with valid JSON and high confidence
-        mock_response = Mock()
-        mock_response.text = '{"amount": 60.0, "description": "Lunch", "confidence": 0.95}'
+    def test_parse_tolerates_json_code_fence(self):
+        client = _mock_gemini_client(parse_json=f"```json\n{PARSE_JSON}\n```")
+        parsed = asyncio.run(
+            parser_service.parse_expense_text(text="Paid 60 for lunch", client=client)
+        )
+        assert parsed["description"] == "Lunch"
 
-        mock_client = Mock()
-        mock_client.models.generate_content.return_value = mock_response
+    def test_parse_low_confidence_raises(self):
+        client = _mock_gemini_client(
+            parse_json='{"amount": 60.0, "description": "Lunch", "confidence": 0.5}'
+        )
+        with pytest.raises(parser_service.AIParseError) as exc_info:
+            asyncio.run(
+                parser_service.parse_expense_text(text="mumble", client=client)
+            )
+        assert "couldn't quite understand" in exc_info.value.message
 
-        with patch("app.features.ai.parser_service.get_gemini_client", return_value=mock_client):
-            result = parser_service.parse_expense_text(
-                text="Paid 60 for lunch",
-                personality=AIPersonality.FRIENDLY,
-                current_user_id=uuid.uuid4(),
-                api_key_encrypted=encrypt_api_key("test_api_key"),
+    def test_parse_invalid_json_raises(self):
+        client = _mock_gemini_client(parse_json="Not valid JSON")
+        with pytest.raises(parser_service.AIParseError) as exc_info:
+            asyncio.run(
+                parser_service.parse_expense_text(text="gibberish", client=client)
+            )
+        assert "couldn't understand" in exc_info.value.message
+
+    def test_parse_nonpositive_amount_raises(self):
+        client = _mock_gemini_client(
+            parse_json='{"amount": -5, "description": "Lunch", "confidence": 0.9}'
+        )
+        with pytest.raises(parser_service.AIParseError):
+            asyncio.run(
+                parser_service.parse_expense_text(text="weird", client=client)
             )
 
-        # Verify parsed data
-        assert result.amount == Decimal("60.0")
-        assert result.description == "Lunch"
-        assert result.confidence_score == 0.95
-        assert result.commentary  # Commentary should be generated
-
-    def test_parse_expense_low_confidence_raises_400(self, db):
-        """Test that low confidence scores raise 400 error."""
-        # Mock Gemini API to return low confidence
-        mock_response = Mock()
-        mock_response.text = '{"amount": 60.0, "description": "Lunch", "confidence": 0.5}'
-
-        mock_client = Mock()
-        mock_client.models.generate_content.return_value = mock_response
-
-        with patch("app.features.ai.parser_service.get_gemini_client", return_value=mock_client):
-            with pytest.raises(HTTPException) as exc_info:
-                parser_service.parse_expense_text(
-                    text="Paid 60 for lunch",
-                    personality=AIPersonality.FRIENDLY,
-                    current_user_id=uuid.uuid4(),
-                    api_key_encrypted=encrypt_api_key("test_api_key"),
-                )
-
-        assert exc_info.value.status_code == 400
-        assert "couldn't quite understand" in exc_info.value.detail
-
-    def test_parse_expense_no_api_key_raises_400(self, db):
-        """Test that missing API key raises 400 with helpful message."""
-        with pytest.raises(HTTPException) as exc_info:
-            parser_service.parse_expense_text(
-                text="Paid 60 for lunch",
-                personality=AIPersonality.FRIENDLY,
-                current_user_id=uuid.uuid4(),
-                api_key_encrypted=None,
+    def test_commentary_uses_personality_prompt(self):
+        client = _mock_gemini_client()
+        # consume the parse call so commentary is next
+        parsed = asyncio.run(
+            parser_service.parse_expense_text(text="Paid 60 for lunch", client=client)
+        )
+        commentary = asyncio.run(
+            parser_service.generate_commentary(
+                original_text="Paid 60 for lunch",
+                parsed_data=parsed,
+                personality=AIPersonality.FUNNY,
+                client=client,
             )
+        )
+        assert commentary == COMMENTARY
+        config = client.aio.models.generate_content.call_args.kwargs["config"]
+        assert (
+            config["system_instruction"]
+            == parser_service.PERSONALITY_PROMPTS["funny"]
+        )
 
-        assert exc_info.value.status_code == 400
-        assert "add your Gemini API key" in exc_info.value.detail
+    def test_commentary_falls_back_when_model_returns_nothing(self):
+        client = Mock()
+        client.aio.models.generate_content = AsyncMock(return_value=Mock(text=""))
+        commentary = asyncio.run(
+            parser_service.generate_commentary(
+                original_text="Paid 60 for lunch",
+                parsed_data={"amount": "60.0", "description": "Lunch", "confidence": 0.95},
+                personality=AIPersonality.FRIENDLY,
+                client=client,
+            )
+        )
+        assert "Lunch" in commentary
 
-    def test_parse_expense_invalid_json_raises_400(self, db):
-        """Test that invalid JSON from AI raises 400 error."""
-        # Mock Gemini API to return invalid JSON
-        mock_response = Mock()
-        mock_response.text = "Not valid JSON"
+    def test_chunk_commentary_yields_words(self):
+        chunks = list(parser_service.chunk_commentary("Got it! Lunch for 60."))
+        assert chunks == ["Got ", "it! ", "Lunch ", "for ", "60."]
+        assert "".join(chunks) == "Got it! Lunch for 60."
 
-        mock_client = Mock()
-        mock_client.models.generate_content.return_value = mock_response
+    def test_roast_mode_is_gone(self):
+        # UX-H5: the personality cap is a product decision, not an accident
+        assert "f3-pbs" not in parser_service.PERSONALITY_PROMPTS
+        assert {p.value for p in AIPersonality} == {
+            "professional",
+            "friendly",
+            "funny",
+        }
 
-        with patch("app.features.ai.parser_service.get_gemini_client", return_value=mock_client):
-            with pytest.raises(HTTPException) as exc_info:
-                parser_service.parse_expense_text(
-                    text="gibberish text",
-                    personality=AIPersonality.FRIENDLY,
-                    current_user_id=uuid.uuid4(),
-                    api_key_encrypted=encrypt_api_key("test_api_key"),
-                )
 
-        assert exc_info.value.status_code == 400
-        assert "couldn't understand" in exc_info.value.detail
+class TestKeyResolution:
+    def test_byok_key_wins(self, db, monkeypatch):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        user = db.exec(select(User)).first()
+        user.gemini_api_key_encrypted = encrypt_api_key("user-own-key-1234567890")
+        resolved = parser_service.resolve_api_key(user)
+        assert resolved == ("user-own-key-1234567890", True)
 
-    def test_parse_expense_all_personalities(self, db):
-        """Test all 4 personality modes use correct system prompts."""
-        from app.features.ai.parser_service import PERSONALITY_PROMPTS
+    def test_server_key_is_default(self, db, monkeypatch):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        user = db.exec(select(User)).first()
+        user.gemini_api_key_encrypted = None
+        resolved = parser_service.resolve_api_key(user)
+        assert resolved == ("server-key", False)
 
-        personalities = [
-            AIPersonality.PROFESSIONAL,
-            AIPersonality.FRIENDLY,
-            AIPersonality.FUNNY,
-            AIPersonality.F3_PBS,
-        ]
+    def test_no_key_anywhere_is_none(self, db, monkeypatch):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+        user = db.exec(select(User)).first()
+        user.gemini_api_key_encrypted = None
+        assert parser_service.resolve_api_key(user) is None
 
-        mock_response = Mock()
-        mock_response.text = '{"amount": 60.0, "description": "Lunch", "confidence": 0.95}'
 
-        for personality in personalities:
-            mock_client = Mock()
-            mock_client.models.generate_content.return_value = mock_response
-
-            with patch("app.features.ai.parser_service.get_gemini_client", return_value=mock_client):
-                result = parser_service.parse_expense_text(
-                    text="Paid 60 for lunch",
-                    personality=personality,
-                    current_user_id=uuid.uuid4(),
-                    api_key_encrypted=encrypt_api_key("test_api_key"),
-                )
-
-            # Verify commentary was generated (should vary by personality)
-            assert result.commentary
-            assert result.confidence_score == 0.95
-
-            # Verify correct system prompt was used
-            assert mock_client.models.generate_content.called
-            # Get the kwargs from the second call (first call is parsing, second is commentary)
-            # We need to check that system_instruction was passed
-            call_args_list = mock_client.models.generate_content.call_args_list
-            # At least one call should have system_instruction matching personality
-            found_correct_prompt = False
-            for call in call_args_list:
-                if "config" in call[1] and "system_instruction" in call[1]["config"]:
-                    if call[1]["config"]["system_instruction"] == PERSONALITY_PROMPTS[personality.value]:
-                        found_correct_prompt = True
-                        break
-            assert found_correct_prompt, f"System prompt for {personality.value} not found in API calls"
-
-    def test_get_group_personality_creates_default(self, db):
-        """Test that missing group settings are created with default."""
-        group_id = _create_group(db)
-
+class TestGroupPersonality:
+    def test_creates_default(self, db):
+        group_id = _create_group_row(db)
         personality = parser_service.get_group_personality(db, group_id)
-
-        # Verify GroupSettings was created
-        settings = db.exec(
+        row = db.exec(
             select(GroupSettings).where(GroupSettings.group_id == group_id)
         ).first()
-
-        assert settings is not None
-        assert settings.ai_personality == "friendly"
+        assert row is not None
+        assert row.ai_personality == "friendly"
         assert personality == AIPersonality.FRIENDLY
 
-    def test_get_group_personality_uses_existing(self, db):
-        """Test that existing group settings are respected."""
-        group_id = _create_group(db)
-
-        # Create GroupSettings with custom personality
-        settings = GroupSettings(group_id=group_id, ai_personality="funny")
-        db.add(settings)
+    def test_uses_existing(self, db):
+        group_id = _create_group_row(db)
+        db.add(GroupSettings(group_id=group_id, ai_personality="funny"))
         db.commit()
+        assert parser_service.get_group_personality(db, group_id) == AIPersonality.FUNNY
 
-        personality = parser_service.get_group_personality(db, group_id)
+    def test_unknown_stored_value_falls_back_to_friendly(self, db):
+        # rows written before the WS7 enum cap (e.g. "f3-pbs") must not 500
+        group_id = _create_group_row(db)
+        db.add(GroupSettings(group_id=group_id, ai_personality="f3-pbs"))
+        db.commit()
+        assert (
+            parser_service.get_group_personality(db, group_id)
+            == AIPersonality.FRIENDLY
+        )
 
-        # Assert returned personality is FUNNY (not default)
-        assert personality == AIPersonality.FUNNY
 
+class TestEncryption:
     def test_api_key_encryption_decryption(self):
-        """Test that encryption/decryption functions work correctly."""
-        original_key = "AIzaSyC_test_api_key_12345"
+        original = "AIzaSyC_test_api_key_12345"
+        encrypted = encrypt_api_key(original)
+        assert encrypted != original
+        assert decrypt_api_key(encrypted) == original
 
-        # Encrypt
-        encrypted = encrypt_api_key(original_key)
-        assert encrypted != original_key  # Encrypted should be different
+    def test_fernet_key_derivation_is_stable_and_keyed(self, monkeypatch):
+        # HKDF from the dedicated ENCRYPTION_KEY (B-C5): deterministic for a
+        # given secret, different for a different secret.
+        monkeypatch.setattr(settings, "ENCRYPTION_KEY", "secret-a")
+        key_a1 = get_encryption_key()
+        key_a2 = get_encryption_key()
+        monkeypatch.setattr(settings, "ENCRYPTION_KEY", "secret-b")
+        key_b = get_encryption_key()
+        assert key_a1 == key_a2
+        assert key_a1 != key_b
+        # and it is not the old truncate-pad of the secret
+        import base64
 
-        # Decrypt
-        decrypted = decrypt_api_key(encrypted)
-        assert decrypted == original_key  # Decrypted matches original
+        assert key_a1 != base64.urlsafe_b64encode(b"secret-a".ljust(32, b"0"))
 
 
 # =============================================================================
-# Integration Tests - Parser Router
+# Unit tests — quota
+# =============================================================================
+
+
+class TestQuota:
+    def test_consume_increments(self, db):
+        user = db.exec(select(User)).first()
+        assert parser_service.consume_free_parse(db, user.id) is True
+        assert parser_service.consume_free_parse(db, user.id) is True
+        row = db.exec(select(AIUsage).where(AIUsage.user_id == user.id)).first()
+        assert row.parse_count == 2
+
+    def test_consume_exhausted(self, db, monkeypatch):
+        monkeypatch.setattr(settings, "AI_FREE_MONTHLY_PARSES", 2)
+        user = db.exec(select(User)).first()
+        assert parser_service.consume_free_parse(db, user.id) is True
+        assert parser_service.consume_free_parse(db, user.id) is True
+        assert parser_service.consume_free_parse(db, user.id) is False
+        row = db.exec(select(AIUsage).where(AIUsage.user_id == user.id)).first()
+        assert row.parse_count == 2  # the denied call must not increment
+
+    def test_quota_resets_each_month(self, db, monkeypatch):
+        monkeypatch.setattr(settings, "AI_FREE_MONTHLY_PARSES", 1)
+        user = db.exec(select(User)).first()
+        db.add(AIUsage(user_id=user.id, period="2020-01", parse_count=99))
+        db.commit()
+        # an exhausted PAST month must not count against the current one
+        assert parser_service.consume_free_parse(db, user.id) is True
+
+
+# =============================================================================
+# Integration tests — the SSE endpoint
 # =============================================================================
 
 
 class TestParserRouter:
-    """Integration tests for AI parsing router endpoints."""
+    def test_parse_sse_complete_payload(self, client, db, monkeypatch):
+        """The B-C1 regression test: real membership, full payload assertion.
 
-    def test_parse_expense_sse_streaming(self, client, normal_user_token_headers, db):
-        """Test SSE streaming endpoint returns correct content-type."""
-        # Mock the parsing service to avoid actual API calls
-        group_id = uuid.uuid4()
+        The old test asserted only status/content-type, so an endpoint that
+        denied every request for months still passed.
+        """
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        headers, user_id, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "AI Parse Group")
 
-        with patch("app.features.ai.parser_service.parse_expense_text") as mock_parse:
-            mock_parse.return_value = Mock(
-                amount=Decimal("60.0"),
-                description="Lunch with team",
-                payer_id=uuid.uuid4(),
-                confidence_score=0.95,
-                commentary="Got it! Lunch for $60.",
+        with patch(
+            "app.features.ai.parser_service.get_gemini_client",
+            return_value=_mock_gemini_client(),
+        ):
+            r = client.post(
+                f"{settings.API_V1_STR}/expenses/parse",
+                json=_parse_request(group["id"], "Paid 60 for lunch with the team"),
+                headers=headers,
             )
 
-            response = client.post(
-                "/api/v1/expenses/parse",
-                json={
-                    "text": "Paid 60 for lunch with the team",
-                    "group_id": str(group_id),
-                    "personality": "friendly",
-                },
-                headers=normal_user_token_headers,
+        assert r.status_code == 200
+        assert "text/event-stream" in r.headers["content-type"]
+
+        events = _sse_events(r.text)
+        assert [e["type"] for e in events][-1] == "complete"
+        assert all(e["type"] != "error" for e in events)
+
+        commentary = "".join(
+            e["data"]["text"] for e in events if e["type"] == "commentary"
+        )
+        assert commentary == COMMENTARY
+
+        complete = events[-1]["data"]
+        assert complete["amount"] == "60.0"  # Decimal string on the wire
+        assert complete["description"] == "Lunch"
+        assert complete["payer_id"] == str(user_id)
+        assert complete["confidence_score"] == 0.95
+        assert complete["commentary"] == COMMENTARY
+
+    def test_parse_non_member_is_403(self, client, db, monkeypatch):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        owner_headers, _, _ = _make_authed_user(client, db)
+        outsider_headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, owner_headers, "Members Only")
+
+        r = client.post(
+            f"{settings.API_V1_STR}/expenses/parse",
+            json=_parse_request(group["id"]),
+            headers=outsider_headers,
+        )
+        assert r.status_code == 403
+        assert "member of this group" in r.json()["detail"]
+
+    def test_parse_no_key_anywhere_is_503(self, client, db, monkeypatch):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+        headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "No AI Configured")
+
+        r = client.post(
+            f"{settings.API_V1_STR}/expenses/parse",
+            json=_parse_request(group["id"]),
+            headers=headers,
+        )
+        assert r.status_code == 503
+        assert "manually" in r.json()["detail"]
+
+    def test_parse_quota_exhausted_is_429(self, client, db, monkeypatch):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        monkeypatch.setattr(settings, "AI_FREE_MONTHLY_PARSES", 0)
+        headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "Quota Group")
+
+        r = client.post(
+            f"{settings.API_V1_STR}/expenses/parse",
+            json=_parse_request(group["id"]),
+            headers=headers,
+        )
+        assert r.status_code == 429
+        assert "free AI parses" in r.json()["detail"]
+
+    def test_parse_increments_usage(self, client, db, monkeypatch):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        headers, user_id, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "Metered Group")
+
+        with patch(
+            "app.features.ai.parser_service.get_gemini_client",
+            return_value=_mock_gemini_client(),
+        ):
+            r = client.post(
+                f"{settings.API_V1_STR}/expenses/parse",
+                json=_parse_request(group["id"]),
+                headers=headers,
+            )
+        assert r.status_code == 200
+
+        row = db.exec(select(AIUsage).where(AIUsage.user_id == user_id)).first()
+        assert row is not None
+        assert row.parse_count == 1
+
+    def test_parse_byok_bypasses_quota_and_uses_user_key(
+        self, client, db, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        monkeypatch.setattr(settings, "AI_FREE_MONTHLY_PARSES", 0)  # hosted closed
+        headers, user_id, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "BYOK Group")
+
+        user = db.get(User, user_id)
+        user.gemini_api_key_encrypted = encrypt_api_key("byok-user-key-1234567890")
+        db.add(user)
+        db.commit()
+
+        with patch(
+            "app.features.ai.parser_service.get_gemini_client",
+            return_value=_mock_gemini_client(),
+        ) as get_client:
+            r = client.post(
+                f"{settings.API_V1_STR}/expenses/parse",
+                json=_parse_request(group["id"]),
+                headers=headers,
             )
 
-        # Verify SSE content type
-        assert response.status_code == 200
-        assert "text/event-stream" in response.headers["content-type"]
-
-    @pytest.mark.skip(
-        reason="Blocked by B-C1: the parse endpoint's membership check has "
-        "swapped arguments and denies every request, and this test never sets "
-        "up real group membership. Rewritten with the real AI path in WS7 "
-        "(10-execution-plan.md)."
-    )
-    def test_parse_expense_no_api_key_returns_error(self, client, normal_user_token_headers, db):
-        """Test that user without API key gets error event."""
-        group_id = uuid.uuid4()
-
-        # Create user with gemini_api_key_encrypted=None (default)
-        response = client.post(
-            "/api/v1/expenses/parse",
-            json={
-                "text": "Paid 60 for lunch",
-                "group_id": str(group_id),
-            },
-            headers=normal_user_token_headers,
+        assert r.status_code == 200
+        assert _sse_events(r.text)[-1]["type"] == "complete"
+        get_client.assert_called_once_with("byok-user-key-1234567890")
+        # BYOK must not touch the meter
+        assert (
+            db.exec(select(AIUsage).where(AIUsage.user_id == user_id)).first() is None
         )
 
-        # Should return error event
-        assert response.status_code == 200
-        assert "add your Gemini API key" in response.text
+    def test_parse_low_confidence_streams_error_event(
+        self, client, db, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "Low Confidence Group")
 
-    def test_parse_expense_unauthenticated_raises_401(self, client, db):
-        """Test endpoint without auth token returns 401."""
-        group_id = uuid.uuid4()
+        low_conf = '{"amount": 60.0, "description": "Lunch", "confidence": 0.4}'
+        with patch(
+            "app.features.ai.parser_service.get_gemini_client",
+            return_value=_mock_gemini_client(parse_json=low_conf),
+        ):
+            r = client.post(
+                f"{settings.API_V1_STR}/expenses/parse",
+                json=_parse_request(group["id"], "asdfghjkl"),
+                headers=headers,
+            )
 
-        response = client.post(
-            "/api/v1/expenses/parse",
-            json={
-                "text": "Paid 60 for lunch",
-                "group_id": str(group_id),
-            },
+        assert r.status_code == 200  # headers already sent — honest contract
+        events = _sse_events(r.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+        assert "couldn't quite understand" in events[0]["error"]
+
+    def test_parse_timeout_streams_timeout_error(self, client, db, monkeypatch):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "Timeout Group")
+
+        slow_client = Mock()
+        slow_client.aio.models.generate_content = AsyncMock(
+            side_effect=httpx.ReadTimeout("upstream too slow")
+        )
+        with patch(
+            "app.features.ai.parser_service.get_gemini_client",
+            return_value=slow_client,
+        ):
+            r = client.post(
+                f"{settings.API_V1_STR}/expenses/parse",
+                json=_parse_request(group["id"]),
+                headers=headers,
+            )
+
+        events = _sse_events(r.text)
+        assert events[0]["type"] == "error"
+        assert "took too long" in events[0]["error"]
+
+    def test_parse_model_crash_streams_generic_error(
+        self, client, db, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "Crash Group")
+
+        broken_client = Mock()
+        broken_client.aio.models.generate_content = AsyncMock(
+            side_effect=RuntimeError("secret internal detail")
+        )
+        with patch(
+            "app.features.ai.parser_service.get_gemini_client",
+            return_value=broken_client,
+        ):
+            r = client.post(
+                f"{settings.API_V1_STR}/expenses/parse",
+                json=_parse_request(group["id"]),
+                headers=headers,
+            )
+
+        events = _sse_events(r.text)
+        assert events[0]["type"] == "error"
+        assert "unexpected error" in events[0]["error"]
+        assert "secret internal detail" not in r.text  # no leakage (S5-M2)
+
+    def test_parse_unauthenticated_is_401(self, client, db):
+        r = client.post(
+            f"{settings.API_V1_STR}/expenses/parse",
+            json=_parse_request(str(uuid.uuid4())),
+        )
+        assert r.status_code == 401
+
+
+# =============================================================================
+# Integration tests — BYOK endpoints
+# =============================================================================
+
+
+class TestApiKeyEndpoints:
+    def test_put_stores_encrypted(self, client, db):
+        headers, user_id, _ = _make_authed_user(client, db)
+        plaintext = "AIzaSy-my-very-own-gemini-key"
+
+        r = client.put(
+            f"{settings.API_V1_STR}/users/me/api-key",
+            json={"api_key": plaintext},
+            headers=headers,
+        )
+        assert r.status_code == 200
+
+        user = db.get(User, user_id)
+        db.refresh(user)
+        assert user.gemini_api_key_encrypted is not None
+        assert plaintext not in user.gemini_api_key_encrypted
+        assert decrypt_api_key(user.gemini_api_key_encrypted) == plaintext
+
+    def test_delete_clears_key(self, client, db):
+        headers, user_id, _ = _make_authed_user(client, db)
+        client.put(
+            f"{settings.API_V1_STR}/users/me/api-key",
+            json={"api_key": "AIzaSy-key-to-be-deleted-123"},
+            headers=headers,
         )
 
-        assert response.status_code == 401
+        r = client.delete(
+            f"{settings.API_V1_STR}/users/me/api-key", headers=headers
+        )
+        assert r.status_code == 200
 
-    @pytest.mark.skip(
-        reason="Blocked by B-C1 (swapped-args membership check denies every "
-        "request); no real group membership set up. Rewritten in WS7 "
-        "(10-execution-plan.md)."
-    )
-    def test_parse_expense_with_gibberish_raises_400(self, client, normal_user_token_headers, db):
-        """Test gibberish input returns low confidence error."""
-        group_id = uuid.uuid4()
+        user = db.get(User, user_id)
+        db.refresh(user)
+        assert user.gemini_api_key_encrypted is None
 
-        # Mock low confidence response
-        with patch("app.features.ai.parser_service.parse_expense_text") as mock_parse:
-            mock_parse.side_effect = HTTPException(
-                status_code=400,
-                detail="I couldn't quite understand that expense. Could you rephrase it?"
-            )
+    def test_put_rejects_implausibly_short_key(self, client, db):
+        headers, _, _ = _make_authed_user(client, db)
+        r = client.put(
+            f"{settings.API_V1_STR}/users/me/api-key",
+            json={"api_key": "short"},
+            headers=headers,
+        )
+        assert r.status_code == 422
 
-            response = client.post(
-                "/api/v1/expenses/parse",
-                json={
-                    "text": "asdfghjkl",
-                    "group_id": str(group_id),
-                },
-                headers=normal_user_token_headers,
-            )
 
-        # Should return error event
-        assert response.status_code == 200
-        assert "couldn't quite understand" in response.text
+# =============================================================================
+# Integration tests — group ai_personality write path (capped at funny)
+# =============================================================================
+
+
+class TestGroupPersonalitySettings:
+    def test_owner_sets_personality(self, client, db):
+        headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "Tone Group")
+
+        r = client.patch(
+            f"{settings.API_V1_STR}/expense-groups/{group['id']}/settings",
+            json={"ai_personality": "funny"},
+            headers=headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["ai_personality"] == "funny"
+        # strict_mode untouched by the partial update
+        assert r.json()["strict_mode"] is False
+
+        r = client.get(
+            f"{settings.API_V1_STR}/expense-groups/{group['id']}/settings",
+            headers=headers,
+        )
+        assert r.json()["ai_personality"] == "funny"
+
+    def test_roast_mode_rejected(self, client, db):
+        headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "No Roast Group")
+
+        r = client.patch(
+            f"{settings.API_V1_STR}/expense-groups/{group['id']}/settings",
+            json={"ai_personality": "f3-pbs"},
+            headers=headers,
+        )
+        assert r.status_code == 422
+
+    def test_member_cannot_set_personality(self, client, db):
+        owner_headers, _, _ = _make_authed_user(client, db)
+        member_headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, owner_headers, "Owner Only Tone")
+
+        r = client.post(
+            f"{settings.API_V1_STR}/expense-groups/{group['id']}/invites",
+            headers=owner_headers,
+        )
+        token = r.json()["invite"]["token"]
+        r = client.get(
+            f"{settings.API_V1_STR}/expense-groups/invite/{token}",
+            headers=member_headers,
+        )
+        assert r.status_code == 200
+
+        r = client.patch(
+            f"{settings.API_V1_STR}/expense-groups/{group['id']}/settings",
+            json={"ai_personality": "professional"},
+            headers=member_headers,
+        )
+        assert r.status_code == 403
+
+    def test_strict_mode_only_update_keeps_personality(self, client, db):
+        headers, _, _ = _make_authed_user(client, db)
+        group = _create_group(client, headers, "Partial Update Group")
+
+        client.patch(
+            f"{settings.API_V1_STR}/expense-groups/{group['id']}/settings",
+            json={"ai_personality": "professional"},
+            headers=headers,
+        )
+        r = client.patch(
+            f"{settings.API_V1_STR}/expense-groups/{group['id']}/settings",
+            json={"strict_mode": True},
+            headers=headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["strict_mode"] is True
+        assert r.json()["ai_personality"] == "professional"
