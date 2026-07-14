@@ -56,8 +56,9 @@ export interface ExpenseSplitsResponse {
 }
 
 /**
- * AI-parsed expense response from Story 3.3's SSE endpoint
- * This is the data format returned by the AI parsing service
+ * AI-parsed expense from the /expenses/parse SSE endpoint (WS7).
+ * The wire sends `amount` as a decimal string (WS4/M1); the parse client
+ * (api/parse.ts) converts it to a number for this edit buffer.
  */
 export interface ExpenseParseResponse {
   /** Parsed amount */

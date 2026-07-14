@@ -10,6 +10,7 @@ import type {
   GroupInviteResponse,
   GroupMembersListResponse,
   GroupSettings,
+  GroupSettingsUpdate,
   PairwiseBalancesResponse,
 } from "../types"
 
@@ -79,7 +80,7 @@ export function usePairwiseBalances(groupId: string) {
   })
 }
 
-// === Group Settings (WS6 — strict mode) ===
+// === Group Settings (WS6 strict mode + WS7 AI personality) ===
 
 async function getGroupSettings(groupId: string): Promise<GroupSettings> {
   return __request(OpenAPI, {
@@ -103,7 +104,7 @@ export function useGroupSettings(groupId: string) {
 
 async function updateGroupSettings(
   groupId: string,
-  data: { strict_mode: boolean },
+  data: GroupSettingsUpdate,
 ): Promise<GroupSettings> {
   return __request(OpenAPI, {
     method: "PATCH",
@@ -117,18 +118,29 @@ async function updateGroupSettings(
   })
 }
 
+const PERSONALITY_TOAST: Record<GroupSettings["ai_personality"], string> = {
+  professional: "The mediator will keep it strictly business",
+  friendly: "The mediator is back to its friendly self",
+  funny: "The mediator will crack a joke now and then",
+}
+
 export function useUpdateGroupSettings(groupId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation<GroupSettings, Error, { strict_mode: boolean }>({
+  return useMutation<GroupSettings, Error, GroupSettingsUpdate>({
     mutationFn: (data) => updateGroupSettings(groupId, data),
-    onSuccess: (settings) => {
+    onSuccess: (settings, variables) => {
       queryClient.setQueryData(["groups", groupId, "settings"], settings)
-      toast.success(
-        settings.strict_mode
-          ? "Strict mode on — every share needs an explicit confirmation"
-          : "Strict mode off — expenses confirm quietly unless someone objects",
-      )
+      if (variables.strict_mode !== undefined) {
+        toast.success(
+          settings.strict_mode
+            ? "Strict mode on — every share needs an explicit confirmation"
+            : "Strict mode off — expenses confirm quietly unless someone objects",
+        )
+      }
+      if (variables.ai_personality !== undefined) {
+        toast.success(PERSONALITY_TOAST[settings.ai_personality])
+      }
     },
     onError: (error) => {
       toast.error(`Couldn't update settings: ${error.message}`)

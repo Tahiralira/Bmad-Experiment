@@ -7,7 +7,6 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { InlineEditableField } from "@/components/ui/inline-input"
 import { useExpenseEdit } from "../hooks/useExpenseEdit"
-import { useAutoConfirm } from "../hooks/useAutoConfirm"
 import { useSplitState } from "../hooks/useSplitState"
 import { useGroupMembers } from "@/features/groups/api/groups"
 import { useUpdateExpenseSplit } from "../api/expenses"
@@ -27,8 +26,6 @@ interface EditableExpensePreviewProps {
   onDiscard: () => void
   /** Group ID for fetching members */
   groupId: string
-  /** Auto-confirm enabled preference (default: false) */
-  autoConfirmEnabled?: boolean
   /** Additional className */
   className?: string
   /** Story 4.1: Current user ID for creator check (optional - for editing existing expenses) */
@@ -45,8 +42,8 @@ interface EditableExpensePreviewProps {
  * - Change tracking with visual highlights
  * - Reset to AI suggestion per field
  * - Zod validation with inline errors
- * - Auto-confirm countdown (if enabled)
- * - Confirm/Discard actions
+ * - Confirm/Discard actions — manual confirm ONLY (UX-H6: financial records
+ *   never commit on a timer)
  * - Payer selection from group members
  * - Complex edit mode: Split type selection, member exclusions (Story 3.5)
  *
@@ -58,7 +55,6 @@ interface EditableExpensePreviewProps {
  *   onDiscard={handleDiscard}
  *   groupId="group-123"
  *   currentUserId="user-123"
- *   autoConfirmEnabled={false}
  * />
  * ```
  */
@@ -67,7 +63,6 @@ export function EditableExpensePreview({
   onConfirm,
   onDiscard,
   groupId,
-  autoConfirmEnabled = false,
   className,
   currentUserId,
   expense,
@@ -101,14 +96,6 @@ export function EditableExpensePreview({
     isValid: isBasicValid,
     validationErrors,
   } = useExpenseEdit(parsedData)
-
-  // Auto-confirm countdown
-  const { countdown, isCountingDown, startCountdown, cancelCountdown } =
-    useAutoConfirm({
-      enabled: autoConfirmEnabled,
-      duration: 3000,
-      onCountdownComplete: () => handleConfirm(),
-    })
 
   // Complex edit mode state
   const [isComplexMode, setIsComplexMode] = useState(false)
@@ -158,25 +145,6 @@ export function EditableExpensePreview({
 
   // Split mutation for saving split configuration (Story 3.5)
   const updateSplitMutation = useUpdateExpenseSplit()
-
-  // Local state for tracking user interaction
-  const [hasInteracted, setHasInteracted] = useState(false)
-
-  // Start countdown on mount (if enabled and user can edit)
-  // Story 4.1: Don't auto-confirm if user is not creator or expense is locked
-  useEffect(() => {
-    if (autoConfirmEnabled && !hasInteracted && !isComplexMode && canEdit) {
-      startCountdown()
-    }
-  }, [autoConfirmEnabled, hasInteracted, isComplexMode, startCountdown, canEdit])
-
-  // Cancel countdown and mark interacted on any user action
-  const handleUserInteraction = () => {
-    if (!hasInteracted) {
-      setHasInteracted(true)
-      cancelCountdown()
-    }
-  }
 
   // Handle confirm action
   const handleConfirm = async () => {
@@ -251,21 +219,18 @@ export function EditableExpensePreview({
     }
   }
 
-  // Handle field change with user interaction tracking
+  // Handle field change
   const handleFieldChange = (field: keyof ExpenseParseResponse, value: string | number) => {
-    handleUserInteraction()
     handleChange(field, value)
   }
 
-  // Handle field reset with user interaction tracking
+  // Handle field reset
   const handleFieldReset = (field: keyof ExpenseParseResponse) => {
-    handleUserInteraction()
     handleReset(field)
   }
 
   // Toggle complex edit mode
   const toggleComplexMode = () => {
-    handleUserInteraction()
     setIsComplexMode((prev) => !prev)
   }
 
@@ -547,8 +512,6 @@ export function EditableExpensePreview({
               >
                 {updateSplitMutation.isPending ? (
                   <span>Saving...</span>
-                ) : isCountingDown ? (
-                  <span>Confirm ({countdown}s)</span>
                 ) : (
                   <span>Confirm</span>
                 )}

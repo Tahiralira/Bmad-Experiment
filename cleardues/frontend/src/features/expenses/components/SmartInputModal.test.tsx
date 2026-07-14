@@ -20,6 +20,19 @@ import {
 import type { ReactElement, ReactNode } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { SmartInputModal } from "./SmartInputModal"
+import { parseExpense, ParseError } from "../api/parse"
+
+// WS7: the modal consumes the real SSE parse client — mock the module (the
+// ParseError class stays real so instanceof checks hold) and a signed-in user.
+vi.mock("../api/parse", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/parse")>()
+  return { ...actual, parseExpense: vi.fn() }
+})
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: "11111111-1111-1111-1111-111111111111" } }),
+}))
+
+const mockParseExpense = vi.mocked(parseExpense)
 
 // SmartInputModal uses useQueryClient/useMutation; every render needs a provider.
 const render = (ui: ReactElement) =>
@@ -315,46 +328,73 @@ describe("SmartInputModal", () => {
     })
   })
 
-  // ========== AC #2, #8, #9: AI Commentary Bubble ==========
-  // SKIPPED: these tests assert the hardcoded setTimeout AI mock (S4-C2), which
-  // also requires a groupId the tests don't pass (S4-C1). The mock is deleted and
-  // replaced with real SSE integration in WS7 (10-execution-plan.md) — rewrite
-  // these against the real parse flow there.
-  describe("AI Commentary Bubble", () => {
-    it.skip("shows AI commentary bubble with streaming text", async () => {
-      render(<SmartInputModal open={true} onOpenChange={() => {}} />)
+  // ========== AC #2, #8, #9: AI parse flow (WS7 — real SSE client) ==========
+  // Rewritten in WS7: the setTimeout mock is gone; the modal consumes the
+  // real parse client (mocked at the module boundary here — the client's own
+  // stream handling is covered in ../api/parse.test.ts).
+  describe("AI Parse Flow", () => {
+    const submitParse = (text = "Paid 60 for lunch") => {
+      fireEvent.change(screen.getByPlaceholderText(/Paid 150 for dinner/), {
+        target: { value: text },
+      })
+      fireEvent.click(screen.getByRole("button", { name: "Add Expense" }))
+    }
 
-      const textarea = screen.getByPlaceholderText(/Paid 150 for dinner/)
-      const submitButton = screen.getByRole("button", { name: "Add Expense" })
+    it("streams commentary chunks and shows the editable preview", async () => {
+      mockParseExpense.mockImplementation(async ({ onCommentary }) => {
+        onCommentary?.("Got ")
+        onCommentary?.("it!")
+        return {
+          amount: 60,
+          description: "Lunch",
+          payer_id: "11111111-1111-1111-1111-111111111111",
+          confidence_score: 0.95,
+          commentary: "Got it!",
+        }
+      })
 
-      fireEvent.change(textarea, { target: { value: "Paid 60 for lunch" } })
-      fireEvent.click(submitButton)
-
-      // Wait for streaming to start
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Got it!/)).toBeInTheDocument()
-        },
-        { timeout: 3000 }
+      render(
+        <SmartInputModal open={true} onOpenChange={() => {}} groupId="group-1" />
       )
+      submitParse()
+
+      // streamed commentary lands in the bubble
+      await waitFor(() => {
+        expect(screen.getByText("Got it!")).toBeInTheDocument()
+      })
+      // parse result opens the editable preview (manual confirm only, UX-H6)
+      await waitFor(() => {
+        expect(screen.getByText("Review Expense")).toBeInTheDocument()
+      })
+      expect(mockParseExpense).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: "Paid 60 for lunch",
+          groupId: "group-1",
+        })
+      )
+      // no countdown on the confirm button — it commits only on click
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument()
     })
 
-    it.skip("shows typing indicator before streaming starts", async () => {
-      render(<SmartInputModal open={true} onOpenChange={() => {}} />)
+    it("shows the server's mediator-voice message when the parse fails", async () => {
+      mockParseExpense.mockRejectedValue(
+        new ParseError(
+          "You've used all your free AI parses for this month — " +
+            "they reset next month. Manual entry is always free."
+        )
+      )
 
-      const textarea = screen.getByPlaceholderText(/Paid 150 for dinner/)
-      const submitButton = screen.getByRole("button", { name: "Add Expense" })
+      render(
+        <SmartInputModal open={true} onOpenChange={() => {}} groupId="group-1" />
+      )
+      submitParse()
 
-      fireEvent.change(textarea, { target: { value: "Paid 60 for lunch" } })
-      fireEvent.click(submitButton)
-
-      // Check for typing indicator dots (aria-hidden="true" dots)
-      await waitFor(
-        () => {
-          const dots = document.querySelectorAll('[aria-hidden="true"].w-2.h-2')
-          expect(dots.length).toBeGreaterThan(0)
-        },
-        { timeout: 500 }
+      await waitFor(() => {
+        expect(screen.getByRole("alert")).toHaveTextContent(/free AI parses/)
+      })
+      // recoverable: the input keeps its text so the user can rephrase
+      expect(screen.getByPlaceholderText(/Paid 150 for dinner/)).toHaveValue(
+        "Paid 60 for lunch"
       )
     })
   })

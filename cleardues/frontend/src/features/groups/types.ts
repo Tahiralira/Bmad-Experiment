@@ -65,11 +65,21 @@ export interface PairwiseBalancesResponse {
   count: number
 }
 
-// === Group Settings (WS6 — strict mode) ===
+// === Group Settings (WS6 strict mode + WS7 AI personality) ===
+
+/** Capped at "funny" (UX-H5) — the roast mode was removed in WS7 */
+export type AIPersonality = "professional" | "friendly" | "funny"
 
 export interface GroupSettings {
   group_id: string
   strict_mode: boolean
+  ai_personality: AIPersonality
+}
+
+/** PATCH body — send only the fields that change */
+export interface GroupSettingsUpdate {
+  strict_mode?: boolean
+  ai_personality?: AIPersonality
 }
 
 // === Member Types ===

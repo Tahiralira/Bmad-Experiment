@@ -14,8 +14,8 @@ export interface ExpensePreviewCardProps {
   onDiscard?: () => void
   /** Group ID for fetching members */
   groupId?: string
-  /** Auto-confirm enabled preference (default: false) */
-  autoConfirmEnabled?: boolean
+  /** Mediator-voice message shown in the error state (WS7) */
+  errorMessage?: string | null
   /** Additional className for styling */
   className?: string
 }
@@ -43,7 +43,7 @@ export function ExpensePreviewCard({
   onConfirm,
   onDiscard,
   groupId,
-  autoConfirmEnabled = false,
+  errorMessage,
   className,
 }: ExpensePreviewCardProps) {
   // Placeholder state (Story 3.2)
@@ -80,7 +80,8 @@ export function ExpensePreviewCard({
     )
   }
 
-  // Ready state (Story 3.4) - Display editable preview
+  // Ready state (Story 3.4) - Display editable preview.
+  // Manual confirm only (UX-H6): financial records never commit on a timer.
   if (status === "ready" && data && onConfirm && onDiscard && groupId) {
     return (
       <EditableExpensePreview
@@ -88,13 +89,13 @@ export function ExpensePreviewCard({
         onConfirm={onConfirm}
         onDiscard={onDiscard}
         groupId={groupId}
-        autoConfirmEnabled={autoConfirmEnabled}
         className={cn("mt-4", className)}
       />
     )
   }
 
-  // Error state (Story 3.4)
+  // Error state — shows the server's mediator-voice message when present
+  // (quota exhausted, low confidence, AI unavailable — WS7)
   if (status === "error") {
     return (
       <div
@@ -104,9 +105,11 @@ export function ExpensePreviewCard({
           "bg-error/10 border border-error/30",
           className
         )}
+        role="alert"
       >
         <p className="text-error text-sm">
-          Failed to parse expense. Please try again or switch to manual form.
+          {errorMessage ||
+            "Failed to parse expense. Please try again or switch to manual form."}
         </p>
       </div>
     )

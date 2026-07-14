@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { AICommentaryBubble } from "./AICommentaryBubble"
 import { ExpensePreviewCard } from "./ExpensePreviewCard"
 import { ExpenseForm } from "./ExpenseForm"
-import { useStreamingText } from "../hooks/useStreamingText"
+import { parseExpense, ParseError } from "../api/parse"
 import { useCreateExpense } from "../api/expenses"
 import type { ExpenseParseResponse, ExpenseCreate } from "../types"
 
@@ -98,42 +98,56 @@ export function SmartInputModal({
   // Expense creation mutation
   const createExpenseMutation = useCreateExpense()
 
-  // Streaming text hook
-  const { streamedText, startStream, resetStream } = useStreamingText({
-    speed: 40, // 40ms per character (middle of 30-50ms range)
-  })
-  // Note: hook also returns isStreaming, but we use component's isProcessing state instead
-  // isProcessing = AI processing duration (includes streaming + simulated API call time)
-  // isStreaming = text animation duration only
-  // We keep isProcessing true for full 2 seconds to simulate API call, not just streaming time
+  // Real AI commentary (WS7/S4-C2): word chunks streamed over SSE are
+  // appended as they arrive — no simulated typing effect
+  const [commentary, setCommentary] = useState("")
+  // Mediator-voice message when a parse fails (quota, low confidence, ...)
+  const [parseError, setParseError] = useState<string | null>(null)
+  // In-flight parse — aborted when the modal closes or a new parse starts
+  const abortRef = useRef<AbortController | null>(null)
 
-  // Handle smart input submission
+  const abortParse = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+  }, [])
+
+  // Handle smart input submission — streams the REAL parse (WS7)
   const handleSmartSubmit = async () => {
-    if (!inputText.trim() || !effectiveGroupId || !currentUserId) return
+    if (!inputText.trim() || !effectiveGroupId || !currentUserId || isProcessing)
+      return
+
+    abortParse()
+    const controller = new AbortController()
+    abortRef.current = controller
 
     setIsProcessing(true)
     setPreviewStatus("loading")
+    setParsedData(null)
+    setParseError(null)
+    setCommentary("")
 
-    // Story 3.3: Call AI parsing service
-    // For now: simulate parsing with mock data — the REAL SSE integration
-    // lands in WS7; the payer is already the real signed-in user so
-    // confirming writes valid data
-    startStream("Got it! Parsing that expense for you...")
-
-    // Simulate AI parsing delay
-    setTimeout(() => {
-      const mockParsedData: ExpenseParseResponse = {
-        amount: 60.00,
-        description: "Lunch with team",
-        payer_id: currentUserId,
-        confidence_score: 0.95,
-        commentary: "Got it! Lunch for $60."
-      }
-
-      setParsedData(mockParsedData)
+    try {
+      const parsed = await parseExpense({
+        text: inputText,
+        groupId: effectiveGroupId,
+        onCommentary: (chunk) => setCommentary((prev) => prev + chunk),
+        signal: controller.signal,
+      })
+      if (controller.signal.aborted) return
+      setParsedData(parsed)
       setPreviewStatus("ready")
-      setIsProcessing(false)
-    }, 2000)
+    } catch (error) {
+      if (controller.signal.aborted) return
+      setCommentary("")
+      setParseError(
+        error instanceof ParseError
+          ? error.message
+          : "Something went wrong talking to the AI. Please try again or use the manual form.",
+      )
+      setPreviewStatus("error")
+    } finally {
+      if (!controller.signal.aborted) setIsProcessing(false)
+    }
   }
 
   // Handle confirm action from editable preview
@@ -177,7 +191,8 @@ export function SmartInputModal({
     setParsedData(null)
     setPreviewStatus("placeholder")
     setInputText("")
-    resetStream()
+    setCommentary("")
+    setParseError(null)
   }
 
   // Handle manual form success
@@ -208,13 +223,15 @@ export function SmartInputModal({
 
   // Handle modal close with state reset
   const handleClose = () => {
+    abortParse()
     onOpenChange(false)
     // Reset state after close animation
     setTimeout(() => {
       setInputText("")
       setMode("smart")
       setIsProcessing(false)
-      resetStream()
+      setCommentary("")
+      setParseError(null)
       setParsedData(null)
       setPreviewStatus("placeholder")
     }, 200) // Match slide-down animation duration
@@ -231,18 +248,23 @@ export function SmartInputModal({
     }
   }, [open, triggerRef])
 
-  // Reset input when modal opens
+  // Reset input when modal opens; abort any in-flight parse on close/unmount
   useEffect(() => {
     if (open) {
       setInputText("")
       setMode("smart")
       setIsProcessing(false)
-      resetStream()
+      setCommentary("")
+      setParseError(null)
       setParsedData(null)
       setPreviewStatus("placeholder")
       setSelectedGroupId(undefined)
+    } else {
+      abortParse()
     }
-  }, [open, resetStream])
+  }, [open, abortParse])
+
+  useEffect(() => () => abortParse(), [abortParse])
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -285,7 +307,10 @@ export function SmartInputModal({
                 }),
               }}
             >
-              <div className="flex flex-col h-full max-h-[80vh] p-6">
+              {/* overflow-y-auto: with real commentary + preview the content
+                  can exceed 80vh — without it Confirm is unreachable on
+                  short viewports (found in WS7 browser verification) */}
+              <div className="flex flex-col h-full max-h-[80vh] p-6 overflow-y-auto">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-4">
                     {/* Radix DialogTitle so screen readers announce the modal */}
@@ -344,11 +369,11 @@ export function SmartInputModal({
 
                   {mode === "smart" ? (
                     <>
-                      {/* AI Commentary Bubble */}
+                      {/* AI Commentary Bubble — real streamed commentary (WS7);
+                          tone follows the group's ai_personality server-side */}
                       <AICommentaryBubble
-                        text={streamedText}
+                        text={commentary}
                         isProcessing={isProcessing}
-                        personality="friendly" // Will be group-specific in Story 8.1
                       />
 
                       {/* Natural Language Input Field */}
@@ -380,14 +405,14 @@ export function SmartInputModal({
                         </button>
                       </div>
 
-                      {/* Expense Preview Card */}
+                      {/* Expense Preview Card — manual confirm only (UX-H6) */}
                       <ExpensePreviewCard
                         data={parsedData}
                         status={previewStatus}
                         onConfirm={handleConfirm}
                         onDiscard={handleDiscard}
                         groupId={effectiveGroupId}
-                        autoConfirmEnabled={false} // TODO: Add user preference setting
+                        errorMessage={parseError}
                       />
 
                       {/* Submit Button — disabled (not silently no-op, S4-C1)

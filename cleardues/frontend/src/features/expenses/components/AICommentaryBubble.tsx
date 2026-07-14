@@ -7,8 +7,6 @@ export interface AICommentaryBubbleProps {
   text: string
   /** Whether AI is currently processing/generating text */
   isProcessing: boolean
-  /** AI personality style for tone customization */
-  personality: "professional" | "friendly" | "funny" | "roast"
   /** Additional className for styling */
   className?: string
 }
@@ -25,17 +23,15 @@ export interface AICommentaryBubbleProps {
  *
  * @example
  * ```tsx
- * <AICommentaryBubble
- *   text={streamedText}
- *   isProcessing={isProcessing}
- *   personality="friendly"
- * />
+ * <AICommentaryBubble text={commentary} isProcessing={isProcessing} />
  * ```
+ *
+ * Tone (professional/friendly/funny) is a server-side concern — the group's
+ * ai_personality shapes the text itself, not the styling.
  */
 export function AICommentaryBubble({
   text,
   isProcessing,
-  personality: _personality, // Will be used for personality-driven styling in Story 8.1
   className,
 }: AICommentaryBubbleProps) {
   const [showTypingIndicator, setShowTypingIndicator] = useState(false)
