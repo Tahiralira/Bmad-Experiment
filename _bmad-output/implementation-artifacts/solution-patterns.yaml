@@ -7,11 +7,11 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-07-14 (WS7: BE-004 streaming generators vs session lifetime)
+# Last Updated: 2026-07-15 (WS8: TEST-004 GET->POST semantic changes, TEST-005 slowapi in tests)
 
 metadata:
   version: "1.0"
-  total_patterns: 23
+  total_patterns: 25
   categories:
     - docker
     - database
@@ -406,6 +406,39 @@ testing:
     prevention: "Always check how EXISTING endpoints handle errors before inventing new patterns"
     stories_encountered: ["5.1"]
     tokens_saved_estimate: "~500 per occurrence"
+
+  - id: "TEST-004"
+    title: "Converting a state-changing GET to preview-GET + action-POST silently breaks old tests"
+    symptoms:
+      - "Tests that 'join via invite link' still pass their status assertion (200) but later steps fail (member missing, splits 400)"
+      - "No error points at the invite step itself"
+    root_cause: "WS8 split GET /invite/{token} into a read-only preview (still 200) + POST /invite/{token}/accept. Old tests hitting the GET get a valid 200 preview — nothing mutates, and the failure surfaces far downstream."
+    solution: |
+      When an endpoint's method/semantics change, grep EVERY test call site of
+      the old URL, not just the feature's own test file:
+        grep -rn "expense-groups/invite/" tests/ | grep -v "/accept"
+      WS8 found 8 helper call sites across 7 unrelated test files.
+    prevention: "Method/semantic changes to shared endpoints require a repo-wide grep for the URL, because status-code assertions won't catch a read-only 200"
+    stories_encountered: ["WS8"]
+    tokens_saved_estimate: "~800 per occurrence"
+
+  - id: "TEST-005"
+    title: "Testing slowapi rate limits without throttling the whole suite"
+    symptoms:
+      - "Every test shares the TestClient IP; per-IP limits 429 unrelated tests"
+      - "Or: limiter disabled globally and the rate-limit test can't assert anything"
+    root_cause: "slowapi's Limiter reads its enabled flag at construction from settings, and storage is process-wide"
+    solution: |
+      1. Construct the limiter with enabled=settings.RATE_LIMIT_ENABLED
+         (app/core/limiter.py).
+      2. conftest sets settings.RATE_LIMIT_ENABLED = False BEFORE any app
+         import (same pre-import block as the test-DB redirect).
+      3. The one test asserting 429s flips `limiter.enabled = True` in a
+         try/finally — slowapi checks the flag per-request, so this is safe
+         at runtime and the consumed bucket is inert once disabled again.
+    prevention: "Never gate rate limiting on ENVIRONMENT (prod parity lost); gate on a dedicated setting the suite can flip"
+    stories_encountered: ["WS8"]
+    tokens_saved_estimate: "~600 per occurrence"
 
   - id: "BE-002"
     title: "'Check all X done' pattern ignores entity owner's own record"

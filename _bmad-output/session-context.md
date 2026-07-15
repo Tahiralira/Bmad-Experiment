@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-14 (WS7 done — the real AI path: FR1 exists for the first time)
+**Last Updated:** 2026-07-15 (WS8 done — template purge + security hardening)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -141,8 +141,52 @@
 > a wire-compatible local fake via `GEMINI_BASE_URL` (google-genai
 > HttpOptions.base_url). Going live with real Gemini = set GEMINI_API_KEY
 > in .env, nothing else.
-> **Next: WS8 (template purge + security hardening) — unblocked. WS9
-> (deploy) depends on it.**
+> WS8 (Template Purge & Security Hardening) DONE 2026-07-15 on branch
+> `ws8/template-purge`: **attack surface halved** — the FastAPI template's
+> parallel password-auth stack is gone (no /login/access-token,
+> /password-recovery, /reset-password, /signup, /private, /admin, /items;
+> Item table dropped; superuser user CRUD deleted; ChangePassword/Admin/
+> Items/DataTable UI deleted; test fixtures mint JWTs directly).
+> (a) S5-H1: OAuth callback now redirects with a 2-min SINGLE-USE code →
+> `POST /auth/oauth/exchange` returns the JWT in the body — tokens never
+> ride URLs; every JWT carries a `jti`, `revoked_token` table +
+> POST /auth/logout = real server-side logout; login lifetime 30d→14d.
+> (b) S5-H2: slowapi per-IP limits (10/min auth, 20/min AI parse, 200/min
+> default, mediator-voice 429; in-memory per worker until WS12 Redis).
+> (c) S5-M1/M6: security headers on API middleware + nginx (CSP, nosniff,
+> DENY, no-referrer, HSTS outside local); allow_credentials=False.
+> (d) S5-M3: Google OIDC rejects unverified emails (email_unverified code).
+> (e) S5-M4: invite GET = read-only preview; joining = explicit POST from
+> a landing page ("You're invited to X — Join"); max_uses cap (default 10,
+> locked increment), owner revocation + list; revoke button in UI.
+> (f) S5-C2/H4/M7, S6-H1: starlette 0.38.6→1.3.1 (CVE-2024-47874), fastapi
+> 0.139, sentry 2.65 (send_default_pii=False), authlib≥1.3.1, slowapi;
+> both Dockerfile syncs --locked (build fails on lock drift).
+> (g) S5-M2: OAuth errors redirect with generic codes; str(e) → server log.
+> (h) UX-H4/S4-M4: `getApiErrorMessage` mediator mapper — server detail
+> passes through, transport failures become calm copy; no raw "Network
+> Error"; handleError.bind contortion gone.
+> Backend **249 passed / 0 skipped** (14 new WS8 security tests; template
+> tests died with their endpoints); frontend **86 passed**, main chunk
+> **169.2 kB gz**. Migration b2c3d4e5f6a7; `alembic check` clean. Live
+> proof: template routes 404, headers on every response, 11th rapid auth
+> hit 429s; Playwright 13/13 (invite preview→Join→group screen, SPA
+> template routes dead, no Password tab, mediator OAuth-error copy).
+> Screenshots → `_bmad-output/implementation-artifacts/ws8-screenshots/`.
+> Key learnings: (1) converting a state-changing GET to preview-GET +
+> action-POST silently breaks old tests — they still 200 on the GET but
+> nothing mutates; grep every test call site of the old URL (8 fixed).
+> (2) slowapi: construct the Limiter with enabled=settings.RATE_LIMIT_ENABLED,
+> set it False in conftest BEFORE app import, and flip `limiter.enabled`
+> inside the one test that asserts 429s. (3) Cold Vite dev loads apply the
+> theme class late — Playwright screenshots must wait for body
+> backgroundColor, not just element presence (extends the WS3 lesson).
+> (4) Never point pydantic EmailStr test data at `.test` TLDs —
+> email-validator rejects special-use domains (same trap as WS4's
+> anonymized emails).
+>
+> **Next: WS9 (deploy & ops) — unblocked (WS1 CI + WS8 hardening done).
+> Adminer removal + env_file scoping deliberately left for WS9.**
 
 ---
 
@@ -270,9 +314,16 @@ cd cleardues/frontend && npm run build
   SSE consumption, manual-confirm only, Mediator-tone setting capped at
   funny; backend 259 passed / 0 skipped, frontend 86 passed. Live Gemini
   needs only GEMINI_API_KEY in .env)
-- WS8 Template Purge & Security Hardening ← **NEXT** (delete password-auth
-  stack + /items + /admin, OAuth token delivery, rate limiting, headers,
-  dep bumps)
+- WS8 Template Purge & Security Hardening ← **DONE** ✓ (2026-07-15; branch
+  ws8/template-purge; password-auth stack + /admin + /items deleted, OAuth
+  one-time-code delivery + jti revocation + logout, per-IP rate limits,
+  security headers, OIDC email_verified, invite preview/POST-accept/caps/
+  revocation, starlette CVE cleared + sentry 2.x + --locked builds,
+  mediator error mapper; backend 249 passed / 0 skipped, frontend 86
+  passed, main chunk 169.2 kB gz)
+- WS9 Deploy & Ops ← **NEXT** (compose-on-VPS commitment, repo extraction,
+  backups + tested restore, image hardening, Adminer removal, monitoring,
+  staging deploy + runbook)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

@@ -468,31 +468,90 @@ this file breaks that merge into runnable units.
 
 ### PHASE 2 — Launch Blockers
 
-- [ ] **WS8 — Template Purge & Security Hardening** (≈1 week)
+- [x] **WS8 — Template Purge & Security Hardening** (≈1 week; done in 1 session)
       Goal: attack surface halved; secrets and deps stop being landmines.
       Depends on: WS1; ideally after WS3 (so deletions don't collide with restyling).
       Inputs: 05 (all C/H/M items), 04 (H2, M8), 06 (H1).
       Tasks:
-      - [ ] Delete the parallel password-auth stack: /signup, /login/access-token,
-            /password-recovery, /reset-password, /private, ChangePassword UI, /admin,
-            /items + backend routers/models + `Item` table migration (S5-H5, S4-H2)
-      - [ ] OAuth token delivery: one-time code exchange or HttpOnly cookie — never
-            a URL query param; shorten lifetime; revocation/jti list (S5-H1)
-      - [ ] Rate limiting: per-IP on auth endpoints + AI parse; global default
-            (S5-H2)
-      - [ ] Security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options)
-            on API + nginx; `allow_credentials=False` (S5-M1, M6)
-      - [ ] Google OIDC: require `email_verified` before account linking (S5-M3)
-      - [ ] Invite accept → POST from a landing page; add revocation + usage caps
-            (S5-M4; pairs with WS10's preview page)
-      - [ ] `uv lock` regenerate; `--locked` in both Dockerfile syncs; pin
-            authlib≥1.3.1, bump starlette≥0.40, sentry-sdk 2.x with PII scrubbing
-            (S5-C2/H4/M7, S6-H1)
-      - [ ] OAuth error redirect: generic code only, no `str(e)` (S5-M2)
-      - [ ] Mediator-voice error mapper: no raw "Network Error", stop swallowing
-            server `detail` (UX-H4, S4-M4)
-      Verification: suite green; manual pass over auth flows; template routes 404.
-      Status: pending
+      - [x] Delete the parallel password-auth stack: /signup, /login/access-token,
+            /login/test-token, /password-recovery, /reset-password (+HTML variant),
+            /users/me/password, /private, superuser user CRUD (list/create/patch/
+            delete/read-by-id), ChangePassword UI, /admin, /items, Pending/DataTable
+            components + `Item` model/table migration, reset/new-account email
+            templates, password-reset JWT helpers (S5-H5, S4-H2). Test fixtures now
+            mint JWTs directly — no password endpoint to round-trip through.
+      - [x] OAuth token delivery (S5-H1): callback redirects with a 2-minute
+            SINGLE-USE code (SHA-256 at rest, FOR UPDATE consume) →
+            `POST /auth/oauth/exchange` returns the JWT in the response body —
+            tokens never ride URLs. Lifetime 30d → 14d (PRD deviation, documented:
+            revocable tokens halve the blast radius). Every JWT carries a `jti`;
+            `revoked_token` table + `POST /auth/logout` = real server-side logout
+            (frontend logout fires it, fire-and-forget); jti-less legacy tokens
+            rejected outright.
+      - [x] Rate limiting (S5-H2): slowapi per-IP — 10/min auth tier (magic-link
+            request/verify, oauth login/callback/exchange), 20/min AI parse,
+            200/min global default via middleware; mediator-voice 429. In-memory
+            per worker (≤4× configured) — Redis backend arrives with WS12 infra.
+      - [x] Security headers (S5-M1, M6): API middleware (nosniff, X-Frame-Options
+            DENY, Referrer-Policy no-referrer, CSP default-src 'none' except /docs,
+            HSTS outside local) + nginx.conf for the SPA (self-hosted CSP,
+            frame-ancestors 'none', HSTS); `allow_credentials=False`.
+      - [x] Google OIDC: login/linking rejected unless `email_verified is True`
+            → generic `email_unverified` redirect code (S5-M3)
+      - [x] Invite accept → POST from a landing page (S5-M4): GET /invite/{token}
+            is now a read-only PREVIEW (group name/member count/already-member);
+            joining is `POST .../accept` behind an explicit "Join <group>" button.
+            max_uses cap (default 10, 1–100 at creation, locked increment —
+            already-member consumes no use), owner revocation
+            (DELETE /{group}/invites/{id}) + owner list endpoint; revoke button in
+            the invite UI.
+      - [x] Deps (S5-C2/H4/M7, S6-H1): relock — starlette 0.38.6 → 1.3.1
+            (CVE-2024-47874 cleared), fastapi 0.139, sentry-sdk 2.65
+            (`send_default_pii=False`), authlib floor ≥1.3.1 (1.7.2 locked),
+            slowapi added; BOTH Dockerfile syncs `--locked` (build now fails on
+            lock drift instead of silently re-resolving).
+      - [x] OAuth error redirect: generic `?error=<code>` only; `str(e)` goes to
+            the server log (S5-M2); frontend maps codes to mediator copy
+      - [x] Mediator-voice error mapper (UX-H4, S4-M4): `getApiErrorMessage` —
+            server `detail` passes through untouched, transport failures become
+            calm copy (no raw "Network Error"); `handleError.bind` contortion
+            removed (S4-L2); calm error-toast title
+      Verification: DONE 2026-07-15 —
+      **Gates:** backend **249 passed / 0 failed / 0 skipped** (14 new WS8
+      security tests; count down from 259 because ~24 template-endpoint tests
+      died with their endpoints); frontend typecheck green, **86 passed**,
+      build green — main chunk **169.2 kB gz** (was 172.5; budget ≤250);
+      `uv lock --check` passes; migration b2c3d4e5f6a7 applied, `alembic check`
+      clean, downgrade exercised.
+      **Live API proof:** all six template routes 404; security headers on every
+      response; rate limiter allows exactly 10 auth-tier hits then 429s with
+      mediator copy (curl, real container).
+      **Browser proof (Playwright, 13/13):** invite landing preview → explicit
+      Join POST → lands inside the group screen; already-member state; /signup,
+      /recover-password, /admin, /items dead in the SPA; Settings has no
+      Password tab (title now "Settings - ClearDues"); OAuth error codes render
+      mediator copy. **Screenshots:** 8 shots (invite landing 375-dark +
+      1280-light, group-after-join, already-member, settings ×2, template-404,
+      oauth-error) → `_bmad-output/implementation-artifacts/ws8-screenshots/`.
+      Notes / deviations:
+      - LOGIN_TOKEN_EXPIRE_DAYS 30 → 14 deviates from the PRD's "Walled
+        Garden"; justified by revocation existing now. Revisit if beta users
+        complain about re-auth frequency.
+      - Existing pre-WS8 sessions are invalidated (tokens lack jti) — acceptable
+        pre-beta, zero real users.
+      - OAuth one-time-code flow proven via mocked provider (tests) + error-path
+        browser check; full live-Google pass needs real client creds (WS9
+        staging).
+      - Invite GET→preview is a trap for old tests: they still got 200 (preview)
+        but nobody joined — converted 8 helper call sites to POST /accept.
+      - Browser-pane clicks/screenshots hung against the Vite dev server;
+        Playwright fallback used per the WS3 learning. New wrinkle: on cold dev
+        loads the theme class applies late — wait for body backgroundColor
+        before screenshotting.
+      - Adminer removal + env_file scoping stay WS9 scope (S5-H3, S6-M1), as
+        planned. Generated client still ships dead template services — WS11
+        owns the client decision (S7-M3).
+      Status: DONE 2026-07-15 (branch ws8/template-purge)
 
 - [ ] **WS9 — Deploy & Ops (first deployment ever)** (≈1 week)
       Goal: a deployable, backed-up, monitored stack.
