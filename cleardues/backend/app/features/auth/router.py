@@ -1,223 +1,62 @@
 # Auth feature router - API routes for authentication and user management
-# Consolidates login and user routes from the original api/routes/ directory
+#
+# WS8 (template purge): the FastAPI template's parallel password-auth stack is
+# GONE — no /login/access-token, /password-recovery, /reset-password,
+# /users/signup, /users/me/password, and no superuser user-management CRUD.
+# ClearDues is passwordless: magic links and OAuth are the only ways in.
 
+import logging
 import secrets
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import col, delete, func, select
+import jwt
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import RedirectResponse
 from starlette.requests import Request
 
 from app.api.deps import (
     CurrentUser,
     SessionDep,
-    get_current_active_superuser,
+    TokenDep,
 )
 from app.core import security
 from app.core.config import settings
-from app.core.security import get_password_hash, verify_password
+from app.core.limiter import AUTH_LIMIT, limiter
+from app.core.oauth import oauth, SUPPORTED_PROVIDERS, is_provider_configured
+from app.core.security import get_password_hash
 from app.features.auth.models import (
     ApiKeyUpdate,
-    Item,
+    LoginCodeExchange,
     Message,
-    NewPassword,
-    Token,
     TokenWithUser,
-    UpdatePassword,
     User,
-    UserCreate,
     UserPublic,
-    UserRegister,
-    UsersPublic,
-    UserUpdate,
     UserUpdateMe,
     MagicLinkRequest,
     AUTH_METHOD_MAGIC_LINK,
     DashboardResponse,
 )
 from app.features.auth import service as auth_service
-from app.core.oauth import oauth, SUPPORTED_PROVIDERS, is_provider_configured
-from app.utils import (
-    generate_new_account_email,
-    generate_magic_link_email,
-    generate_password_reset_token,
-    generate_reset_password_email,
-    send_email,
-    verify_password_reset_token,
-)
+from app.utils import generate_magic_link_email, send_email
+
+logger = logging.getLogger(__name__)
 
 # Main auth router - will be included in api/main.py
 router = APIRouter()
 
-# Login router
-login_router = APIRouter(tags=["login"])
-
 # Users router
 users_router = APIRouter(prefix="/users", tags=["users"])
 
-# Auth router for magic link registration/verification
+# Auth router for magic link registration/verification + OAuth
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 # ============================================================================
-# LOGIN ROUTES
+# USER ROUTES (self-service only — the admin CRUD died with the template)
 # ============================================================================
-
-@login_router.post("/login/access-token")
-def login_access_token(
-    session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
-) -> Token:
-    """
-    OAuth2 compatible token login, get an access token for future requests
-    """
-    user = auth_service.authenticate(
-        session=session, email=form_data.username, password=form_data.password
-    )
-    if not user:
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
-    elif not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return Token(
-        access_token=security.create_access_token(
-            user.id, expires_delta=access_token_expires
-        )
-    )
-
-
-@login_router.post("/login/test-token", response_model=UserPublic)
-def test_token(current_user: CurrentUser) -> Any:
-    """
-    Test access token
-    """
-    return current_user
-
-
-@login_router.post("/password-recovery/{email}")
-def recover_password(email: str, session: SessionDep) -> Message:
-    """
-    Password Recovery
-    """
-    user = auth_service.get_user_by_email(session=session, email=email)
-
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="The user with this email does not exist in the system.",
-        )
-    password_reset_token = generate_password_reset_token(email=email)
-    email_data = generate_reset_password_email(
-        email_to=user.email, email=email, token=password_reset_token
-    )
-    send_email(
-        email_to=user.email,
-        subject=email_data.subject,
-        html_content=email_data.html_content,
-    )
-    return Message(message="Password recovery email sent")
-
-
-@login_router.post("/reset-password/")
-def reset_password(session: SessionDep, body: NewPassword) -> Message:
-    """
-    Reset password
-    """
-    email = verify_password_reset_token(token=body.token)
-    if not email:
-        raise HTTPException(status_code=400, detail="Invalid token")
-    user = auth_service.get_user_by_email(session=session, email=email)
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="The user with this email does not exist in the system.",
-        )
-    elif not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    hashed_password = get_password_hash(password=body.new_password)
-    user.hashed_password = hashed_password
-    session.add(user)
-    session.commit()
-    return Message(message="Password updated successfully")
-
-
-@login_router.post(
-    "/password-recovery-html-content/{email}",
-    dependencies=[Depends(get_current_active_superuser)],
-    response_class=HTMLResponse,
-)
-def recover_password_html_content(email: str, session: SessionDep) -> Any:
-    """
-    HTML Content for Password Recovery
-    """
-    user = auth_service.get_user_by_email(session=session, email=email)
-
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="The user with this username does not exist in the system.",
-        )
-    password_reset_token = generate_password_reset_token(email=email)
-    email_data = generate_reset_password_email(
-        email_to=user.email, email=email, token=password_reset_token
-    )
-
-    return HTMLResponse(
-        content=email_data.html_content, headers={"subject:": email_data.subject}
-    )
-
-
-# ============================================================================
-# USER ROUTES
-# ============================================================================
-
-@users_router.get(
-    "/",
-    dependencies=[Depends(get_current_active_superuser)],
-    response_model=UsersPublic,
-)
-def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
-    """
-    Retrieve users.
-    """
-    count_statement = select(func.count()).select_from(User)
-    count = session.exec(count_statement).one()
-
-    statement = select(User).offset(skip).limit(limit)
-    users = session.exec(statement).all()
-
-    return UsersPublic(data=users, count=count)
-
-
-@users_router.post(
-    "/", dependencies=[Depends(get_current_active_superuser)], response_model=UserPublic
-)
-def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
-    """
-    Create new user.
-    """
-    user = auth_service.get_user_by_email(session=session, email=user_in.email)
-    if user:
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this email already exists in the system.",
-        )
-
-    user = auth_service.create_user(session=session, user_create=user_in)
-    if settings.emails_enabled and user_in.email:
-        email_data = generate_new_account_email(
-            email_to=user_in.email, username=user_in.email, password=user_in.password
-        )
-        send_email(
-            email_to=user_in.email,
-            subject=email_data.subject,
-            html_content=email_data.html_content,
-        )
-    return user
 
 
 @users_router.patch("/me", response_model=UserPublic)
@@ -239,26 +78,6 @@ def update_user_me(
     session.commit()
     session.refresh(current_user)
     return current_user
-
-
-@users_router.patch("/me/password", response_model=Message)
-def update_password_me(
-    *, session: SessionDep, body: UpdatePassword, current_user: CurrentUser
-) -> Any:
-    """
-    Update own password.
-    """
-    if not verify_password(body.current_password, current_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect password")
-    if body.current_password == body.new_password:
-        raise HTTPException(
-            status_code=400, detail="New password cannot be the same as the current one"
-        )
-    hashed_password = get_password_hash(body.new_password)
-    current_user.hashed_password = hashed_password
-    session.add(current_user)
-    session.commit()
-    return Message(message="Password updated successfully")
 
 
 @users_router.get("/me", response_model=UserPublic)
@@ -349,110 +168,16 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     )
 
 
-@users_router.post("/signup", response_model=UserPublic)
-def register_user(session: SessionDep, user_in: UserRegister) -> Any:
-    """
-    Create new user without the need to be logged in.
-    """
-    user = auth_service.get_user_by_email(session=session, email=user_in.email)
-    if user:
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this email already exists in the system",
-        )
-    user_create = UserCreate.model_validate(user_in)
-    user = auth_service.create_user(session=session, user_create=user_create)
-    return user
-
-
-@users_router.get("/{user_id}", response_model=UserPublic)
-def read_user_by_id(
-    user_id: uuid.UUID, session: SessionDep, current_user: CurrentUser
-) -> Any:
-    """
-    Get a specific user by id.
-    """
-    user = session.get(User, user_id)
-    if user is not None and user == current_user:
-        return user
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=403,
-            detail="The user doesn't have enough privileges",
-        )
-    # 404 guard (WS4/M9): returning None made response validation 500
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
-
-
-@users_router.patch(
-    "/{user_id}",
-    dependencies=[Depends(get_current_active_superuser)],
-    response_model=UserPublic,
-)
-def update_user(
-    *,
-    session: SessionDep,
-    user_id: uuid.UUID,
-    user_in: UserUpdate,
-) -> Any:
-    """
-    Update a user.
-    """
-    db_user = session.get(User, user_id)
-    if not db_user:
-        raise HTTPException(
-            status_code=404,
-            detail="The user with this id does not exist in the system",
-        )
-    if user_in.email:
-        existing_user = auth_service.get_user_by_email(session=session, email=user_in.email)
-        if existing_user and existing_user.id != user_id:
-            raise HTTPException(
-                status_code=409, detail="User with this email already exists"
-            )
-
-    db_user = auth_service.update_user(session=session, db_user=db_user, user_in=user_in)
-    return db_user
-
-
-@users_router.delete("/{user_id}", dependencies=[Depends(get_current_active_superuser)])
-def delete_user(
-    session: SessionDep, current_user: CurrentUser, user_id: uuid.UUID
-) -> Message:
-    """
-    Delete a user (soft delete — WS4/C4).
-
-    Same semantics as self-deletion: anonymize + disable login, keep shared
-    financial records, refuse while the user has unsettled expenses.
-    """
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user == current_user:
-        raise HTTPException(
-            status_code=403, detail="Super users are not allowed to delete themselves"
-        )
-    if auth_service.has_unsettled_obligations(session, user.id):
-        raise HTTPException(
-            status_code=409,
-            detail="User still has unsettled expenses and cannot be deleted.",
-        )
-    statement = delete(Item).where(col(Item.owner_id) == user_id)
-    session.exec(statement)  # type: ignore
-    auth_service.soft_delete_user(session, user)
-    session.commit()
-    return Message(message="User deleted successfully")
-
-
 # ============================================================================
 # MAGIC LINK AUTH ROUTES
 # ============================================================================
 
 
 @auth_router.post("/register", response_model=Message)
-def request_magic_link(session: SessionDep, body: MagicLinkRequest) -> Message:
+@limiter.limit(AUTH_LIMIT)
+def request_magic_link(
+    request: Request, session: SessionDep, body: MagicLinkRequest
+) -> Message:
     """
     Request a magic link for passwordless registration.
 
@@ -460,7 +185,7 @@ def request_magic_link(session: SessionDep, body: MagicLinkRequest) -> Message:
     Returns a generic success message regardless of whether the email exists
     (to prevent email enumeration attacks).
 
-    Rate limited to 3 requests per email per hour.
+    Rate limited per email (3/hour) and per IP (WS8/S5-H2).
     """
     # Check if user already exists
     existing_user = auth_service.get_user_by_email(session=session, email=body.email)
@@ -500,7 +225,10 @@ def request_magic_link(session: SessionDep, body: MagicLinkRequest) -> Message:
 
 
 @auth_router.get("/verify/{token}", response_model=TokenWithUser)
-def verify_magic_link(session: SessionDep, token: str) -> TokenWithUser:
+@limiter.limit(AUTH_LIMIT)
+def verify_magic_link(
+    request: Request, session: SessionDep, token: str
+) -> TokenWithUser:
     """
     Verify a magic link token and create the user account.
 
@@ -563,14 +291,17 @@ def verify_magic_link(session: SessionDep, token: str) -> TokenWithUser:
 
 
 @auth_router.post("/login", response_model=Message)
-def request_login_magic_link(session: SessionDep, body: MagicLinkRequest) -> Message:
+@limiter.limit(AUTH_LIMIT)
+def request_login_magic_link(
+    request: Request, session: SessionDep, body: MagicLinkRequest
+) -> Message:
     """
     Request a magic link for passwordless login.
 
     Only works for registered users. Returns generic message
     regardless of whether email exists (prevents enumeration).
 
-    Rate limited to 3 requests per email per hour.
+    Rate limited per email (3/hour) and per IP (WS8/S5-H2).
     """
     # Check if user exists
     existing_user = auth_service.get_user_by_email(session=session, email=body.email)
@@ -614,12 +345,16 @@ def request_login_magic_link(session: SessionDep, body: MagicLinkRequest) -> Mes
 
 
 @auth_router.get("/login/verify/{token}", response_model=TokenWithUser)
-def verify_login_magic_link(session: SessionDep, token: str) -> TokenWithUser:
+@limiter.limit(AUTH_LIMIT)
+def verify_login_magic_link(
+    request: Request, session: SessionDep, token: str
+) -> TokenWithUser:
     """
     Verify a login magic link token.
 
     Unlike registration verification, this does NOT create a user.
-    User must already exist. Returns JWT with 30-day expiration per PRD.
+    User must already exist. Returns a revocable JWT
+    (LOGIN_TOKEN_EXPIRE_DAYS).
     """
     # Verify token
     magic_token = auth_service.verify_magic_link_token(session=session, token_str=token)
@@ -649,7 +384,7 @@ def verify_login_magic_link(session: SessionDep, token: str) -> TokenWithUser:
     # Mark token as used
     auth_service.mark_token_as_used(session=session, token=magic_token)
 
-    # Generate JWT with 30-day expiration (PRD "Walled Garden")
+    # Long-lived login JWT (revocable via jti — WS8/S5-H1)
     access_token_expires = timedelta(days=settings.LOGIN_TOKEN_EXPIRE_DAYS)
     access_token = security.create_access_token(
         user.id, expires_delta=access_token_expires
@@ -663,11 +398,48 @@ def verify_login_magic_link(session: SessionDep, token: str) -> TokenWithUser:
 
 
 # ============================================================================
-# OAUTH ROUTES (Story 1.6)
+# SESSION MANAGEMENT (WS8/S5-H1)
 # ============================================================================
 
 
+@auth_router.post("/logout", response_model=Message)
+def logout(
+    session: SessionDep, token: TokenDep, current_user: CurrentUser
+) -> Message:
+    """
+    Revoke the current access token server-side.
+
+    Clearing localStorage alone leaves the JWT valid until expiry; this adds
+    its jti to the revocation list so the token is dead everywhere.
+    """
+    payload = jwt.decode(
+        token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
+    )
+    auth_service.revoke_token(
+        session,
+        jti=uuid.UUID(payload["jti"]),
+        user_id=current_user.id,
+        expires_at=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+    )
+    session.commit()
+    return Message(message="Signed out. That session can't be used again.")
+
+
+# ============================================================================
+# OAUTH ROUTES (Story 1.6; token delivery reworked in WS8/S5-H1)
+# ============================================================================
+
+
+def _oauth_error_redirect(error_code: str) -> RedirectResponse:
+    """Redirect to the frontend with a generic error CODE only (S5-M2):
+    exception text never rides a URL — details go to the server log."""
+    return RedirectResponse(
+        url=f"{settings.FRONTEND_HOST}/auth/callback?error={error_code}"
+    )
+
+
 @auth_router.get("/oauth/{provider}/login")
+@limiter.limit(AUTH_LIMIT)
 async def oauth_login(request: Request, provider: str) -> RedirectResponse:
     """
     Initiate OAuth login flow for the specified provider.
@@ -695,6 +467,7 @@ async def oauth_login(request: Request, provider: str) -> RedirectResponse:
 
 
 @auth_router.get("/oauth/{provider}/callback")
+@limiter.limit(AUTH_LIMIT)
 async def oauth_callback(
     request: Request,
     provider: str,
@@ -702,8 +475,12 @@ async def oauth_callback(
 ) -> RedirectResponse:
     """
     Handle OAuth callback from provider.
-    Exchanges authorization code for token, creates/links user, returns JWT.
-    Redirects to frontend with token in query parameter.
+
+    Exchanges the authorization code for provider tokens, creates/links the
+    user, then redirects to the frontend with a SHORT-LIVED ONE-TIME CODE —
+    never the JWT itself (WS8/S5-H1: query strings land in access logs,
+    history, and Referer headers). The frontend swaps the code for the JWT
+    at POST /auth/oauth/exchange.
     """
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(
@@ -721,10 +498,9 @@ async def oauth_callback(
 
     try:
         token = await client.authorize_access_token(request)
-    except Exception as e:
-        # Redirect to frontend with error
-        error_url = f"{settings.FRONTEND_HOST}/auth/callback?error=oauth_failed&message={str(e)}"
-        return RedirectResponse(url=error_url)
+    except Exception:
+        logger.exception("OAuth token exchange failed for provider %s", provider)
+        return _oauth_error_redirect("oauth_failed")
 
     # Extract user info based on provider
     email: str | None = None
@@ -738,6 +514,12 @@ async def oauth_callback(
             # Fallback to fetching userinfo separately
             resp = await client.get("userinfo")
             user_info = resp.json()
+        # S5-M3: never link an OAuth identity to an account via an email the
+        # provider hasn't verified — that's a silent account-takeover path.
+        # (GitHub's branch below already selects only verified emails.)
+        if user_info.get("email_verified") is not True:
+            logger.warning("Google OAuth login with unverified email rejected")
+            return _oauth_error_redirect("email_unverified")
         email = user_info.get("email")
         full_name = user_info.get("name")
         provider_id = user_info.get("sub")  # Google's unique user ID
@@ -761,12 +543,10 @@ async def oauth_callback(
                     break
 
     if not email:
-        error_url = f"{settings.FRONTEND_HOST}/auth/callback?error=no_email&message=Could not retrieve email from OAuth provider"
-        return RedirectResponse(url=error_url)
+        return _oauth_error_redirect("no_email")
 
     if not provider_id:
-        error_url = f"{settings.FRONTEND_HOST}/auth/callback?error=no_provider_id&message=Could not retrieve user ID from OAuth provider"
-        return RedirectResponse(url=error_url)
+        return _oauth_error_redirect("no_provider_id")
 
     # Find or create user (handles account linking)
     user = auth_service.find_or_create_oauth_user(
@@ -778,21 +558,53 @@ async def oauth_callback(
     )
 
     if not user.is_active:
-        error_url = f"{settings.FRONTEND_HOST}/auth/callback?error=inactive&message=Account is deactivated"
-        return RedirectResponse(url=error_url)
+        return _oauth_error_redirect("inactive")
 
-    # Generate JWT with 30-day expiration (PRD "Walled Garden")
+    # One-time code instead of the JWT (WS8/S5-H1): 2-minute, single-use,
+    # hashed at rest. The frontend exchanges it immediately via POST.
+    login_code = auth_service.create_login_code(session, user.id)
+    session.commit()
+
+    return RedirectResponse(
+        url=f"{settings.FRONTEND_HOST}/auth/callback?code={login_code}"
+    )
+
+
+@auth_router.post("/oauth/exchange", response_model=TokenWithUser)
+@limiter.limit(AUTH_LIMIT)
+def exchange_login_code(
+    request: Request, session: SessionDep, body: LoginCodeExchange
+) -> TokenWithUser:
+    """
+    Exchange a one-time OAuth login code for an access token.
+
+    The code arrives via the OAuth callback redirect; it is single-use and
+    expires in 2 minutes. The JWT is delivered in this POST response body —
+    never in a URL.
+    """
+    user = auth_service.consume_login_code(session, body.code)
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="This sign-in link has expired or was already used. "
+            "Please sign in again.",
+        )
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Account is deactivated.")
+    session.commit()
+
     access_token_expires = timedelta(days=settings.LOGIN_TOKEN_EXPIRE_DAYS)
     access_token = security.create_access_token(
         user.id, expires_delta=access_token_expires
     )
 
-    # Redirect to frontend with token
-    frontend_callback_url = f"{settings.FRONTEND_HOST}/auth/callback?token={access_token}"
-    return RedirectResponse(url=frontend_callback_url)
+    return TokenWithUser(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserPublic.model_validate(user),
+    )
 
 
 # Include sub-routers into main auth router
-router.include_router(login_router)
 router.include_router(users_router)
 router.include_router(auth_router)

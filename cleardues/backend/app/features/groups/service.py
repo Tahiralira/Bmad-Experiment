@@ -152,6 +152,7 @@ def create_group_invite(
     session: Session,
     group_id: uuid.UUID,
     creator_id: uuid.UUID,
+    max_uses: int = 10,
 ) -> GroupInvite:
     """
     Create a new invite token for a group.
@@ -160,6 +161,7 @@ def create_group_invite(
         session: Database session
         group_id: UUID of the group to create invite for
         creator_id: UUID of the user creating the invite (must be owner)
+        max_uses: how many joins this link allows (WS8/S5-M4)
 
     Returns:
         Created GroupInvite with token
@@ -168,6 +170,7 @@ def create_group_invite(
         group_id=group_id,
         token=GroupInvite.generate_token(),
         expires_at=GroupInvite.default_expiration(),
+        max_uses=max_uses,
         created_by=creator_id,
     )
     session.add(invite)
@@ -184,13 +187,17 @@ def get_invite_by_token(session: Session, token: str) -> GroupInvite | None:
 
 def is_invite_valid(invite: GroupInvite) -> tuple[bool, str]:
     """
-    Check if an invite is valid.
+    Check if an invite is valid (not expired / revoked / used up — WS8/S5-M4).
 
     Returns:
         Tuple of (is_valid, error_message)
     """
+    if invite.revoked_at is not None:
+        return False, "This invite link was revoked by the group owner"
     if invite.is_expired():
         return False, "This invite link has expired"
+    if invite.use_count >= invite.max_uses:
+        return False, "This invite link has reached its usage limit"
     return True, ""
 
 
@@ -202,17 +209,27 @@ def accept_invite(
     """
     Accept an invite and add user to the group.
 
-    Args:
-        session: Database session
-        invite: The invite to accept
-        user_id: UUID of the user accepting the invite
+    The invite row is re-read FOR UPDATE (WS4/M8 discipline) so concurrent
+    accepts can't blow past max_uses; joining consumes one use, but an
+    already-member no-op does not.
 
     Returns:
         Tuple of (success, message)
     """
-    # Check if already a member
+    # Check if already a member (consumes no use)
     if is_group_member(session, group_id=invite.group_id, user_id=user_id):
         return True, "You are already a member of this group"
+
+    # Lock the invite row and re-validate under the lock
+    locked_invite = session.exec(
+        select(GroupInvite).where(GroupInvite.id == invite.id).with_for_update()
+    ).one()
+    is_valid, error_msg = is_invite_valid(locked_invite)
+    if not is_valid:
+        return False, error_msg
+
+    locked_invite.use_count += 1
+    session.add(locked_invite)
 
     # Add as member
     member = GroupMember(
@@ -226,6 +243,15 @@ def accept_invite(
     return True, "Successfully joined the group"
 
 
+def revoke_invite(session: Session, invite: GroupInvite) -> GroupInvite:
+    """Revoke an invite (WS8/S5-M4). Idempotent. Flushes; caller commits."""
+    if invite.revoked_at is None:
+        invite.revoked_at = utc_now()
+        session.add(invite)
+        session.flush()
+    return invite
+
+
 def is_group_owner(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     """Check if user is the owner of the group."""
     statement = select(GroupMember).where(
@@ -237,12 +263,13 @@ def is_group_owner(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) ->
 
 
 def get_group_invites(session: Session, group_id: uuid.UUID) -> list[GroupInvite]:
-    """Get all active (non-expired) invites for a group."""
+    """Get all active (non-expired, non-revoked) invites for a group."""
     statement = (
         select(GroupInvite)
         .where(
             GroupInvite.group_id == group_id,
             GroupInvite.expires_at > utc_now(),
+            GroupInvite.revoked_at.is_(None),  # type: ignore[union-attr]
         )
         .order_by(GroupInvite.created_at.desc())
     )

@@ -34,8 +34,17 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(32)
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
-    # 30 days for login tokens ("Walled Garden" per PRD)
-    LOGIN_TOKEN_EXPIRE_DAYS: int = 30
+    # Login token lifetime. The PRD's "Walled Garden" asked for 30 days;
+    # WS8/S5-H1 shortened it to 14 now that tokens are revocable — a stolen
+    # token's blast radius is half, and real users re-auth via magic
+    # link/OAuth in one tap.
+    LOGIN_TOKEN_EXPIRE_DAYS: int = 14
+
+    # Per-IP rate limiting (WS8/S5-H2). The default applies to every route
+    # via middleware; stricter per-route tiers live in app/core/limiter.py.
+    # Disabled only by the test suite.
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_DEFAULT: str = "200/minute"
     FRONTEND_HOST: str = "http://localhost:5173"
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
 
@@ -91,8 +100,6 @@ class Settings(BaseSettings):
         if not self.EMAILS_FROM_NAME:
             self.EMAILS_FROM_NAME = self.PROJECT_NAME
         return self
-
-    EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48
 
     @computed_field  # type: ignore[prop-decorator]
     @property

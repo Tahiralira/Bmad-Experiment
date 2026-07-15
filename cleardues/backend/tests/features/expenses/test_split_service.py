@@ -387,8 +387,8 @@ class TestExpenseSplitAPI:
         )
         assert invite_response.status_code == 201
         invite_token = invite_response.json()["invite"]["token"]
-        accept_response = client.get(
-            f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}",
+        accept_response = client.post(
+            f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}/accept",
             headers=second_user_token_headers,
         )
         assert accept_response.status_code == 200

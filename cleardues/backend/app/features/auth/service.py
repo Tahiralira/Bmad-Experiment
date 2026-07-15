@@ -8,14 +8,14 @@ from typing import Any
 
 from sqlmodel import Session, delete, func, select
 
-from app.core.security import get_password_hash, verify_password
+from app.core.security import get_password_hash
 from app.features.auth.models import (
     User,
     UserCreate,
     UserUpdate,
-    Item,
-    ItemCreate,
+    LoginCode,
     MagicLinkToken,
+    RevokedToken,
     AUTH_METHOD_OAUTH,
     GroupBalanceSummary,
 )
@@ -62,15 +62,6 @@ def get_user_by_email(*, session: Session, email: str) -> User | None:
     statement = select(User).where(User.email == email)
     session_user = session.exec(statement).first()
     return session_user
-
-
-def authenticate(*, session: Session, email: str, password: str) -> User | None:
-    db_user = get_user_by_email(session=session, email=email)
-    if not db_user:
-        return None
-    if not verify_password(password, db_user.hashed_password):
-        return None
-    return db_user
 
 
 # ============================================================================
@@ -149,16 +140,6 @@ def soft_delete_user(session: Session, user: User) -> None:
         delete(MagicLinkToken).where(MagicLinkToken.email == original_email)
     )
     session.flush()
-
-
-# Item CRUD - temporarily kept here for backward compatibility
-# Will be moved to expenses feature in future stories
-def create_item(*, session: Session, item_in: ItemCreate, owner_id: uuid.UUID) -> Item:
-    db_item = Item.model_validate(item_in, update={"owner_id": owner_id})
-    session.add(db_item)
-    session.commit()
-    session.refresh(db_item)
-    return db_item
 
 
 # ============================================================================
@@ -247,6 +228,77 @@ def cleanup_expired_tokens(*, session: Session) -> int:
         session.delete(token)
     session.commit()
     return count
+
+
+# ============================================================================
+# ONE-TIME LOGIN CODES + TOKEN REVOCATION (WS8/S5-H1)
+# ============================================================================
+
+# A login code only has to survive one browser redirect; anything longer just
+# widens the window in which a log-file reader could race the user's browser.
+LOGIN_CODE_EXPIRE_SECONDS = 120
+
+
+def create_login_code(session: Session, user_id: uuid.UUID) -> str:
+    """
+    Mint a single-use login code for OAuth token delivery.
+
+    Returns the RAW code (goes into the redirect URL); only its SHA-256 hash
+    is stored. Flushes; the caller commits.
+    """
+    raw_code = secrets.token_urlsafe(32)
+    code = LoginCode(
+        user_id=user_id,
+        code_hash=hash_token(raw_code),
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(seconds=LOGIN_CODE_EXPIRE_SECONDS),
+    )
+    session.add(code)
+    session.flush()
+    return raw_code
+
+
+def consume_login_code(session: Session, raw_code: str) -> User | None:
+    """
+    Redeem a login code: valid + unexpired + unused → mark used, return user.
+
+    The row is locked FOR UPDATE so two concurrent exchanges of the same code
+    can't both succeed (WS4/M8 discipline). Flushes; the caller commits.
+    """
+    code = session.exec(
+        select(LoginCode)
+        .where(
+            LoginCode.code_hash == hash_token(raw_code),
+            LoginCode.expires_at > datetime.now(timezone.utc),
+            LoginCode.used_at.is_(None),
+        )
+        .with_for_update()
+    ).first()
+    if not code:
+        return None
+
+    code.used_at = datetime.now(timezone.utc)
+    session.add(code)
+    session.flush()
+    return session.get(User, code.user_id)
+
+
+def revoke_token(
+    session: Session, *, jti: uuid.UUID, user_id: uuid.UUID, expires_at: datetime
+) -> None:
+    """
+    Add a token's jti to the revocation list (idempotent). Flushes; the
+    caller commits.
+    """
+    if session.get(RevokedToken, jti):
+        return
+    session.add(RevokedToken(jti=jti, user_id=user_id, expires_at=expires_at))
+    session.flush()
+
+
+def is_token_revoked(session: Session, jti: uuid.UUID) -> bool:
+    """True if this jti has been revoked (checked on every request)."""
+    return session.get(RevokedToken, jti) is not None
 
 
 # ============================================================================

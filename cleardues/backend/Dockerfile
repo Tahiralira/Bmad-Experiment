@@ -21,11 +21,14 @@ ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
 # Install dependencies
+# --locked (S6-H1): FAIL the build if uv.lock is out of sync with
+# pyproject.toml instead of silently re-resolving inside the image —
+# that silent re-resolve is how unpinned crypto/OAuth libs shipped for months.
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project
+    uv sync --locked --no-install-project
 
 ENV PYTHONPATH=/app
 
@@ -36,9 +39,9 @@ COPY ./pyproject.toml ./uv.lock ./alembic.ini /app/
 COPY ./app /app/app
 COPY ./tests /app/tests
 
-# Sync the project
+# Sync the project (also --locked — see note above)
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync
+    uv sync --locked
 
 CMD ["fastapi", "run", "--workers", "4", "app/main.py"]

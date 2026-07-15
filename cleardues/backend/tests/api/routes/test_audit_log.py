@@ -57,8 +57,8 @@ def _add_second_user_to_group(
     second_user_id = second_group.json()["created_by"]
 
     # Accept invite
-    accept_response = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{token}",
+    accept_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{token}/accept",
         headers=second_user_headers,
     )
     assert accept_response.status_code == 200

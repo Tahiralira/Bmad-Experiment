@@ -31,7 +31,11 @@ from app.features.expenses.models import (
     SplitStatus,
 )
 from app.features.groups.models import ExpenseGroup
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.utils import (
+    random_email,
+    random_lower_string,
+    token_headers_for_user,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -39,23 +43,16 @@ from tests.utils.utils import random_email, random_lower_string
 # ---------------------------------------------------------------------------
 
 
-def _make_authed_user(client: TestClient, db: Session) -> tuple[dict[str, str], uuid.UUID, str]:
-    """Create a fresh user and log in; returns (headers, user_id, email)."""
+def _make_authed_user(
+    client: TestClient, db: Session
+) -> tuple[dict[str, str], uuid.UUID, str]:
+    """Create a fresh user with a directly-minted JWT (WS8: no password
+    login endpoint exists); returns (headers, user_id, email)."""
     email = random_email()
-    password = random_lower_string()
     user = crud.create_user(
-        session=db, user_create=UserCreate(email=email, password=password)
+        session=db, user_create=UserCreate(email=email, password=random_lower_string())
     )
-    r = client.post(
-        f"{settings.API_V1_STR}/login/access-token",
-        data={"username": email, "password": password},
-    )
-    assert r.status_code == 200
-    return (
-        {"Authorization": f"Bearer {r.json()['access_token']}"},
-        user.id,
-        email,
-    )
+    return (token_headers_for_user(user), user.id, email)
 
 
 def _create_group(client: TestClient, headers: dict[str, str], name: str) -> dict:
@@ -78,8 +75,8 @@ def _join_group(
     )
     assert r.status_code == 201
     token = r.json()["invite"]["token"]
-    r = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{token}", headers=member_headers
+    r = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{token}/accept", headers=member_headers
     )
     assert r.status_code == 200
 
@@ -461,15 +458,16 @@ def test_account_deletion_blocked_until_settled_then_anonymized(
 # ---------------------------------------------------------------------------
 
 
-def test_read_nonexistent_user_returns_404_for_superuser(
+def test_read_user_by_id_endpoint_removed(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
+    """GET /users/{id} was template admin surface; WS8 deleted it outright
+    (the WS4/M9 404-guard fix is moot — the whole route is gone)."""
     r = client.get(
         f"{settings.API_V1_STR}/users/{uuid.uuid4()}",
         headers=superuser_token_headers,
     )
     assert r.status_code == 404
-    assert r.json()["detail"] == "User not found"
 
 
 # ---------------------------------------------------------------------------

@@ -14,17 +14,22 @@ from app.features.expenses.models import (
     PairwiseBalancesPublic,
 )
 from app.features.groups import service
+from app.features.auth.models import Message
 from app.features.groups.models import (
     ExpenseGroup,
     ExpenseGroupCreate,
     ExpenseGroupDetail,
     ExpenseGroupPublic,
     ExpenseGroupWithMembers,
+    GroupInvite,
+    GroupInviteCreate,
     GroupInvitePublic,
     GroupInviteResponse,
+    GroupInvitesPublic,
     GroupMembersListResponse,
     GroupSettingsPublic,
     GroupSettingsUpdate,
+    InvitePreview,
 )
 
 router = APIRouter(prefix="/expense-groups", tags=["groups"])
@@ -305,6 +310,41 @@ def list_group_members(
 
 
 # === Invite Endpoints ===
+#
+# WS8/S5-M4: accepting an invite is a POST (GET only previews — a
+# state-changing GET let link prefetchers join groups), invites are capped
+# per-use and revocable by the owner.
+
+
+def _build_invite_public(invite: GroupInvite) -> GroupInvitePublic:
+    return GroupInvitePublic(
+        id=invite.id,
+        group_id=invite.group_id,
+        token=invite.token,
+        expires_at=invite.expires_at,
+        created_at=invite.created_at,
+        max_uses=invite.max_uses,
+        use_count=invite.use_count,
+        revoked_at=invite.revoked_at,
+        invite_url=f"{settings.FRONTEND_HOST}/invite/{invite.token}",
+    )
+
+
+def _get_group_for_owner(
+    session: SessionDep, group_id: uuid.UUID, current_user: CurrentUser
+) -> None:
+    """Enforce group existence + ownership (404 / 403)."""
+    group = service.get_group_by_id(session, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+    if not service.is_group_owner(session, group_id, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the group owner can manage invite links",
+        )
 
 
 @router.post("/{group_id}/invites", response_model=GroupInviteResponse, status_code=201)
@@ -312,72 +352,131 @@ def create_invite(
     group_id: uuid.UUID,
     session: SessionDep,
     current_user: CurrentUser,
+    invite_in: GroupInviteCreate | None = None,
 ) -> GroupInviteResponse:
     """
     Generate an invite link for a group.
 
-    Only the group owner can generate invites.
+    Only the group owner can generate invites. Links expire after 30 days
+    and allow max_uses joins (default 10).
     """
-    # Verify group exists
-    group = service.get_group_by_id(session, group_id)
-    if not group:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Group not found",
-        )
+    _get_group_for_owner(session, group_id, current_user)
 
-    # Verify user is owner
-    if not service.is_group_owner(session, group_id, current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the group owner can generate invite links",
-        )
-
-    invite = service.create_group_invite(session, group_id, current_user.id)
+    max_uses = invite_in.max_uses if invite_in else 10
+    invite = service.create_group_invite(
+        session, group_id, current_user.id, max_uses=max_uses
+    )
     session.commit()
 
-    # Build invite URL
-    invite_url = f"{settings.FRONTEND_HOST}/invite/{invite.token}"
-
     return GroupInviteResponse(
-        invite=GroupInvitePublic(
-            id=invite.id,
-            group_id=invite.group_id,
-            token=invite.token,
-            expires_at=invite.expires_at,
-            created_at=invite.created_at,
-            invite_url=invite_url,
-        ),
+        invite=_build_invite_public(invite),
         message="Invite link created successfully",
     )
 
 
-@router.get("/invite/{token}", response_model=GroupInviteResponse)
-def accept_invite(
-    token: str,
+@router.get("/{group_id}/invites", response_model=GroupInvitesPublic)
+def list_invites(
+    group_id: uuid.UUID,
     session: SessionDep,
     current_user: CurrentUser,
-) -> GroupInviteResponse:
+) -> GroupInvitesPublic:
     """
-    Accept a group invite using the invite token.
+    List a group's active invite links (owner only) — the revocation UI.
+    """
+    _get_group_for_owner(session, group_id, current_user)
+    invites = service.get_group_invites(session, group_id)
+    return GroupInvitesPublic(
+        data=[_build_invite_public(i) for i in invites],
+        count=len(invites),
+    )
 
-    The authenticated user will be added as a member of the group.
+
+@router.delete("/{group_id}/invites/{invite_id}", response_model=Message)
+def revoke_invite(
+    group_id: uuid.UUID,
+    invite_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> Message:
     """
-    # Look up invite
+    Revoke an invite link (owner only, WS8/S5-M4). The link stops working
+    immediately; existing members are unaffected.
+    """
+    _get_group_for_owner(session, group_id, current_user)
+
+    invite = session.get(GroupInvite, invite_id)
+    if not invite or invite.group_id != group_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invite not found",
+        )
+
+    service.revoke_invite(session, invite)
+    session.commit()
+    return Message(message="Invite link revoked. It can't be used to join anymore.")
+
+
+def _get_valid_invite(session: SessionDep, token: str) -> GroupInvite:
+    """Look up an invite token and 404/410 on invalid/expired/revoked."""
     invite = service.get_invite_by_token(session, token)
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Invalid invite link",
         )
-
-    # Check if valid
     is_valid, error_msg = service.is_invite_valid(invite)
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail=error_msg,
         )
+    return invite
+
+
+@router.get("/invite/{token}", response_model=InvitePreview)
+def preview_invite(
+    token: str,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> InvitePreview:
+    """
+    Preview an invite WITHOUT joining: group name, member count, expiry.
+
+    Read-only — the landing page renders this and joining happens via the
+    explicit POST below. (WS10 extends this into the public preview page.)
+    """
+    invite = _get_valid_invite(session, token)
+
+    group = service.get_group_by_id(session, invite.group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The group no longer exists",
+        )
+
+    return InvitePreview(
+        group_id=group.id,
+        group_name=group.name,
+        member_count=service.get_group_member_count(session, group.id),
+        expires_at=invite.expires_at,
+        already_member=service.is_group_member(
+            session, group_id=group.id, user_id=current_user.id
+        ),
+    )
+
+
+@router.post("/invite/{token}/accept", response_model=GroupInviteResponse)
+def accept_invite(
+    token: str,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> GroupInviteResponse:
+    """
+    Accept a group invite using the invite token (explicit POST — WS8/S5-M4).
+
+    The authenticated user will be added as a member of the group.
+    """
+    invite = _get_valid_invite(session, token)
 
     # Get group (verify it still exists)
     group = service.get_group_by_id(session, invite.group_id)
@@ -387,8 +486,10 @@ def accept_invite(
             detail="The group no longer exists",
         )
 
-    # Accept the invite
+    # Accept the invite (re-validates under a row lock; counts the use)
     success, message = service.accept_invite(session, invite, current_user.id)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail=message)
     session.commit()
 
     return GroupInviteResponse(

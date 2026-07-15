@@ -16,8 +16,10 @@ happened):
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from starlette.requests import Request
 
 from app.api.deps import CurrentUser, SessionDep
+from app.core.limiter import AI_PARSE_LIMIT, limiter
 from app.features.ai import parser_service
 from app.features.ai.models import ExpenseParseRequest, ExpenseParseResponse, ParseStreamEvent
 from app.features.groups.service import is_group_member
@@ -28,7 +30,9 @@ parser_router = APIRouter(prefix="/expenses", tags=["ai-parsing"])
 
 
 @parser_router.post("/parse")
+@limiter.limit(AI_PARSE_LIMIT)  # per-IP (WS8/S5-H2) — model calls cost money
 async def parse_expense(
+    request: Request,
     *,
     session: SessionDep,
     current_user: CurrentUser,

@@ -1,4 +1,5 @@
 import base64
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -8,6 +9,9 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
+# Passwords exist only as bootstrap/placeholder hashes — there is no password
+# LOGIN path (WS8 deleted the template's parallel password-auth stack), so
+# there is deliberately no verify_password here.
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -15,14 +19,18 @@ ALGORITHM = "HS256"
 
 
 def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
+    # jti makes the token individually revocable (WS8/S5-H1): logout and
+    # future admin revocation insert the jti into revoked_token, and
+    # get_current_user rejects it from then on.
     expire = datetime.now(timezone.utc) + expires_delta
-    to_encode = {"exp": expire, "sub": str(subject)}
+    to_encode = {
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "sub": str(subject),
+        "jti": str(uuid.uuid4()),
+    }
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:

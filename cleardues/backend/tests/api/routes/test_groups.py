@@ -201,7 +201,7 @@ def test_create_invite_as_non_owner(
     )
     assert response.status_code == 403
     content = response.json()
-    assert "Only the group owner can generate invite links" in content["detail"]
+    assert "Only the group owner can manage invite links" in content["detail"]
 
 
 def test_create_invite_nonexistent_group(
@@ -242,8 +242,8 @@ def test_accept_valid_invite(
     invite = invite_response.json()["invite"]
 
     # Accept invite as second user
-    accept_response = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}",
+    accept_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}/accept",
         headers=second_user_token_headers,
     )
     assert accept_response.status_code == 200
@@ -285,8 +285,8 @@ def test_accept_invite_already_member(
     invite = invite_response.json()["invite"]
 
     # Accept invite as same user (owner, already a member)
-    accept_response = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}",
+    accept_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}/accept",
         headers=normal_user_token_headers,
     )
     assert accept_response.status_code == 200
@@ -298,8 +298,8 @@ def test_accept_invalid_invite_token(
     client: TestClient, normal_user_token_headers: dict[str, str]
 ) -> None:
     """Test accepting invalid token returns 404."""
-    response = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/invalid-token-12345",
+    response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/invalid-token-12345/accept",
         headers=normal_user_token_headers,
     )
     assert response.status_code == 404
@@ -340,8 +340,8 @@ def test_accept_expired_invite(
     db.commit()
 
     # Try to accept expired invite
-    accept_response = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}",
+    accept_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}/accept",
         headers=second_user_token_headers,
     )
     assert accept_response.status_code == 410
@@ -376,15 +376,15 @@ def test_invite_can_be_used_multiple_times(
     invite = invite_response.json()["invite"]
 
     # First user accepts
-    accept_response1 = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}",
+    accept_response1 = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}/accept",
         headers=second_user_token_headers,
     )
     assert accept_response1.status_code == 200
 
     # Second user accepts same invite
-    accept_response2 = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}",
+    accept_response2 = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}/accept",
         headers=superuser_token_headers,
     )
     assert accept_response2.status_code == 200
@@ -581,8 +581,8 @@ def test_list_group_members_owner_first(
     assert invite_response.status_code == 201
     invite = invite_response.json()["invite"]
 
-    accept_response = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}",
+    accept_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite['token']}/accept",
         headers=second_user_token_headers,
     )
     assert accept_response.status_code == 200

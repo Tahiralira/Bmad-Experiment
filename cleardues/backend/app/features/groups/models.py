@@ -73,6 +73,12 @@ class GroupMembersListResponse(SQLModel):
 # === Invite Schemas ===
 
 
+class GroupInviteCreate(SQLModel):
+    """Request schema for creating an invite (WS8/S5-M4: capped usage)."""
+
+    max_uses: int = Field(default=10, ge=1, le=100)
+
+
 class GroupInvitePublic(SQLModel):
     """Response schema for a group invite."""
 
@@ -81,6 +87,9 @@ class GroupInvitePublic(SQLModel):
     token: str
     expires_at: datetime
     created_at: datetime
+    max_uses: int
+    use_count: int
+    revoked_at: datetime | None = None
     invite_url: str | None = None  # Computed field
 
 
@@ -90,6 +99,28 @@ class GroupInviteResponse(SQLModel):
     invite: GroupInvitePublic | None = None
     group: ExpenseGroupPublic | None = None
     message: str
+
+
+class GroupInvitesPublic(SQLModel):
+    """Owner-facing list of a group's invites (for revocation)."""
+
+    data: list[GroupInvitePublic]
+    count: int
+
+
+class InvitePreview(SQLModel):
+    """What an invited person sees BEFORE joining (WS8/S5-M4).
+
+    Accepting used to be a state-changing GET — any link prefetcher could
+    join a group. Now GET shows this preview and joining is an explicit POST
+    from the landing page.
+    """
+
+    group_id: uuid.UUID
+    group_name: str
+    member_count: int
+    expires_at: datetime
+    already_member: bool
 
 
 # === Database Models ===
@@ -219,7 +250,9 @@ class GroupSettings(SQLModel, table=True):
 class GroupInvite(SQLModel, table=True):
     """
     Invite tokens for joining expense groups via shareable links.
-    Unlike magic link tokens, these can be used multiple times until expiration.
+
+    Multi-use up to max_uses (WS8/S5-M4 — a leaked link is no longer an
+    unlimited door), revocable by the owner, and expiring after 30 days.
     """
 
     __tablename__ = "group_invite"
@@ -231,6 +264,9 @@ class GroupInvite(SQLModel, table=True):
     )
     token: str = Field(unique=True, index=True, max_length=64)
     expires_at: datetime = Field(sa_type=_AWARE_DATETIME)
+    max_uses: int = Field(default=10)
+    use_count: int = Field(default=0)
+    revoked_at: datetime | None = Field(default=None, sa_type=_AWARE_DATETIME)
     created_by: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
     )

@@ -25,15 +25,11 @@ class UserBase(SQLModel):
     full_name: str | None = Field(default=None, max_length=255)
 
 
-# Properties to receive via API on creation
+# Properties to receive on user creation. The password is a bootstrap-only
+# concept (superuser seed + test fixtures) — there is NO password login
+# endpoint (WS8 deleted the template's parallel password-auth stack).
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
-
-
-class UserRegister(SQLModel):
-    email: EmailStr = Field(max_length=255)
-    password: str = Field(min_length=8, max_length=128)
-    full_name: str | None = Field(default=None, max_length=255)
 
 
 # Properties to receive via API on update, all are optional
@@ -45,11 +41,6 @@ class UserUpdate(UserBase):
 class UserUpdateMe(SQLModel):
     full_name: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = Field(default=None, max_length=255)
-
-
-class UpdatePassword(SQLModel):
-    current_password: str = Field(min_length=8, max_length=128)
-    new_password: str = Field(min_length=8, max_length=128)
 
 
 class ApiKeyUpdate(SQLModel):
@@ -96,7 +87,6 @@ class User(UserBase, table=True):
         sa_type=_AWARE_DATETIME,
         sa_column_kwargs={"onupdate": utc_now},
     )
-    items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
     expense_splits: list["ExpenseSplit"] = Relationship(back_populates="user")
 
     # Composite unique index from the OAuth migration (declared here so
@@ -138,6 +128,45 @@ class MagicLinkRequest(SQLModel):
     email: EmailStr = Field(max_length=255)
 
 
+# One-time login code for OAuth token delivery (WS8/S5-H1).
+# The OAuth callback used to put the 30-day JWT itself in the redirect URL —
+# straight into access logs, browser history, and Referer headers. Now the
+# redirect carries only a short-lived single-use code; the frontend exchanges
+# it for the JWT via POST, so the long-lived credential never rides a URL.
+class LoginCode(SQLModel, table=True):
+    __tablename__ = "login_code"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, index=True, ondelete="CASCADE"
+    )
+    # SHA-256 of the raw code, same at-rest discipline as magic-link tokens
+    code_hash: str = Field(unique=True, index=True, max_length=64)
+    expires_at: datetime = Field(sa_type=_AWARE_DATETIME)
+    used_at: datetime | None = Field(default=None, sa_type=_AWARE_DATETIME)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
+
+
+class LoginCodeExchange(SQLModel):
+    """Request schema for exchanging a one-time OAuth login code for a JWT."""
+
+    code: str = Field(min_length=16, max_length=128)
+
+
+# Server-side JWT revocation (WS8/S5-H1): every access token carries a `jti`;
+# a revoked jti is rejected by get_current_user until the token would have
+# expired anyway (expires_at marks when the row can be purged).
+class RevokedToken(SQLModel, table=True):
+    __tablename__ = "revoked_token"
+
+    jti: uuid.UUID = Field(primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, index=True, ondelete="CASCADE"
+    )
+    expires_at: datetime = Field(sa_type=_AWARE_DATETIME)
+    revoked_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
+
+
 # Properties to return via API, id is always required
 class UserPublic(UserBase):
     id: uuid.UUID
@@ -168,44 +197,7 @@ class TokenWithUser(Token):
 # Contents of JWT token
 class TokenPayload(SQLModel):
     sub: str | None = None
-
-
-class NewPassword(SQLModel):
-    token: str
-    new_password: str = Field(min_length=8, max_length=128)
-
-
-# Item model - temporarily kept here for backward compatibility
-# Will be moved to expenses feature in future stories
-class ItemBase(SQLModel):
-    title: str = Field(min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=255)
-
-
-class ItemCreate(ItemBase):
-    pass
-
-
-class ItemUpdate(ItemBase):
-    title: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
-
-
-class Item(ItemBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    owner_id: uuid.UUID = Field(
-        foreign_key="user.id", nullable=False, ondelete="CASCADE"
-    )
-    owner: User | None = Relationship(back_populates="items")
-
-
-class ItemPublic(ItemBase):
-    id: uuid.UUID
-    owner_id: uuid.UUID
-
-
-class ItemsPublic(SQLModel):
-    data: list[ItemPublic]
-    count: int
+    jti: str | None = None
 
 
 # === Dashboard Schemas (Story 2.4) ===

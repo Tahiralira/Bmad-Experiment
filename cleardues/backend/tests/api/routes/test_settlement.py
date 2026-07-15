@@ -81,8 +81,8 @@ def _create_confirmed_expense(
 
     # NOTE: invite acceptance is currently a state-changing GET (S5-M4);
     # becomes POST in WS8 — update this then.
-    accept_response = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}",
+    accept_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}/accept",
         headers=second_user_headers,
     )
     assert accept_response.status_code == 200
@@ -253,8 +253,8 @@ def test_settle_expense_group_member_no_split_returns_403(
     invite_token = invite_response.json()["invite"]["token"]
 
     # NOTE: GET-based acceptance per current API (S5-M4); becomes POST in WS8.
-    accept_response = client.get(
-        f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}",
+    accept_response = client.post(
+        f"{settings.API_V1_STR}/expense-groups/invite/{invite_token}/accept",
         headers=second_user_token_headers,
     )
     assert accept_response.status_code == 200

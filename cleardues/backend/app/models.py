@@ -10,31 +10,24 @@ from app.features.auth.models import (
     UserBase,
     UserCreate,
     UserPublic,
-    UserRegister,
     UsersPublic,
     UserUpdate,
     UserUpdateMe,
-    UpdatePassword,
     # Auth models
     Token,
     TokenWithUser,
     TokenPayload,
-    NewPassword,
     Message,
     # Magic link models
     MagicLinkToken,
     MagicLinkRequest,
+    # Session security models (WS8)
+    LoginCode,
+    RevokedToken,
     # Auth method constants
     AUTH_METHOD_PASSWORD,
     AUTH_METHOD_MAGIC_LINK,
     AUTH_METHOD_OAUTH,
-    # Item models (temporary - will be moved to expenses feature)
-    Item,
-    ItemBase,
-    ItemCreate,
-    ItemPublic,
-    ItemsPublic,
-    ItemUpdate,
 )
 
 __all__ = [
@@ -45,31 +38,24 @@ __all__ = [
     "UserBase",
     "UserCreate",
     "UserPublic",
-    "UserRegister",
     "UsersPublic",
     "UserUpdate",
     "UserUpdateMe",
-    "UpdatePassword",
     # Auth models
     "Token",
     "TokenWithUser",
     "TokenPayload",
-    "NewPassword",
     "Message",
     # Magic link models
     "MagicLinkToken",
     "MagicLinkRequest",
+    # Session security models (WS8)
+    "LoginCode",
+    "RevokedToken",
     # Auth method constants
     "AUTH_METHOD_PASSWORD",
     "AUTH_METHOD_MAGIC_LINK",
     "AUTH_METHOD_OAUTH",
-    # Item models
-    "Item",
-    "ItemBase",
-    "ItemCreate",
-    "ItemPublic",
-    "ItemsPublic",
-    "ItemUpdate",
 ]
 
 # Register ALL feature models with SQLModel metadata. Prestart (initial_data),

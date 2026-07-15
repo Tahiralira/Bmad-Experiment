@@ -26,6 +26,12 @@ if settings.ENVIRONMENT != "local":
 if not settings.POSTGRES_DB.endswith("_test"):
     settings.POSTGRES_DB = f"{settings.POSTGRES_DB}_test"
 
+# Per-IP rate limiting off for the suite (every request comes from the same
+# testclient IP and would trip the auth tiers immediately). This must happen
+# before app imports because the Limiter reads the setting at construction.
+# The dedicated rate-limit test flips limiter.enabled back on for its scope.
+settings.RATE_LIMIT_ENABLED = False
+
 
 def _ensure_test_database_exists() -> None:
     """Create the dedicated test database if it doesn't exist yet."""
@@ -98,20 +104,16 @@ def client() -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture(scope="module")
-def superuser_token_headers(client: TestClient) -> dict[str, str]:
-    return get_superuser_token_headers(client)
+def superuser_token_headers(db: Session) -> dict[str, str]:
+    return get_superuser_token_headers(db)
 
 
 @pytest.fixture(scope="module")
-def normal_user_token_headers(client: TestClient, db: Session) -> dict[str, str]:
-    return authentication_token_from_email(
-        client=client, email=settings.EMAIL_TEST_USER, db=db
-    )
+def normal_user_token_headers(db: Session) -> dict[str, str]:
+    return authentication_token_from_email(email=settings.EMAIL_TEST_USER, db=db)
 
 
 @pytest.fixture(scope="module")
-def second_user_token_headers(client: TestClient, db: Session) -> dict[str, str]:
+def second_user_token_headers(db: Session) -> dict[str, str]:
     """Token headers for a second test user (for multi-user tests)."""
-    return authentication_token_from_email(
-        client=client, email="seconduser@example.com", db=db
-    )
+    return authentication_token_from_email(email="seconduser@example.com", db=db)

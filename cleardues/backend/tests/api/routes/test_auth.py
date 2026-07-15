@@ -448,8 +448,9 @@ def test_login_rate_limiting(client: TestClient, db: Session) -> None:
     assert len(tokens) == 3
 
 
-def test_login_jwt_30_day_expiration(client: TestClient, db: Session) -> None:
-    """Test that login verification returns JWT with 30-day expiration per PRD 'Walled Garden'."""
+def test_login_jwt_expiration(client: TestClient, db: Session) -> None:
+    """Login JWTs live LOGIN_TOKEN_EXPIRE_DAYS (14 — shortened from the
+    PRD's 30 in WS8/S5-H1 now that tokens are revocable)."""
     import jwt
     from app.core.config import settings as app_settings
     from app.core.security import ALGORITHM
@@ -477,13 +478,17 @@ def test_login_jwt_30_day_expiration(client: TestClient, db: Session) -> None:
     # Decode the JWT and verify expiration
     decoded = jwt.decode(access_token, app_settings.SECRET_KEY, algorithms=[ALGORITHM])
 
-    # Check that expiration is approximately 30 days from now
+    # Check that expiration matches the configured lifetime
     exp_timestamp = decoded["exp"]
     now = datetime.now(timezone.utc).timestamp()
     days_until_expiry = (exp_timestamp - now) / (60 * 60 * 24)
 
-    # Allow 1 minute tolerance for test execution time
-    assert 29.99 <= days_until_expiry <= 30.01, f"JWT expiration should be ~30 days, got {days_until_expiry:.2f} days"
+    expected = app_settings.LOGIN_TOKEN_EXPIRE_DAYS
+    assert expected - 0.01 <= days_until_expiry <= expected + 0.01, (
+        f"JWT expiration should be ~{expected} days, got {days_until_expiry:.2f}"
+    )
+    # Every token carries a revocable jti (WS8/S5-H1)
+    assert decoded["jti"]
 
 
 # ============================================================================
@@ -663,7 +668,8 @@ def test_get_user_by_oauth_not_found(db: Session) -> None:
 
 
 def test_oauth_callback_creates_new_user(client: TestClient, db: Session) -> None:
-    """Test OAuth callback creates new user and redirects with token."""
+    """OAuth callback creates the user and redirects with a one-time CODE —
+    never the JWT itself (WS8/S5-H1); the code then exchanges for a token."""
     email = random_email()
 
     # Mock the OAuth client and its methods
@@ -671,6 +677,7 @@ def test_oauth_callback_creates_new_user(client: TestClient, db: Session) -> Non
     mock_client.authorize_access_token = AsyncMock(return_value={
         "userinfo": {
             "email": email,
+            "email_verified": True,
             "name": "OAuth Test User",
             "sub": f"google-{email}",
         }
@@ -686,9 +693,11 @@ def test_oauth_callback_creates_new_user(client: TestClient, db: Session) -> Non
                 follow_redirects=False,
             )
 
-    # Should redirect to frontend
+    # Should redirect to frontend with ?code=, no token in the URL
     assert r.status_code == 307
-    assert "token=" in r.headers["location"]
+    location = r.headers["location"]
+    assert "code=" in location
+    assert "token=" not in location
 
     # Verify user was created
     statement = select(User).where(User.email == email)
@@ -696,6 +705,21 @@ def test_oauth_callback_creates_new_user(client: TestClient, db: Session) -> Non
     assert user is not None
     assert user.oauth_provider == "google"
     assert user.auth_method == AUTH_METHOD_OAUTH
+
+    # The code exchanges for a JWT exactly once (single-use)
+    raw_code = location.split("code=")[1]
+    r = client.post(
+        f"{settings.API_V1_STR}/auth/oauth/exchange", json={"code": raw_code}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["access_token"]
+    assert body["user"]["email"] == email
+
+    r = client.post(
+        f"{settings.API_V1_STR}/auth/oauth/exchange", json={"code": raw_code}
+    )
+    assert r.status_code == 400  # already used
 
 
 def test_oauth_callback_links_existing_user(client: TestClient, db: Session) -> None:
@@ -716,6 +740,7 @@ def test_oauth_callback_links_existing_user(client: TestClient, db: Session) -> 
     mock_client.authorize_access_token = AsyncMock(return_value={
         "userinfo": {
             "email": email,
+            "email_verified": True,
             "name": "OAuth Name",
             "sub": "google-linked-id",
         }
@@ -731,9 +756,10 @@ def test_oauth_callback_links_existing_user(client: TestClient, db: Session) -> 
                 follow_redirects=False,
             )
 
-    # Should redirect with token
+    # Should redirect with a one-time code (WS8/S5-H1)
     assert r.status_code == 307
-    assert "token=" in r.headers["location"]
+    assert "code=" in r.headers["location"]
+    assert "token=" not in r.headers["location"]
 
     # Verify OAuth fields were added to existing user
     db.refresh(existing_user)
@@ -746,7 +772,7 @@ def test_oauth_callback_failed_auth(client: TestClient) -> None:
     """Test OAuth callback handles authentication failure gracefully."""
     mock_client = MagicMock()
     mock_client.authorize_access_token = AsyncMock(
-        side_effect=Exception("OAuth verification failed")
+        side_effect=Exception("OAuth verification failed: secret detail")
     )
 
     with patch("app.features.auth.router.is_provider_configured", return_value=True):
@@ -759,9 +785,40 @@ def test_oauth_callback_failed_auth(client: TestClient) -> None:
                 follow_redirects=False,
             )
 
-    # Should redirect to frontend with error
+    # Should redirect to frontend with a generic error CODE only — the
+    # exception text must never appear in the URL (S5-M2)
     assert r.status_code == 307
     assert "error=oauth_failed" in r.headers["location"]
+    assert "message=" not in r.headers["location"]
+    assert "secret detail" not in r.headers["location"]
+
+
+def test_oauth_callback_unverified_email_rejected(client: TestClient) -> None:
+    """Google identities with unverified emails must not log in or link
+    accounts (S5-M3)."""
+    email = random_email()
+    mock_client = MagicMock()
+    mock_client.authorize_access_token = AsyncMock(return_value={
+        "userinfo": {
+            "email": email,
+            "email_verified": False,
+            "name": "Unverified User",
+            "sub": f"google-unverified-{email}",
+        }
+    })
+
+    with patch("app.features.auth.router.is_provider_configured", return_value=True):
+        with patch("app.features.auth.router.oauth") as mock_oauth:
+            mock_oauth.create_client.return_value = mock_client
+
+            r = client.get(
+                f"{settings.API_V1_STR}/auth/oauth/google/callback",
+                params={"code": "test_code", "state": "test_state"},
+                follow_redirects=False,
+            )
+
+    assert r.status_code == 307
+    assert "error=email_unverified" in r.headers["location"]
 
 
 def test_oauth_callback_inactive_user(client: TestClient, db: Session) -> None:
@@ -785,6 +842,7 @@ def test_oauth_callback_inactive_user(client: TestClient, db: Session) -> None:
     mock_client.authorize_access_token = AsyncMock(return_value={
         "userinfo": {
             "email": email,
+            "email_verified": True,
             "name": "Inactive User",
             "sub": f"google-inactive-{email}",
         }
