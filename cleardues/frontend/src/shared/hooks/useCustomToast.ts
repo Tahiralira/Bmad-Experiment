@@ -8,7 +8,8 @@ export const useCustomToast = () => {
   }
 
   const showErrorToast = (description: string) => {
-    toast.error("Something went wrong!", {
+    // Mediator voice (UX-H4): calm, no exclamation, no blame
+    toast.error("That didn't go through", {
       description,
     })
   }

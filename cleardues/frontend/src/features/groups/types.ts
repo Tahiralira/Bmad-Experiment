@@ -37,6 +37,9 @@ export interface GroupInvite {
   token: string
   expires_at: string
   created_at: string
+  max_uses: number
+  use_count: number
+  revoked_at?: string | null
   invite_url?: string
 }
 
@@ -44,6 +47,20 @@ export interface GroupInviteResponse {
   invite?: GroupInvite
   group?: ExpenseGroup
   message: string
+}
+
+export interface GroupInvitesResponse {
+  data: GroupInvite[]
+  count: number
+}
+
+/** What an invited person sees BEFORE joining (WS8/S5-M4). */
+export interface InvitePreview {
+  group_id: string
+  group_name: string
+  member_count: number
+  expires_at: string
+  already_member: boolean
 }
 
 // === Pairwise Balances (WS6/S2-F9) ===

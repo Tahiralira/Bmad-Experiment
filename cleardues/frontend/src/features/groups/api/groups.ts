@@ -3,14 +3,17 @@ import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
 import { GroupsService, OpenAPI } from "@/shared/api"
+import { getApiErrorMessage } from "@/utils"
 import type {
   ExpenseGroup,
   ExpenseGroupCreate,
   ExpenseGroupDetail,
   GroupInviteResponse,
+  GroupInvitesResponse,
   GroupMembersListResponse,
   GroupSettings,
   GroupSettingsUpdate,
+  InvitePreview,
   PairwiseBalancesResponse,
 } from "../types"
 
@@ -143,40 +146,64 @@ export function useUpdateGroupSettings(groupId: string) {
       }
     },
     onError: (error) => {
-      toast.error(`Couldn't update settings: ${error.message}`)
+      toast.error(getApiErrorMessage(error))
     },
   })
 }
 
-// === Invite API ===
+// === Invite API (WS8/S5-M4: preview via GET, join via explicit POST,
+// owner revocation, usage caps) ===
 
 async function createInvite(groupId: string): Promise<GroupInviteResponse> {
   return __request(OpenAPI, {
     method: "POST",
     url: `/api/v1/expense-groups/${groupId}/invites`,
-    errors: {
-      401: "Unauthorized",
-      403: "Only the group owner can generate invite links",
-      404: "Group not found",
-    },
+  })
+}
+
+async function getInvitePreview(token: string): Promise<InvitePreview> {
+  return __request(OpenAPI, {
+    method: "GET",
+    url: `/api/v1/expense-groups/invite/${token}`,
   })
 }
 
 async function acceptInvite(token: string): Promise<GroupInviteResponse> {
   return __request(OpenAPI, {
+    method: "POST",
+    url: `/api/v1/expense-groups/invite/${token}/accept`,
+  })
+}
+
+async function revokeInvite(
+  groupId: string,
+  inviteId: string,
+): Promise<{ message: string }> {
+  return __request(OpenAPI, {
+    method: "DELETE",
+    url: `/api/v1/expense-groups/${groupId}/invites/${inviteId}`,
+  })
+}
+
+async function listInvites(groupId: string): Promise<GroupInvitesResponse> {
+  return __request(OpenAPI, {
     method: "GET",
-    url: `/api/v1/expense-groups/invite/${token}`,
-    errors: {
-      401: "Unauthorized",
-      404: "Invalid invite link",
-      410: "This invite link has expired",
-    },
+    url: `/api/v1/expense-groups/${groupId}/invites`,
   })
 }
 
 export function useCreateInvite() {
   return useMutation({
     mutationFn: createInvite,
+  })
+}
+
+export function useInvitePreview(token: string) {
+  return useQuery<InvitePreview, Error>({
+    queryKey: ["invite-preview", token],
+    queryFn: () => getInvitePreview(token),
+    enabled: !!token,
+    retry: false,
   })
 }
 
@@ -189,6 +216,26 @@ export function useAcceptInvite() {
       // Invalidate groups list to show new membership
       queryClient.invalidateQueries({ queryKey: ["groups"] })
     },
+  })
+}
+
+export function useRevokeInvite(groupId: string) {
+  return useMutation({
+    mutationFn: (inviteId: string) => revokeInvite(groupId, inviteId),
+    onSuccess: (result) => {
+      toast.success(result.message)
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error))
+    },
+  })
+}
+
+export function useGroupInvites(groupId: string, enabled: boolean) {
+  return useQuery<GroupInvitesResponse, Error>({
+    queryKey: ["groups", groupId, "invites"],
+    queryFn: () => listInvites(groupId),
+    enabled,
   })
 }
 

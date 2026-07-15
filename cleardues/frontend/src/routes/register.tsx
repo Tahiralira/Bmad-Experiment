@@ -69,7 +69,7 @@ function Register() {
       setSubmitted(true)
       showSuccessToast("Check your email for the magic link!")
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (err: unknown) => handleError(err, showErrorToast),
   })
 
   const onSubmit = (data: FormData) => {
@@ -181,13 +181,6 @@ function Register() {
             Already have an account?{" "}
             <RouterLink to="/login" className="underline underline-offset-4">
               Log in
-            </RouterLink>
-          </div>
-
-          <div className="text-center text-sm">
-            Prefer to use a password?{" "}
-            <RouterLink to="/signup" className="underline underline-offset-4">
-              Sign up with password
             </RouterLink>
           </div>
         </form>

@@ -1,19 +1,24 @@
 /**
- * OAuth callback page that handles the redirect from OAuth providers.
- * Reads the JWT token from URL params and stores it in localStorage.
+ * OAuth callback page.
+ *
+ * WS8/S5-H1: the backend redirects here with a short-lived ONE-TIME CODE
+ * (never the JWT — tokens in URLs land in access logs and history). This
+ * page immediately exchanges the code for the access token via POST.
  */
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
+import { request as __request } from "@/client/core/request"
 import { AuthLayout } from "@/components/Common/AuthLayout"
+import { OpenAPI } from "@/shared/api"
+import { getApiErrorMessage } from "@/utils"
 
 export const Route = createFileRoute("/auth/callback")({
   component: OAuthCallbackPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    token: search.token as string | undefined,
+    code: search.code as string | undefined,
     error: search.error as string | undefined,
-    message: search.message as string | undefined,
   }),
   head: () => ({
     meta: [
@@ -24,30 +29,53 @@ export const Route = createFileRoute("/auth/callback")({
   }),
 })
 
+interface TokenWithUser {
+  access_token: string
+  token_type: string
+}
+
 function OAuthCallbackPage() {
   const navigate = useNavigate()
-  const { token, error, message } = Route.useSearch()
+  const { code, error } = Route.useSearch()
   const [status, setStatus] = useState<"loading" | "error">("loading")
   const [errorMessage, setErrorMessage] = useState<string>("")
+  const hasExchanged = useRef(false)
 
   useEffect(() => {
     if (error) {
       setStatus("error")
-      setErrorMessage(message || getErrorMessage(error))
+      setErrorMessage(getErrorMessage(error))
       return
     }
 
-    if (token) {
-      // Store token and redirect to dashboard
-      localStorage.setItem("access_token", token)
-      navigate({ to: "/" })
+    if (code) {
+      // Exchange the one-time code for the access token (exactly once —
+      // the code is single-use, so a StrictMode double-run would fail)
+      if (hasExchanged.current) {
+        return
+      }
+      hasExchanged.current = true
+      __request<TokenWithUser>(OpenAPI, {
+        method: "POST",
+        url: "/api/v1/auth/oauth/exchange",
+        body: { code },
+        mediaType: "application/json",
+      })
+        .then((response) => {
+          localStorage.setItem("access_token", response.access_token)
+          navigate({ to: "/" })
+        })
+        .catch((err: unknown) => {
+          setStatus("error")
+          setErrorMessage(getApiErrorMessage(err))
+        })
       return
     }
 
-    // No token or error - something went wrong
+    // No code or error - something went wrong
     setStatus("error")
-    setErrorMessage("No authentication token received. Please try again.")
-  }, [token, error, message, navigate])
+    setErrorMessage("That sign-in didn't complete. Please try again.")
+  }, [code, error, navigate])
 
   if (status === "error") {
     return (
@@ -103,17 +131,21 @@ function OAuthCallbackPage() {
   )
 }
 
+// The backend sends generic error CODES only (WS8/S5-M2) — human copy
+// lives here, in the mediator's voice.
 function getErrorMessage(errorCode: string): string {
   const errorMessages: Record<string, string> = {
-    oauth_failed: "OAuth authentication failed. Please try again.",
+    oauth_failed: "That sign-in didn't complete. Please try again.",
+    email_unverified:
+      "Your email address isn't verified with that provider yet. Verify it there first, then try again.",
     no_email:
-      "Could not retrieve your email from the OAuth provider. Please try a different login method.",
+      "We couldn't get your email from that provider. Please try a different sign-in method.",
     no_provider_id:
-      "Could not verify your identity with the OAuth provider. Please try again.",
-    inactive: "Your account has been deactivated. Please contact support.",
+      "We couldn't verify your identity with that provider. Please try again.",
+    inactive: "This account has been deactivated. Please contact support.",
   }
   return (
     errorMessages[errorCode] ||
-    "An unexpected error occurred. Please try again."
+    "That sign-in didn't complete. Please try again."
   )
 }

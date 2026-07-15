@@ -1,14 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 
-import {
-  type Body_login_login_access_token as AccessToken,
-  AuthService,
-  LoginService,
-  type UserPublic,
-  type UserRegister,
-  UsersService,
-} from "@/shared/api"
+import { request as __request } from "@/client/core/request"
+import { AuthService, OpenAPI, type UserPublic, UsersService } from "@/shared/api"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
 import { handleError } from "@/utils"
 
@@ -27,35 +21,16 @@ const useAuth = () => {
     enabled: isLoggedIn(),
   })
 
-  const signUpMutation = useMutation({
-    mutationFn: (data: UserRegister) =>
-      UsersService.registerUser({ requestBody: data }),
-    onSuccess: () => {
-      navigate({ to: "/login" })
-    },
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] })
-    },
-  })
-
-  const login = async (data: AccessToken) => {
-    const response = await LoginService.loginAccessToken({
-      formData: data,
-    })
-    localStorage.setItem("access_token", response.access_token)
-  }
-
-  const loginMutation = useMutation({
-    mutationFn: login,
-    onSuccess: () => {
-      navigate({ to: "/" })
-    },
-    onError: handleError.bind(showErrorToast),
-  })
-
   const logout = () => {
+    // Revoke the token server-side (WS8/S5-H1) — clearing localStorage alone
+    // would leave the JWT valid until expiry. Fire-and-forget: the local
+    // sign-out must not depend on the network.
+    __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/auth/logout",
+    }).catch(() => {})
     localStorage.removeItem("access_token")
+    queryClient.removeQueries({ queryKey: ["currentUser"] })
     navigate({ to: "/login" })
   }
 
@@ -63,7 +38,8 @@ const useAuth = () => {
   const requestLoginMagicLinkMutation = useMutation({
     mutationFn: (email: string) =>
       AuthService.requestLoginMagicLink({ requestBody: { email } }),
-    onError: handleError.bind(showErrorToast),
+    onError: (err: Parameters<typeof handleError>[0]) =>
+      handleError(err, showErrorToast),
   })
 
   // Magic link login - verify token and store JWT
@@ -77,12 +53,11 @@ const useAuth = () => {
       queryClient.invalidateQueries({ queryKey: ["currentUser"] })
       navigate({ to: "/" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (err: Parameters<typeof handleError>[0]) =>
+      handleError(err, showErrorToast),
   })
 
   return {
-    signUpMutation,
-    loginMutation,
     logout,
     user,
     requestLoginMagicLinkMutation,

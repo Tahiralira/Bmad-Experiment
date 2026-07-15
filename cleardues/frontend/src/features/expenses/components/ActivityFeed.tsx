@@ -1,6 +1,7 @@
 import { Activity } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 
+import { getApiErrorMessage } from "@/utils"
 import { useGroupAuditLog } from "../api/expenses"
 import type { AuditLog } from "../types"
 import { ActivityFeedItem } from "./ActivityFeedItem"
@@ -90,9 +91,7 @@ export function ActivityFeed({
         {title && (
           <h2 className="text-heading font-medium text-primary">{title}</h2>
         )}
-        <p className="text-sm text-destructive">
-          Failed to load activity: {error.message}
-        </p>
+        <p className="text-sm text-destructive">{getApiErrorMessage(error)}</p>
       </div>
     )
   }

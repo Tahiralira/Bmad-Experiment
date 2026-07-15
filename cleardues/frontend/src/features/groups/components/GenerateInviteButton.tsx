@@ -1,31 +1,39 @@
 import { useState } from "react"
 
-import { useCreateInvite } from "../api/groups"
+import { getApiErrorMessage } from "@/utils"
+import { useCreateInvite, useRevokeInvite } from "../api/groups"
+import type { GroupInvite } from "../types"
 
 interface Props {
   groupId: string
 }
 
 export function GenerateInviteButton({ groupId }: Props) {
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
-  const [expiresAt, setExpiresAt] = useState<string | null>(null)
+  const [invite, setInvite] = useState<GroupInvite | null>(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const createInvite = useCreateInvite()
+  const revokeInvite = useRevokeInvite(groupId)
 
   const handleGenerate = async () => {
     setError(null)
     try {
       const result = await createInvite.mutateAsync(groupId)
       if (result.invite?.invite_url) {
-        setInviteUrl(result.invite.invite_url)
-        setExpiresAt(result.invite.expires_at ?? null)
+        setInvite(result.invite)
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to create invite"
-      setError(errorMessage)
+      setError(getApiErrorMessage(err))
     }
+  }
+
+  const handleRevoke = () => {
+    if (!invite) return
+    revokeInvite.mutate(invite.id, {
+      onSuccess: () => {
+        setInvite(null)
+      },
+    })
   }
 
   const formatExpirationDate = (dateString: string): string => {
@@ -38,20 +46,20 @@ export function GenerateInviteButton({ groupId }: Props) {
   }
 
   const handleCopy = async () => {
-    if (inviteUrl) {
-      await navigator.clipboard.writeText(inviteUrl)
+    if (invite?.invite_url) {
+      await navigator.clipboard.writeText(invite.invite_url)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
   }
 
   const handleShare = async () => {
-    if (inviteUrl && navigator.share) {
+    if (invite?.invite_url && navigator.share) {
       try {
         await navigator.share({
           title: "Join my expense group",
           text: "Click to join our expense tracking group",
-          url: inviteUrl,
+          url: invite.invite_url,
         })
       } catch {
         // User cancelled or share failed, fall back to copy
@@ -62,13 +70,13 @@ export function GenerateInviteButton({ groupId }: Props) {
     }
   }
 
-  if (!inviteUrl) {
+  if (!invite) {
     return (
       <div className="space-y-2">
         <button
           onClick={handleGenerate}
           disabled={createInvite.isPending}
-          className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
+          className="min-h-11 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {createInvite.isPending ? "Generating..." : "Generate Invite Link"}
         </button>
@@ -79,31 +87,40 @@ export function GenerateInviteButton({ groupId }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 rounded-md border bg-gray-50 p-2">
+      <div className="flex items-center gap-2 rounded-md border bg-muted p-2">
         <input
           type="text"
-          value={inviteUrl}
+          value={invite.invite_url ?? ""}
           readOnly
           className="flex-1 bg-transparent text-sm"
         />
         <button
           onClick={handleCopy}
-          className="rounded px-2 py-1 text-sm hover:bg-gray-200"
+          className="rounded px-2 py-1 text-sm hover:bg-accent"
         >
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
-      {expiresAt && (
-        <p className="text-xs text-gray-500">
-          Expires: {formatExpirationDate(expiresAt)}
-        </p>
-      )}
-      <button
-        onClick={handleShare}
-        className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-      >
-        Share Invite
-      </button>
+      <p className="text-xs text-muted-foreground">
+        Good for {invite.max_uses}{" "}
+        {invite.max_uses === 1 ? "join" : "joins"} · expires{" "}
+        {formatExpirationDate(invite.expires_at)}
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={handleShare}
+          className="min-h-11 flex-1 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+        >
+          Share Invite
+        </button>
+        <button
+          onClick={handleRevoke}
+          disabled={revokeInvite.isPending}
+          className="min-h-11 rounded-md border border-destructive px-4 py-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+        >
+          {revokeInvite.isPending ? "Revoking..." : "Revoke"}
+        </button>
+      </div>
     </div>
   )
 }

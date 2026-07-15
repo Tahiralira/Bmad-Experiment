@@ -9,10 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
-import { Route as RecoverPasswordRouteImport } from './routes/recover-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
@@ -21,31 +18,14 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPendingRouteImport } from './routes/_layout/pending'
-import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutGroupsRouteImport } from './routes/_layout/groups'
-import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
 import { Route as LoginVerifyTokenRouteImport } from './routes/login.verify.$token'
 import { Route as LayoutGroupsGroupIdRouteImport } from './routes/_layout/groups_.$groupId'
 
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RecoverPasswordRoute = RecoverPasswordRouteImport.update({
-  id: '/recover-password',
-  path: '/recover-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -87,19 +67,9 @@ const LayoutPendingRoute = LayoutPendingRouteImport.update({
   path: '/pending',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutItemsRoute = LayoutItemsRouteImport.update({
-  id: '/items',
-  path: '/items',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutGroupsRoute = LayoutGroupsRouteImport.update({
   id: '/groups',
   path: '/groups',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutAdminRoute = LayoutAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutActivityRoute = LayoutActivityRouteImport.update({
@@ -120,14 +90,9 @@ const LayoutGroupsGroupIdRoute = LayoutGroupsGroupIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRouteWithChildren
-  '/recover-password': typeof RecoverPasswordRoute
   '/register': typeof RegisterRoute
-  '/reset-password': typeof ResetPasswordRoute
-  '/signup': typeof SignupRoute
   '/activity': typeof LayoutActivityRoute
-  '/admin': typeof LayoutAdminRoute
   '/groups': typeof LayoutGroupsRoute
-  '/items': typeof LayoutItemsRoute
   '/pending': typeof LayoutPendingRoute
   '/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -139,14 +104,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRouteWithChildren
-  '/recover-password': typeof RecoverPasswordRoute
   '/register': typeof RegisterRoute
-  '/reset-password': typeof ResetPasswordRoute
-  '/signup': typeof SignupRoute
   '/activity': typeof LayoutActivityRoute
-  '/admin': typeof LayoutAdminRoute
   '/groups': typeof LayoutGroupsRoute
-  '/items': typeof LayoutItemsRoute
   '/pending': typeof LayoutPendingRoute
   '/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -160,14 +120,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteWithChildren
   '/login': typeof LoginRouteWithChildren
-  '/recover-password': typeof RecoverPasswordRoute
   '/register': typeof RegisterRoute
-  '/reset-password': typeof ResetPasswordRoute
-  '/signup': typeof SignupRoute
   '/_layout/activity': typeof LayoutActivityRoute
-  '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/groups': typeof LayoutGroupsRoute
-  '/_layout/items': typeof LayoutItemsRoute
   '/_layout/pending': typeof LayoutPendingRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -181,14 +136,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/login'
-    | '/recover-password'
     | '/register'
-    | '/reset-password'
-    | '/signup'
     | '/activity'
-    | '/admin'
     | '/groups'
-    | '/items'
     | '/pending'
     | '/settings'
     | '/auth/callback'
@@ -200,14 +150,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
-    | '/recover-password'
     | '/register'
-    | '/reset-password'
-    | '/signup'
     | '/activity'
-    | '/admin'
     | '/groups'
-    | '/items'
     | '/pending'
     | '/settings'
     | '/auth/callback'
@@ -220,14 +165,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_layout'
     | '/login'
-    | '/recover-password'
     | '/register'
-    | '/reset-password'
-    | '/signup'
     | '/_layout/activity'
-    | '/_layout/admin'
     | '/_layout/groups'
-    | '/_layout/items'
     | '/_layout/pending'
     | '/_layout/settings'
     | '/auth/callback'
@@ -241,10 +181,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   LayoutRoute: typeof LayoutRouteWithChildren
   LoginRoute: typeof LoginRouteWithChildren
-  RecoverPasswordRoute: typeof RecoverPasswordRoute
   RegisterRoute: typeof RegisterRoute
-  ResetPasswordRoute: typeof ResetPasswordRoute
-  SignupRoute: typeof SignupRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   InviteTokenRoute: typeof InviteTokenRoute
   VerifyTokenRoute: typeof VerifyTokenRoute
@@ -252,32 +189,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/register': {
       id: '/register'
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/recover-password': {
-      id: '/recover-password'
-      path: '/recover-password'
-      fullPath: '/recover-password'
-      preLoaderRoute: typeof RecoverPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -336,25 +252,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutPendingRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/items': {
-      id: '/_layout/items'
-      path: '/items'
-      fullPath: '/items'
-      preLoaderRoute: typeof LayoutItemsRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/groups': {
       id: '/_layout/groups'
       path: '/groups'
       fullPath: '/groups'
       preLoaderRoute: typeof LayoutGroupsRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/admin': {
-      id: '/_layout/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/activity': {
@@ -383,9 +285,7 @@ declare module '@tanstack/react-router' {
 
 interface LayoutRouteChildren {
   LayoutActivityRoute: typeof LayoutActivityRoute
-  LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutGroupsRoute: typeof LayoutGroupsRoute
-  LayoutItemsRoute: typeof LayoutItemsRoute
   LayoutPendingRoute: typeof LayoutPendingRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
@@ -394,9 +294,7 @@ interface LayoutRouteChildren {
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutActivityRoute: LayoutActivityRoute,
-  LayoutAdminRoute: LayoutAdminRoute,
   LayoutGroupsRoute: LayoutGroupsRoute,
-  LayoutItemsRoute: LayoutItemsRoute,
   LayoutPendingRoute: LayoutPendingRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
@@ -419,10 +317,7 @@ const LoginRouteWithChildren = LoginRoute._addFileChildren(LoginRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   LayoutRoute: LayoutRouteWithChildren,
   LoginRoute: LoginRouteWithChildren,
-  RecoverPasswordRoute: RecoverPasswordRoute,
   RegisterRoute: RegisterRoute,
-  ResetPasswordRoute: ResetPasswordRoute,
-  SignupRoute: SignupRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   InviteTokenRoute: InviteTokenRoute,
   VerifyTokenRoute: VerifyTokenRoute,
