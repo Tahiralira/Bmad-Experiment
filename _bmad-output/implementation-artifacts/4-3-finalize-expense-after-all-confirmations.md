@@ -457,8 +457,8 @@ feat: Complete Story 4.3 - Finalize expense after all confirmations
 - [Source: epics.md - Story 4.3](_bmad-output/planning-artifacts/epics.md#story-43-finalize-expense-after-all-confirmations)
 - [Source: architecture.md - Redis Events](_bmad-output/planning-artifacts/architecture.md#api--communication-patterns) — Event naming: `domain.entity.action`
 - [Source: prd.md - FR10](_bmad-output/planning-artifacts/prd.md#transaction-logic--workflow) — "Involved members must Confirm an expense before it is finalized as debt"
-- [Source: models.py](cleardues/backend/app/features/expenses/models.py) — ExpenseStatus enum with CONFIRMED
-- [Source: service.py](cleardues/backend/app/features/expenses/service.py) — confirm_expense_split() function
+- [Source: models.py](backend/app/features/expenses/models.py) — ExpenseStatus enum with CONFIRMED
+- [Source: service.py](backend/app/features/expenses/service.py) — confirm_expense_split() function
 - [Previous Story: 4.2](_bmad-output/implementation-artifacts/4-2-expense-confirmation-workflow.md) — Confirmation patterns
 
 ## Dev Agent Record
@@ -489,13 +489,13 @@ Claude (glm-5)
 
 ### File List
 
-- `cleardues/backend/app/features/expenses/models.py` — Added `confirmed_at` field to Expense model and ExpensePublic schema
-- `cleardues/backend/app/features/expenses/service.py` — Added `check_all_splits_confirmed()`, `finalize_expense()`, `publish_expense_confirmed_event()`, `notify_group_of_finalized_expense()` functions; modified `confirm_expense_split()` to trigger finalization; fixed pre-existing syntax errors
-- `cleardues/backend/app/features/auth/service.py` — Implemented actual net balance calculation in `get_user_dashboard()` replacing placeholder 0.0
-- `cleardues/backend/app/alembic/versions/f2a3b4c5d6e7_add_confirmed_at_to_expense.py` — New migration adding `confirmed_at` column to expense table
-- `cleardues/frontend/src/features/expenses/types.ts` — Added `confirmed_at` field to Expense interface
-- `cleardues/frontend/src/features/expenses/components/PendingConfirmationsList.tsx` — Added "Confirmed" status badge and confirmed timestamp display
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Added `group-balances` query invalidation to useConfirmExpense
+- `backend/app/features/expenses/models.py` — Added `confirmed_at` field to Expense model and ExpensePublic schema
+- `backend/app/features/expenses/service.py` — Added `check_all_splits_confirmed()`, `finalize_expense()`, `publish_expense_confirmed_event()`, `notify_group_of_finalized_expense()` functions; modified `confirm_expense_split()` to trigger finalization; fixed pre-existing syntax errors
+- `backend/app/features/auth/service.py` — Implemented actual net balance calculation in `get_user_dashboard()` replacing placeholder 0.0
+- `backend/app/alembic/versions/f2a3b4c5d6e7_add_confirmed_at_to_expense.py` — New migration adding `confirmed_at` column to expense table
+- `frontend/src/features/expenses/types.ts` — Added `confirmed_at` field to Expense interface
+- `frontend/src/features/expenses/components/PendingConfirmationsList.tsx` — Added "Confirmed" status badge and confirmed timestamp display
+- `frontend/src/features/expenses/api/expenses.ts` — Added `group-balances` query invalidation to useConfirmExpense
 
 ## Change Log
 
@@ -531,8 +531,8 @@ Claude (glm-5)
 
 ### Files Modified During Review
 
-- `cleardues/backend/app/features/auth/service.py` — Replaced N+1 balance calculation with aggregated SQL query
-- `cleardues/backend/app/features/expenses/service.py` — Fixed datetime, Redis client reuse, optimized finalization check
-- `cleardues/backend/app/core/config.py` — Added REDIS_HOST and REDIS_PORT settings
-- `cleardues/frontend/src/features/expenses/components/PendingConfirmationsList.tsx` — Hide action buttons on confirmed expenses
+- `backend/app/features/auth/service.py` — Replaced N+1 balance calculation with aggregated SQL query
+- `backend/app/features/expenses/service.py` — Fixed datetime, Redis client reuse, optimized finalization check
+- `backend/app/core/config.py` — Added REDIS_HOST and REDIS_PORT settings
+- `frontend/src/features/expenses/components/PendingConfirmationsList.tsx` — Hide action buttons on confirmed expenses
 - `_bmad-output/implementation-artifacts/4-3-finalize-expense-after-all-confirmations.md` — Fixed task statuses, added review section

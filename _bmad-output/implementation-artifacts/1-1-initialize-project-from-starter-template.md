@@ -180,7 +180,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101) via Claude Code CLI
 - `LICENSE` - MIT License
 - `copier.yml` - Template configuration
 
-**Backend (`cleardues/backend/`)**
+**Backend (`backend/`)**
 - `app/main.py` - FastAPI application entry point
 - `app/api/main.py` - API router configuration
 - `app/api/routes/login.py` - Authentication endpoints
@@ -195,7 +195,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101) via Claude Code CLI
 - `alembic.ini` - Database migrations config
 - `app/alembic/` - Migration scripts
 
-**Frontend (`cleardues/frontend/`)**
+**Frontend (`frontend/`)**
 - `package.json` - Node.js dependencies
 - `src/` - React + TypeScript source
 - `Dockerfile` - Frontend container definition

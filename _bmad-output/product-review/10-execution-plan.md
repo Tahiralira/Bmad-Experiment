@@ -649,10 +649,10 @@ this file breaks that merge into runnable units.
       root CI + both platforms' monorepo Root Directory support make nesting
       harmless for now; revisit at WS11/WS13 (extraction stays drilled).
       Tasks:
-      - [x] `cleardues/frontend/vercel.json` — SPA rewrite + WS8 security
+      - [x] `frontend/vercel.json` — SPA rewrite + WS8 security
             headers ported from nginx.conf + immutable /assets + no-cache HTML
       - [x] `render.yaml` blueprint (repo root): python runtime + uv
-            (auto-detected via uv.lock in rootDir cleardues/backend), free
+            (auto-detected via uv.lock in rootDir backend), free
             plan, startup migrations (free tier has no preDeployCommand),
             health-check path, buildFilters, generateValue secrets
             (SECRET_KEY/ENCRYPTION_KEY), sync:false prompts for the rest
@@ -686,6 +686,46 @@ this file breaks that merge into runnable units.
         magic-link email needs an SMTP provider env-var drop later.
       Status: DONE 2026-07-16 (branch ws9.5/replatform)
 
+- [x] **WS9.6 — Repo flatten & cleanup** (unplanned session, 2026-07-16;
+      supersedes WS9.5's "nesting is harmless" call — Vercel's root-directory
+      picker in practice only descends one level, so `cleardues/frontend` was
+      unselectable)
+      Goal: pre-merge-to-main cleanup; `backend/` and `frontend/` selectable
+      by PaaS root-directory pickers.
+      Tasks:
+      - [x] Flattened: everything under `cleardues/` git-mv'd to the repo
+            root (306 tracked renames); `cleardues/` is gone. S6-M4's
+            "extract to own repo" is now equivalent to just pushing this
+            repo to a new remote (deployment-vps.md §7 updated).
+      - [x] RESCUED FILES the old root .gitignore silently excluded from git
+            (CI never caught it — it only runs on main/PRs, and neither had
+            happened since the files appeared): `frontend/package.json`
+            (bare `package.json` ignore line!), `frontend/src/lib/utils.ts`
+            (bare `lib/`), `backend/app/email-templates/build/*.html` (bare
+            `build/`). A fresh clone could not build the frontend at all.
+      - [x] .gitignore rewritten: the two .gitignores merged at root, broad
+            Python-template patterns (`lib/`, `build/`, `dist/`,
+            `package.json`) removed or anchored (`/frontend/dist/`)
+      - [x] Junk deleted: `nul` ×2, `temp.py` (S6-L3); foreign-tool configs
+            removed from tracking (`.kilocodemodes`, `.github/agents/` —
+            BMAD-generated for Kilo Code / GitHub Copilot, unused,
+            recoverable from git history)
+      - [x] `name: cleardues` pinned in docker-compose.yml — the project
+            name used to come from the `cleardues/` folder name; pinning
+            preserves the existing app-db-data volume and container names
+      - [x] Path-reference sweep: `cleardues/<x>` → `<x>` across CLAUDE.md,
+            ci.yml, db-backup.yml, render.yaml (rootDir/buildFilters →
+            `backend`), deployment.md (Vercel Root Directory → `frontend`),
+            deployment-vps.md, trackers, and story/planning artifacts.
+            Product-review docs 00–09 keep their historical `cleardues/`
+            narrative where it *describes* the old layout (findings are
+            point-in-time records).
+      Verification: backend 251 passed (after `docker compose build backend`
+      — see solution-patterns: tests are volume-mounted but app code runs
+      from the image); frontend typecheck + 86 tests + build green; compose
+      stack restarted from the new root and healthy.
+      Status: DONE 2026-07-16 (branch ws9.6/repo-restructure)
+
 - [ ] **WS10 — Growth Wiring & Analytics** (≈1 week)
       Goal: the beta can convert, retain, and be measured — globally.
       Depends on: WS5, WS6; WS9 for PostHog hosting.
@@ -718,7 +758,8 @@ this file breaks that merge into runnable units.
       Inputs: 07 (top-10 table), 04 (H5, H4).
       Tasks:
       - [ ] Repo-root README (what/status/stack/quickstart/layout) + LICENSE decision;
-            strip cleardues/README to dev setup; delete template badges/screenshots/
+            strip the template README.md (at repo root since WS9.6) to dev setup;
+            delete template badges/screenshots/
             release-notes/img/ (S7-H1, M6)
       - [ ] backend/README rewrite: feature-based architecture, real migration
             workflow (S7-H2); SECURITY.md contact fixed (S7-M1)

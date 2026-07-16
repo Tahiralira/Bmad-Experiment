@@ -1,6 +1,16 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-16 (WS9.5 done — replatform to Vercel/Render/Neon prepped)
+**Last Updated:** 2026-07-16 (WS9.6 done — repo flattened: app now at repo root)
+
+> **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
+> `backend/`, `frontend/`, compose files, and deployment docs live at the repo
+> root. Any `cleardues/<path>` reference in documents written before this date
+> means `<path>` today. Three files had NEVER been in git because the old root
+> .gitignore's broad patterns (`package.json`, `lib/`, `build/`) swallowed them:
+> `frontend/package.json`, `frontend/src/lib/utils.ts`,
+> `backend/app/email-templates/build/*.html` — rescued in WS9.6; a fresh clone
+> before that could not build. Docker compose project name is now pinned
+> (`name: cleardues`) so local volumes survived the move.
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -318,10 +328,10 @@ docker compose up -d
 docker compose exec backend pytest -v
 
 # Frontend type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 
 # Frontend build
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 ```
 
 ---

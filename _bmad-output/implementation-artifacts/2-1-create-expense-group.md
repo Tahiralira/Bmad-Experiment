@@ -636,10 +636,10 @@ curl -X POST http://localhost:8000/api/v1/expense-groups \
   -d '{"name": "Weekend Trip"}'
 
 # Frontend build check
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Frontend type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ### API Contract
@@ -705,10 +705,10 @@ Authorization: Bearer <jwt_token>
 - [Source: epics.md - Story 2.1](../_bmad-output/planning-artifacts/epics.md#story-21-create-expense-group)
 - [Source: architecture.md - Project Structure](../_bmad-output/planning-artifacts/architecture.md#complete-project-directory-structure)
 - [Source: architecture.md - Naming Patterns](../_bmad-output/planning-artifacts/architecture.md#naming-patterns)
-- [Existing Code: features/auth/models.py](../../cleardues/backend/app/features/auth/models.py)
-- [Existing Code: features/groups/models.py](../../cleardues/backend/app/features/groups/models.py)
-- [Existing Code: features/groups/router.py](../../cleardues/backend/app/features/groups/router.py)
-- [Existing Code: features/groups/service.py](../../cleardues/backend/app/features/groups/service.py)
+- [Existing Code: features/auth/models.py](../../backend/app/features/auth/models.py)
+- [Existing Code: features/groups/models.py](../../backend/app/features/groups/models.py)
+- [Existing Code: features/groups/router.py](../../backend/app/features/groups/router.py)
+- [Existing Code: features/groups/service.py](../../backend/app/features/groups/service.py)
 - [Previous Story: 1-6-social-authentication-oauth.md](./1-6-social-authentication-oauth.md)
 
 ### Important Notes for Developer
@@ -750,24 +750,24 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 ### File List
 
 **Backend (Modified/Created):**
-- cleardues/backend/app/features/groups/models.py (MODIFIED)
-- cleardues/backend/app/features/groups/service.py (MODIFIED)
-- cleardues/backend/app/features/groups/router.py (MODIFIED)
-- cleardues/backend/app/api/main.py (MODIFIED - added groups router)
-- cleardues/backend/app/alembic/versions/c5e9f3a1b2d4_add_expense_group_and_group_member.py (CREATED)
-- cleardues/backend/tests/api/routes/test_groups.py (CREATED)
-- cleardues/backend/tests/conftest.py (MODIFIED - added group cleanup)
+- backend/app/features/groups/models.py (MODIFIED)
+- backend/app/features/groups/service.py (MODIFIED)
+- backend/app/features/groups/router.py (MODIFIED)
+- backend/app/api/main.py (MODIFIED - added groups router)
+- backend/app/alembic/versions/c5e9f3a1b2d4_add_expense_group_and_group_member.py (CREATED)
+- backend/tests/api/routes/test_groups.py (CREATED)
+- backend/tests/conftest.py (MODIFIED - added group cleanup)
 
 **Frontend (Created):**
-- cleardues/frontend/src/features/groups/types.ts (CREATED)
-- cleardues/frontend/src/features/groups/api/groups.ts (CREATED)
-- cleardues/frontend/src/features/groups/api/index.ts (CREATED)
-- cleardues/frontend/src/features/groups/components/CreateGroupForm.tsx (CREATED)
-- cleardues/frontend/src/features/groups/components/index.ts (CREATED)
-- cleardues/frontend/src/features/groups/hooks/index.ts (CREATED)
-- cleardues/frontend/src/features/groups/index.ts (CREATED)
-- cleardues/frontend/src/features/index.ts (MODIFIED)
-- cleardues/frontend/src/client/sdk.gen.ts (MODIFIED - added GroupsService)
+- frontend/src/features/groups/types.ts (CREATED)
+- frontend/src/features/groups/api/groups.ts (CREATED)
+- frontend/src/features/groups/api/index.ts (CREATED)
+- frontend/src/features/groups/components/CreateGroupForm.tsx (CREATED)
+- frontend/src/features/groups/components/index.ts (CREATED)
+- frontend/src/features/groups/hooks/index.ts (CREATED)
+- frontend/src/features/groups/index.ts (CREATED)
+- frontend/src/features/index.ts (MODIFIED)
+- frontend/src/client/sdk.gen.ts (MODIFIED - added GroupsService)
 
 ## Change Log
 
@@ -820,8 +820,8 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Files Modified During Review
 
-- `cleardues/backend/app/features/groups/service.py` - Performance optimizations, transaction handling
-- `cleardues/backend/app/features/groups/router.py` - Optimized list endpoint, fixed types
+- `backend/app/features/groups/service.py` - Performance optimizations, transaction handling
+- `backend/app/features/groups/router.py` - Optimized list endpoint, fixed types
 
 ### Verification
 

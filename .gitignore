@@ -1,4 +1,4 @@
-# AI Agent Folders (Useless for source code)
+# === AI agent tool folders (generated, per-user) ===
 .agent/
 .agentvibes/
 .augment/
@@ -17,69 +17,63 @@
 .trae/
 .windsurf/
 
-# Python / General
-.venv/
-venv/
+# === BMAD framework install — only its output is tracked ===
+/_bmad/
+!/_bmad-output/
+
+# === Local-only backups / archives ===
+/_bmad-backup/
+/cleardues-old-prd/
+
+# === Secrets & environment ===
+.env
+.env.*
+!.env.example
+
+# === Python ===
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
 *.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
-# Node.js
+# === Node ===
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-.next/
-out/
-.nuxt/
 
-# IDEs and OS
+# === Build outputs ===
+# NOTE: keep these anchored/scoped — a bare `lib/` or `build/` here once
+# silently untracked frontend/src/lib/ and backend/app/email-templates/build/.
+/frontend/dist/
+
+# === Testing artifacts ===
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# === IDEs and OS ===
 .vscode/
 .idea/
 .DS_Store
 .DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+ehthumbs.db
 
-# BMAD Framework - Ignore ALL except output and project config
-/_bmad/
-!/_bmad-output/
+# === Docker ===
+docker-compose.local.yml
+*.log
 
-# Backup and old folders
-/_bmad-backup/
-/cleardues-old-prd/
-
-# Local/Secrets
-.env
-.env.*
-!.env.example
-
-# Windows artifacts
+# === Windows artifacts ===
 nul
-
-# Temporary
-temp.py
-package.json

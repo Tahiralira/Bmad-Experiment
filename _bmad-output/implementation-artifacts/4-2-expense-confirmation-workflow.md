@@ -717,8 +717,8 @@ feat: Complete Story 4.2 - Expense confirmation workflow
 - [Source: epics.md - Story 4.2](_bmad-output/planning-artifacts/epics.md#story-42-expense-confirmation-workflow)
 - [Source: architecture.md - API Patterns](_bmad-output/planning-artifacts/architecture.md#api--communication-patterns)
 - [Source: prd.md - FR10](_bmad-output/planning-artifacts/prd.md#transaction-logic--workflow) — "Involved members must Confirm an expense before it is finalized as debt"
-- [Source: models.py](cleardues/backend/app/features/expenses/models.py) — ExpenseSplit model with `status` and `confirmed_at`
-- [Source: router.py](cleardues/backend/app/features/expenses/router.py) — Existing endpoint patterns
+- [Source: models.py](backend/app/features/expenses/models.py) — ExpenseSplit model with `status` and `confirmed_at`
+- [Source: router.py](backend/app/features/expenses/router.py) — Existing endpoint patterns
 - [Previous Story: 4.1](_bmad-output/implementation-artifacts/4-1-creator-only-edit-restriction.md) — Authorization patterns, status guards
 
 ## Dev Agent Record
@@ -755,18 +755,18 @@ No issues encountered during implementation.
 ### File List
 
 **Created:**
-- `cleardues/frontend/src/features/expenses/components/PendingConfirmationsList.tsx`
-- `cleardues/frontend/src/routes/_layout/pending.tsx`
+- `frontend/src/features/expenses/components/PendingConfirmationsList.tsx`
+- `frontend/src/routes/_layout/pending.tsx`
 
 **Modified:**
-- `cleardues/backend/app/features/expenses/models.py` - Added confirmation schemas
-- `cleardues/backend/app/features/expenses/service.py` - Added confirm/reject functions
-- `cleardues/backend/app/features/expenses/router.py` - Added confirm/reject/pending-confirmations endpoints
-- `cleardues/frontend/src/features/expenses/types.ts` - Added confirmation types
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` - Added confirm/reject API functions
-- `cleardues/frontend/src/features/expenses/api/index.ts` - Exported new hooks
-- `cleardues/frontend/src/components/ui/orbital-nav.tsx` - Added pending confirmations nav item
-- `cleardues/frontend/src/routeTree.gen.ts` - Auto-generated route tree (TanStack Router)
+- `backend/app/features/expenses/models.py` - Added confirmation schemas
+- `backend/app/features/expenses/service.py` - Added confirm/reject functions
+- `backend/app/features/expenses/router.py` - Added confirm/reject/pending-confirmations endpoints
+- `frontend/src/features/expenses/types.ts` - Added confirmation types
+- `frontend/src/features/expenses/api/expenses.ts` - Added confirm/reject API functions
+- `frontend/src/features/expenses/api/index.ts` - Exported new hooks
+- `frontend/src/components/ui/orbital-nav.tsx` - Added pending confirmations nav item
+- `frontend/src/routeTree.gen.ts` - Auto-generated route tree (TanStack Router)
 
 ## Code Review Fixes
 
@@ -793,7 +793,7 @@ No issues encountered during implementation.
 ## Testing Evidence
 
 ### Build Verification
-- ✅ Frontend builds successfully: `npm run build` in `cleardues/frontend`
+- ✅ Frontend builds successfully: `npm run build` in `frontend`
 - ✅ TypeScript type checking passes: `npm run typecheck`
 - ✅ Backend imports validated (no circular dependencies)
 

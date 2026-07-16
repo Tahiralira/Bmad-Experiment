@@ -646,10 +646,10 @@ curl -X POST http://localhost:8000/api/v1/expenses/ \
   -d '{"group_id": "<uuid>", "amount": 50.00, "description": "Lunch"}'
 
 # Frontend build check
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Frontend type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ### API Contract
@@ -737,8 +737,8 @@ This is Story 1 of 8 in Epic 3 (Smart Expense Entry):
 - [Source: architecture.md - Data Architecture](../_bmad-output/planning-artifacts/architecture.md#data-architecture)
 - [Source: architecture.md - API Patterns](../_bmad-output/planning-artifacts/architecture.md#api--communication-patterns)
 - [Source: prd.md - FR4-FR8](../_bmad-output/planning-artifacts/prd.md#expense-input--processing)
-- [Existing Code: features/groups/models.py](../../cleardues/backend/app/features/groups/models.py)
-- [Existing Code: features/expenses/models.py](../../cleardues/backend/app/features/expenses/models.py) (placeholder)
+- [Existing Code: features/groups/models.py](../../backend/app/features/groups/models.py)
+- [Existing Code: features/expenses/models.py](../../backend/app/features/expenses/models.py) (placeholder)
 - [Previous Story: 2-4-dashboard-with-net-balances.md](./2-4-dashboard-with-net-balances.md)
 
 ## Dev Agent Record
@@ -786,20 +786,20 @@ N/A - Implementation proceeded without blocking issues.
 ### File List
 
 **Backend - New/Modified:**
-- cleardues/backend/app/features/expenses/models.py (MODIFIED - added Expense, ExpenseSplit, schemas)
-- cleardues/backend/app/features/expenses/service.py (MODIFIED - added create_expense, is_user_group_member)
-- cleardues/backend/app/features/expenses/router.py (MODIFIED - replaced items_router with expenses_router)
-- cleardues/backend/app/alembic/versions/e8f9a0b1c2d3_add_expense_and_expense_split.py (NEW - migration)
-- cleardues/backend/tests/api/routes/test_expenses.py (NEW - 11 tests, including payer validation test added during review)
+- backend/app/features/expenses/models.py (MODIFIED - added Expense, ExpenseSplit, schemas)
+- backend/app/features/expenses/service.py (MODIFIED - added create_expense, is_user_group_member)
+- backend/app/features/expenses/router.py (MODIFIED - replaced items_router with expenses_router)
+- backend/app/alembic/versions/e8f9a0b1c2d3_add_expense_and_expense_split.py (NEW - migration)
+- backend/tests/api/routes/test_expenses.py (NEW - 11 tests, including payer validation test added during review)
 
 **Backend - Deleted:**
-- cleardues/backend/tests/api/routes/test_items.py (DELETED - legacy items tests)
+- backend/tests/api/routes/test_items.py (DELETED - legacy items tests)
 
 **Frontend - New/Modified:**
-- cleardues/frontend/src/features/expenses/types.ts (NEW)
-- cleardues/frontend/src/features/expenses/api/expenses.ts (NEW)
-- cleardues/frontend/src/features/expenses/api/index.ts (NEW)
-- cleardues/frontend/src/features/expenses/components/ExpenseForm.tsx (NEW)
-- cleardues/frontend/src/features/expenses/components/index.ts (NEW)
-- cleardues/frontend/src/features/expenses/index.ts (MODIFIED - added exports)
+- frontend/src/features/expenses/types.ts (NEW)
+- frontend/src/features/expenses/api/expenses.ts (NEW)
+- frontend/src/features/expenses/api/index.ts (NEW)
+- frontend/src/features/expenses/components/ExpenseForm.tsx (NEW)
+- frontend/src/features/expenses/components/index.ts (NEW)
+- frontend/src/features/expenses/index.ts (MODIFIED - added exports)
 

@@ -379,7 +379,7 @@ Anatomy:
 
 ```bash
 # Type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 
 # Build
 npm run build
@@ -470,8 +470,8 @@ This is Story 4 of 7 in Epic 2.5 (UX Foundation & Design System):
 - [Source: epics.md - Story 2.5.4](../_bmad-output/planning-artifacts/epics.md#story-254-smart-input-modal-foundation)
 - [Source: architecture.md - Frontend Structure](../_bmad-output/planning-artifacts/architecture.md)
 - [Previous Story: 2-5-3-orbital-navigation-system.md](./2-5-3-orbital-navigation-system.md)
-- [Existing Code: frontend/src/components/ui/agent-orb.tsx](../../cleardues/frontend/src/components/ui/agent-orb.tsx)
-- [Existing Code: frontend/src/components/ui/orbital-nav.tsx](../../cleardues/frontend/src/components/ui/orbital-nav.tsx)
+- [Existing Code: frontend/src/components/ui/agent-orb.tsx](../../frontend/src/components/ui/agent-orb.tsx)
+- [Existing Code: frontend/src/components/ui/orbital-nav.tsx](../../frontend/src/components/ui/orbital-nav.tsx)
 - [Framer Motion Docs - AnimatePresence](https://www.framer.com/motion/animate-presence/)
 - [Radix UI Dialog](https://www.radix-ui.com/docs/primitives/components/dialog)
 
@@ -520,15 +520,15 @@ Initial build error with Framer Motion variants. Fixed by:
 ### File List
 
 **New Files:**
-- `cleardues/frontend/src/shared/hooks/useLongPress.ts`
-- `cleardues/frontend/src/components/ui/smart-input-modal.tsx`
+- `frontend/src/shared/hooks/useLongPress.ts`
+- `frontend/src/components/ui/smart-input-modal.tsx`
 
 **Modified Files:**
-- `cleardues/frontend/src/shared/hooks/index.ts` - exported useLongPress hook and types
-- `cleardues/frontend/src/components/ui/agent-orb.tsx` - added onLongPress prop and hook usage
-- `cleardues/frontend/src/components/ui/orbital-nav.tsx` - added onLongPress prop passthrough
-- `cleardues/frontend/src/routes/_layout.tsx` - added SmartInputModal with state management
-- `cleardues/frontend/package-lock.json` - added focus-trap-react dependency
+- `frontend/src/shared/hooks/index.ts` - exported useLongPress hook and types
+- `frontend/src/components/ui/agent-orb.tsx` - added onLongPress prop and hook usage
+- `frontend/src/components/ui/orbital-nav.tsx` - added onLongPress prop passthrough
+- `frontend/src/routes/_layout.tsx` - added SmartInputModal with state management
+- `frontend/package-lock.json` - added focus-trap-react dependency
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - marked story in-progress
 
 ### Code Review Fixes Applied (2026-01-15)

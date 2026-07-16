@@ -188,13 +188,13 @@ All CRITICAL and MEDIUM issues have been fixed. LOW issues documented for future
 **Impact:** Blocking event loop, degraded performance, violated AC2 (< 2s NFR3).
 
 **Fix Applied:**
-- Removed `async` from both functions in [parser_service.py:92](cleardues/backend/app/features/ai/parser_service.py#L92)
-- Removed `async` from [parser_service.py:132](cleardues/backend/app/features/ai/parser_service.py#L132)
-- Removed `await` from router call in [parser_router.py:81](cleardues/backend/app/features/ai/parser_router.py#L81)
+- Removed `async` from both functions in [parser_service.py:92](backend/app/features/ai/parser_service.py#L92)
+- Removed `async` from [parser_service.py:132](backend/app/features/ai/parser_service.py#L132)
+- Removed `await` from router call in [parser_router.py:81](backend/app/features/ai/parser_router.py#L81)
 
 **Files Modified:**
-- `cleardues/backend/app/features/ai/parser_service.py`
-- `cleardues/backend/app/features/ai/parser_router.py`
+- `backend/app/features/ai/parser_service.py`
+- `backend/app/features/ai/parser_router.py`
 
 ---
 
@@ -205,7 +205,7 @@ All CRITICAL and MEDIUM issues have been fixed. LOW issues documented for future
 
 **Fix Applied:**
 - Added import: `from app.features.expenses.service import is_user_group_member`
-- Added validation in [parser_router.py:64](cleardues/backend/app/features/ai/parser_router.py#L64-L70):
+- Added validation in [parser_router.py:64](backend/app/features/ai/parser_router.py#L64-L70):
   ```python
   if not is_user_group_member(session, expense_in.group_id, current_user.id):
       event = ParseStreamEvent(type="error", error="You must be a member of this group to parse expenses.")
@@ -214,12 +214,12 @@ All CRITICAL and MEDIUM issues have been fixed. LOW issues documented for future
   ```
 
 **Files Modified:**
-- `cleardues/backend/app/features/ai/parser_router.py`
+- `backend/app/features/ai/parser_router.py`
 
 ---
 
 #### CRITICAL-003: Missing Import in Test File ✅ FIXED
-**Problem:** `select()` used but not imported from `sqlmodel` in [test_ai_parsing.py:147](cleardues/backend/tests/api/routes/test_ai_parsing.py#L147).
+**Problem:** `select()` used but not imported from `sqlmodel` in [test_ai_parsing.py:147](backend/tests/api/routes/test_ai_parsing.py#L147).
 
 **Impact:** Tests would fail with `NameError: name 'select' is not defined`.
 
@@ -229,7 +229,7 @@ All CRITICAL and MEDIUM issues have been fixed. LOW issues documented for future
 - Updated all test function calls to remove `await` keywords
 
 **Files Modified:**
-- `cleardues/backend/tests/api/routes/test_ai_parsing.py`
+- `backend/tests/api/routes/test_ai_parsing.py`
 
 ---
 
@@ -250,12 +250,12 @@ All CRITICAL and MEDIUM issues have been fixed. LOW issues documented for future
 **Impact:** Personality modes may not work correctly in production.
 
 **Fix Applied:**
-Enhanced [test_ai_parsing.py:111-146](cleardues/backend/tests/api/routes/test_ai_parsing.py#L111-L146) to verify:
+Enhanced [test_ai_parsing.py:111-146](backend/tests/api/routes/test_ai_parsing.py#L111-L146) to verify:
 - `PERSONALITY_PROMPTS[personality.value]` was passed to `generate_content()`
 - `system_instruction` in `config` matches expected personality prompt
 
 **Files Modified:**
-- `cleardues/backend/tests/api/routes/test_ai_parsing.py`
+- `backend/tests/api/routes/test_ai_parsing.py`
 
 ---
 
@@ -265,26 +265,26 @@ Enhanced [test_ai_parsing.py:111-146](cleardues/backend/tests/api/routes/test_ai
 **Impact:** AC10, AC11 not actually implemented - always uses request personality, never group default.
 
 **Fix Applied:**
-- Changed `personality` field type in [models.py:57](cleardues/backend/app/features/ai/models.py#L57):
+- Changed `personality` field type in [models.py:57](backend/app/features/ai/models.py#L57):
   ```python
   personality: AIPersonality | None = Field(default=None, description="...")
   ```
 - Updated router logic to detect `None` and fetch group personality
 
 **Files Modified:**
-- `cleardues/backend/app/features/ai/models.py`
+- `backend/app/features/ai/models.py`
 
 ---
 
 ### 🟢 LOW ISSUES DOCUMENTED
 
 #### LOW-001: Generic Exception Handling
-**File:** [parser_router.py:104](cleardues/backend/app/features/ai/parser_router.py#L104)
+**File:** [parser_router.py:104](backend/app/features/ai/parser_router.py#L104)
 **Issue:** Broad `except Exception` masks errors, no logging.
 **Recommendation:** Add logging for production debugging.
 
 #### LOW-002: Test Uses Random UUID
-**File:** [test_ai_parsing.py:42](cleardues/backend/tests/api/routes/test_ai_parsing.py#L42)
+**File:** [test_ai_parsing.py:42](backend/tests/api/routes/test_ai_parsing.py#L42)
 **Issue:** Creates random UUID without database setup.
 **Impact:** Minimal - test passes but unrealistic.
 
@@ -1012,7 +1012,7 @@ curl -N http://localhost:8000/api/v1/expenses/parse \
   }'
 
 # Frontend build check
-cd cleardues/frontend && npm run typecheck && npm run build
+cd frontend && npm run typecheck && npm run build
 ```
 
 ### API Contract
@@ -1248,20 +1248,20 @@ Story 3.3 implementation complete! AI Parsing Service Integration successfully i
 - ✅ **NFR5**: Per-user API keys provide natural rate limiting
 
 **Files Created (7):**
-1. `cleardues/backend/app/features/ai/__init__.py`
-2. `cleardues/backend/app/features/ai/models.py`
-3. `cleardues/backend/app/features/ai/parser_service.py`
-4. `cleardues/backend/app/features/ai/parser_router.py`
-5. `cleardues/backend/app/alembic/versions/e9f0b1c2d3e4_add_group_settings.py`
-6. `cleardues/backend/app/alembic/versions/f0a1b2c3d4e5_add_user_gemini_api_key.py`
-7. `cleardues/backend/tests/api/routes/test_ai_parsing.py`
+1. `backend/app/features/ai/__init__.py`
+2. `backend/app/features/ai/models.py`
+3. `backend/app/features/ai/parser_service.py`
+4. `backend/app/features/ai/parser_router.py`
+5. `backend/app/alembic/versions/e9f0b1c2d3e4_add_group_settings.py`
+6. `backend/app/alembic/versions/f0a1b2c3d4e5_add_user_gemini_api_key.py`
+7. `backend/tests/api/routes/test_ai_parsing.py`
 
 **Files Modified (4):**
-1. `cleardues/backend/app/features/groups/models.py` (GroupSettings + ExpenseGroup relationship)
-2. `cleardues/backend/app/features/auth/models.py` (gemini_api_key_encrypted field)
-3. `cleardues/backend/app/core/security.py` (encryption/decryption functions)
-4. `cleardues/backend/app/api/main.py` (AI router registration)
-5. `cleardues/backend/pyproject.toml` (google-genai, cryptography dependencies)
+1. `backend/app/features/groups/models.py` (GroupSettings + ExpenseGroup relationship)
+2. `backend/app/features/auth/models.py` (gemini_api_key_encrypted field)
+3. `backend/app/core/security.py` (encryption/decryption functions)
+4. `backend/app/api/main.py` (AI router registration)
+5. `backend/pyproject.toml` (google-genai, cryptography dependencies)
 
 **Remaining Work (Task 10 - Manual Testing):**
 
@@ -1297,22 +1297,22 @@ Task 10 subtasks require running Docker containers and manual testing with curl:
 - _bmad-output/implementation-artifacts/3-3-ai-parsing-service-integration.md (this file)
 
 **Backend Files to Create:**
-- cleardues/backend/app/features/ai/__init__.py (NEW)
-- cleardues/backend/app/features/ai/models.py (NEW)
-- cleardues/backend/app/features/ai/parser_service.py (NEW)
-- cleardues/backend/app/features/ai/parser_router.py (NEW)
-- cleardues/backend/tests/api/routes/test_ai_parsing.py (NEW)
+- backend/app/features/ai/__init__.py (NEW)
+- backend/app/features/ai/models.py (NEW)
+- backend/app/features/ai/parser_service.py (NEW)
+- backend/app/features/ai/parser_router.py (NEW)
+- backend/tests/api/routes/test_ai_parsing.py (NEW)
 
 **Backend Files to Modify:**
-- cleardues/backend/app/features/groups/models.py (MODIFY - add GroupSettings, update ExpenseGroup)
-- cleardues/backend/app/features/auth/models.py (MODIFY - add gemini_api_key_encrypted to User)
-- cleardues/backend/app/core/security.py (MODIFY - add encrypt/decrypt_api_key functions)
-- cleardues/backend/app/api/main.py (MODIFY - register parser_router)
-- cleardues/backend/pyproject.toml (MODIFY - add google-genai, cryptography dependencies)
+- backend/app/features/groups/models.py (MODIFY - add GroupSettings, update ExpenseGroup)
+- backend/app/features/auth/models.py (MODIFY - add gemini_api_key_encrypted to User)
+- backend/app/core/security.py (MODIFY - add encrypt/decrypt_api_key functions)
+- backend/app/api/main.py (MODIFY - register parser_router)
+- backend/pyproject.toml (MODIFY - add google-genai, cryptography dependencies)
 
 **Database Migrations to Create:**
-- cleardues/backend/alembic/versions/XXXXX_add_group_settings.py (NEW - via alembic revision)
-- cleardues/backend/alembic/versions/XXXXX_add_user_gemini_key.py (NEW - via alembic revision)
+- backend/alembic/versions/XXXXX_add_group_settings.py (NEW - via alembic revision)
+- backend/alembic/versions/XXXXX_add_user_gemini_key.py (NEW - via alembic revision)
 
 **Reference Documents:**
 - _bmad-output/implementation-artifacts/tech-spec-ai-parsing-service-integration.md (tech spec used as source)

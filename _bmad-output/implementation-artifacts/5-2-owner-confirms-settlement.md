@@ -27,7 +27,7 @@ so that the debt is officially cleared from the system.
 ## Tasks / Subtasks
 
 - [x] Task 1: Backend — Confirm settlement claim service + endpoint (AC: #1, #2, #3, #7, #8, #9, #10)
-  - [x] 1.1 Add `confirm_settlement_claim(session, claim_id, current_user_id)` to `cleardues/backend/app/features/expenses/service.py`:
+  - [x] 1.1 Add `confirm_settlement_claim(session, claim_id, current_user_id)` to `backend/app/features/expenses/service.py`:
     - Load claim by ID (return None → router: 404)
     - Load associated split → expense via JOIN (return None → router: 404)
     - Verify `current_user_id == expense.payer_id` (return "FORBIDDEN" → router: 403)
@@ -37,21 +37,21 @@ so that the debt is officially cleared from the system.
     - Record audit: `action_type=SETTLED`, `before_data={"status": "pending", "amount": str(claim.amount)}`, `after_data={"status": "confirmed"}`
     - Check if ALL splits in expense are now SETTLED → if yes, transition expense status to `ExpenseStatus.SETTLED`
     - Commit + return `_build_claim_public(claim, session)`
-  - [x] 1.2 Add `POST /settlement-claims/{claim_id}/confirm` endpoint to `cleardues/backend/app/features/expenses/router.py`:
+  - [x] 1.2 Add `POST /settlement-claims/{claim_id}/confirm` endpoint to `backend/app/features/expenses/router.py`:
     - Requires authenticated user (CurrentUser dependency)
     - Calls `confirm_settlement_claim(session, claim_id, current_user.id)`
     - Error responses: 404 (claim not found), 403 (not expense owner), 409 (already processed)
     - Returns 200 OK with `SettlementClaimPublic`
 
 - [x] Task 2: Backend — Reject settlement claim service + endpoint (AC: #2, #4, #7, #8, #9, #10)
-  - [x] 2.1 Add `reject_settlement_claim(session, claim_id, current_user_id)` to `cleardues/backend/app/features/expenses/service.py`:
+  - [x] 2.1 Add `reject_settlement_claim(session, claim_id, current_user_id)` to `backend/app/features/expenses/service.py`:
     - Same auth/status guards as confirm
     - Update claim: `status = REJECTED`, `rejected_at = datetime.now(timezone.utc)`
     - Do NOT change split status (claimant can re-submit a new claim)
     - Delete the rejected claim to allow re-claim? No — keep for audit trail. The UNIQUE constraint on `expense_split_id` means the claimant needs the rejected claim deleted first. Decision: On rejection, delete the claim record so the user can re-claim. Audit log entry preserves the rejection history.
     - Record audit: `action_type=REJECTED`, `before_data={"status": "pending"}, after_data={"status": "rejected"}`
     - Commit + return `_build_claim_public(claim, session)` (before deleting, for response)
-  - [x] 2.2 Add `POST /settlement-claims/{claim_id}/reject` endpoint to `cleardues/backend/app/features/expenses/router.py`:
+  - [x] 2.2 Add `POST /settlement-claims/{claim_id}/reject` endpoint to `backend/app/features/expenses/router.py`:
     - Same pattern as confirm endpoint
     - Returns 200 OK with `SettlementClaimPublic`
 
@@ -65,7 +65,7 @@ so that the debt is officially cleared from the system.
     - Place BEFORE parameterized routes to avoid path conflicts
 
 - [x] Task 4: Frontend — API hooks for confirm/reject settlement (AC: #3, #4)
-  - [x] 4.1 Add `confirmSettlement(claimId)` async function to `cleardues/frontend/src/features/expenses/api/expenses.ts`:
+  - [x] 4.1 Add `confirmSettlement(claimId)` async function to `frontend/src/features/expenses/api/expenses.ts`:
     - `POST /api/v1/expenses/settlement-claims/{claimId}/confirm`
     - Error map: 403, 404, 409
   - [x] 4.2 Add `useConfirmSettlement()` mutation hook:
@@ -81,12 +81,12 @@ so that the debt is officially cleared from the system.
     - Query key: `["pending-settlement-claims"]`
 
 - [x] Task 5: Frontend — Owner's settlement claim review UI (AC: #1, #2, #11)
-  - [x] 5.1 Create `cleardues/frontend/src/features/expenses/components/SettlementClaimCard.tsx`:
+  - [x] 5.1 Create `frontend/src/features/expenses/components/SettlementClaimCard.tsx`:
     - Displays: claimant name, amount, claimed date, expense description
     - Action buttons: "Confirm" (amber/success) and "Reject" (muted/destructive)
     - Optimistic UI: immediate visual update on confirm/reject
     - Error recovery: `useEffect` to revert on mutation failure
-  - [x] 5.2 Create `cleardues/frontend/src/features/expenses/components/SettlementClaimsList.tsx`:
+  - [x] 5.2 Create `frontend/src/features/expenses/components/SettlementClaimsList.tsx`:
     - Fetches claims with `usePendingSettlementClaims()`
     - Shows list of `SettlementClaimCard` components
     - Empty state: "No pending settlement claims" with amber accent
@@ -133,7 +133,7 @@ so that the debt is officially cleared from the system.
     - Expense transitions to SETTLED when all splits settled
   - [x] 9.2 Backend: Write tests for `GET /settlement-claims/pending-for-owner` endpoint
   - [x] 9.3 Backend: Write tests for `POST /settlement-claims/{claim_id}/reject` endpoint
-  - [x] 9.4 Frontend: Run `cd cleardues/frontend && npm run typecheck && npm run build` — no errors
+  - [x] 9.4 Frontend: Run `cd frontend && npm run typecheck && npm run build` — no errors
   - [x] 9.5 Backend: Run `docker compose exec backend pytest` — written but pre-existing `GroupSettings | None` issue may block suite
   - [x] 9.6 Manual: Verify fade-out animation on confirm
   - [x] 9.7 Manual: Verify zero balance celebratory empty state
@@ -376,21 +376,21 @@ These fixes were applied in Story 5.1 and must be followed:
 ### Project Structure Notes
 
 **No new backend files needed** — all code added to existing expense feature files:
-- `cleardues/backend/app/features/expenses/service.py` — Add 3 functions
-- `cleardues/backend/app/features/expenses/router.py` — Add 3 endpoints
-- `cleardues/backend/tests/api/routes/test_settlement.py` — Add to existing test file
+- `backend/app/features/expenses/service.py` — Add 3 functions
+- `backend/app/features/expenses/router.py` — Add 3 endpoints
+- `backend/tests/api/routes/test_settlement.py` — Add to existing test file
 
 **New frontend files:**
-- `cleardues/frontend/src/features/expenses/components/SettlementClaimCard.tsx`
-- `cleardues/frontend/src/features/expenses/components/SettlementClaimsList.tsx`
+- `frontend/src/features/expenses/components/SettlementClaimCard.tsx`
+- `frontend/src/features/expenses/components/SettlementClaimsList.tsx`
 
 **Files to modify:**
-- `cleardues/backend/app/features/expenses/service.py` — Add `confirm_settlement_claim()`, `reject_settlement_claim()`, `get_claims_awaiting_owner_confirmation()`, `check_all_splits_settled()`
-- `cleardues/backend/app/features/expenses/router.py` — Add 3 endpoints
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Add 3 hooks + 3 API functions
-- `cleardues/frontend/src/features/expenses/utils/activityFormatters.ts` — Extend `formatSettledEntry()` for confirm/reject
-- `cleardues/frontend/src/features/expenses/components/index.ts` — Export new components
-- `cleardues/frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx` — Update to react to claim status changes
+- `backend/app/features/expenses/service.py` — Add `confirm_settlement_claim()`, `reject_settlement_claim()`, `get_claims_awaiting_owner_confirmation()`, `check_all_splits_settled()`
+- `backend/app/features/expenses/router.py` — Add 3 endpoints
+- `frontend/src/features/expenses/api/expenses.ts` — Add 3 hooks + 3 API functions
+- `frontend/src/features/expenses/utils/activityFormatters.ts` — Extend `formatSettledEntry()` for confirm/reject
+- `frontend/src/features/expenses/components/index.ts` — Export new components
+- `frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx` — Update to react to claim status changes
 
 **No Alembic migration needed** — Story 5.1 already created the `settlement_claim` table with `confirmed_at` and `rejected_at` fields.
 
@@ -402,13 +402,13 @@ These fixes were applied in Story 5.1 and must be followed:
 - [UX: Payment = Silence](_bmad-output/planning-artifacts/ux-design-specification.md)
 - [UX: Settlement Flow Journey](_bmad-output/planning-artifacts/ux-design-specification.md)
 - [Previous Story 5.1](_bmad-output/implementation-artifacts/5-1-mark-debt-as-settled-claim-payment.md)
-- [SettlementClaim model](cleardues/backend/app/features/expenses/models.py)
-- [Expense service — confirm/finalize pattern](cleardues/backend/app/features/expenses/service.py)
-- [Expense router — settle endpoint pattern](cleardues/backend/app/features/expenses/router.py)
-- [Frontend types](cleardues/frontend/src/features/expenses/types.ts)
-- [Frontend API hooks](cleardues/frontend/src/features/expenses/api/expenses.ts)
-- [Activity formatters](cleardues/frontend/src/features/expenses/utils/activityFormatters.ts)
-- [ConfirmedExpenseCard](cleardues/frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx)
+- [SettlementClaim model](backend/app/features/expenses/models.py)
+- [Expense service — confirm/finalize pattern](backend/app/features/expenses/service.py)
+- [Expense router — settle endpoint pattern](backend/app/features/expenses/router.py)
+- [Frontend types](frontend/src/features/expenses/types.ts)
+- [Frontend API hooks](frontend/src/features/expenses/api/expenses.ts)
+- [Activity formatters](frontend/src/features/expenses/utils/activityFormatters.ts)
+- [ConfirmedExpenseCard](frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx)
 - [Solution patterns](_bmad-output/implementation-artifacts/solution-patterns.yaml)
 
 ## Dev Agent Record
@@ -454,17 +454,17 @@ Claude (glm-5.1)
 ### File List
 
 **New Files:**
-- `cleardues/frontend/src/features/expenses/components/SettlementClaimCard.tsx` — Claim card with confirm/reject buttons + fade-out animation
-- `cleardues/frontend/src/features/expenses/components/SettlementClaimsList.tsx` — Claims list with skeleton loading + celebratory empty state
+- `frontend/src/features/expenses/components/SettlementClaimCard.tsx` — Claim card with confirm/reject buttons + fade-out animation
+- `frontend/src/features/expenses/components/SettlementClaimsList.tsx` — Claims list with skeleton loading + celebratory empty state
 
 **Modified Files:**
-- `cleardues/backend/app/features/expenses/service.py` — Added `confirm_settlement_claim()` (with payer auto-settle fix), `reject_settlement_claim()`, `get_claims_awaiting_owner_confirmation()` (batch user fetch), `check_all_splits_settled()`
-- `cleardues/backend/app/features/expenses/router.py` — Added 3 endpoints: confirm, reject, pending-for-owner; extracted `_handle_settlement_result()` helper
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Added `useConfirmSettlement()`, `useRejectSettlement()`, `usePendingSettlementClaims()` hooks
-- `cleardues/frontend/src/features/expenses/utils/activityFormatters.ts` — Updated `formatSettledEntry()` and `formatRejectedEntry()` for settlement confirm/reject messages
-- `cleardues/frontend/src/features/expenses/components/index.ts` — Added exports for SettlementClaimCard, SettlementClaimsList
-- `cleardues/frontend/src/features/groups/components/GroupDetail.tsx` — Added Settlement Claims section with Banknote icon header
-- `cleardues/backend/tests/api/routes/test_settlement.py` — Added 12 tests for Story 5.2 confirm/reject/pending-for-owner
+- `backend/app/features/expenses/service.py` — Added `confirm_settlement_claim()` (with payer auto-settle fix), `reject_settlement_claim()`, `get_claims_awaiting_owner_confirmation()` (batch user fetch), `check_all_splits_settled()`
+- `backend/app/features/expenses/router.py` — Added 3 endpoints: confirm, reject, pending-for-owner; extracted `_handle_settlement_result()` helper
+- `frontend/src/features/expenses/api/expenses.ts` — Added `useConfirmSettlement()`, `useRejectSettlement()`, `usePendingSettlementClaims()` hooks
+- `frontend/src/features/expenses/utils/activityFormatters.ts` — Updated `formatSettledEntry()` and `formatRejectedEntry()` for settlement confirm/reject messages
+- `frontend/src/features/expenses/components/index.ts` — Added exports for SettlementClaimCard, SettlementClaimsList
+- `frontend/src/features/groups/components/GroupDetail.tsx` — Added Settlement Claims section with Banknote icon header
+- `backend/tests/api/routes/test_settlement.py` — Added 12 tests for Story 5.2 confirm/reject/pending-for-owner
 
 **No Alembic migration needed** — Story 5.1 already created the settlement_claim table with confirmed_at and rejected_at fields.
 

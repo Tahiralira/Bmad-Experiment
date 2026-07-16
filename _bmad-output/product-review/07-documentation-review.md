@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-06
 **Scope:** README(s), CLAUDE.md, BMAD artifact consistency, API docs, onboarding docs.
-**Inputs reviewed:** CLAUDE.md, cleardues/README.md, development.md, deployment.md
+**Inputs reviewed:** CLAUDE.md, README.md, development.md, deployment.md
 (status only — content reviewed in S6), backend/README.md, frontend/README.md,
 SECURITY.md, release-notes.md, .env.example, session-context.md, sprint-status.yaml,
 \_bmad/bmm/docs/BMAD-USAGE-GUIDE.md, \_bmad/bmm/docs/TRACKING-SETUP-GUIDE.md,
@@ -34,7 +34,7 @@ the other half would embarrass the project the moment a second human looks at th
 | # | Severity | Finding | Cross-ref |
 |---|----------|---------|-----------|
 | C1 | CRITICAL | CLAUDE.md — the only file auto-injected into every AI session, with "OVERRIDE" authority — is materially false: status table 5 months stale (says Epic 2.5 next; reality Epic 5 at 2/3), tech stack lists Redux/WebSockets/Redis-PubSub/Celery (none exist in code), and both documented verification commands fail today | S3, S4 |
-| H1 | HIGH | ClearDues has no README anywhere: git repo root has none at all; cleardues/README.md is the unedited template ("Full Stack FastAPI Template", upstream CI badges, template admin screenshots, instructions to clone tiangolo's repo, MIT license for the *template*) with one ClearDues OAuth section grafted on | S6-M4 |
+| H1 | HIGH | ClearDues has no README anywhere: git repo root has none at all; README.md is the unedited template ("Full Stack FastAPI Template", upstream CI badges, template admin screenshots, instructions to clone tiangolo's repo, MIT license for the *template*) with one ClearDues OAuth section grafted on | S6-M4 |
 | H2 | HIGH | backend/README.md documents the architecture the project explicitly abandoned (`app/models.py`, `app/crud.py`) and states "Alembic is already configured to import your SQLModel models from ./backend/app/models.py" — the precise assumption that makes autogenerate blind to all feature models (S3). The doc *teaches* the bug | S3 |
 | H3 | HIGH | Every documented quality-gate workflow fails in practice: `pytest`/`scripts/test.sh` (suite broken, S3), `npm run typecheck` (17 errors, S4), `npx playwright test` (stale template password-auth specs, S4), "If you use GitHub Actions the tests will run automatically" (all CI dead, S6-C1). Docs describe a quality process that does not exist | S3, S4, S6 |
 | M1 | MEDIUM | SECURITY.md routes vulnerability reports to `security@tiangolo.com` (the template author) — a misdirected disclosure channel for a financial-records app; no actual security policy exists | S5 |
@@ -97,11 +97,11 @@ own and point at the auto-updated files.
 
 ### H1 — The product has no README; the repo has no front door
 **Where:** repo root (`Bmad-Experiment/` — no README.md at all);
-`cleardues/README.md` (unedited template).
+`README.md` (unedited template).
 
 The git repository root contains `CLAUDE.md`, `_bmad/`, `_bmad-output/`, `cleardues/`
 — and no README. GitHub's landing page for this project renders nothing. One level
-down, `cleardues/README.md` opens with "# Full Stack FastAPI Template," carries the
+down, `README.md` opens with "# Full Stack FastAPI Template," carries the
 *upstream template's* CI badges (pointing at `fastapi/full-stack-fastapi-template`
 workflows), screenshots of the template's admin dashboard (`img/` still committed),
 instructions for cloning tiangolo's repo and syncing with upstream, Copier project
@@ -120,12 +120,12 @@ itself is formally undefined (the MIT statement covers the template); (d) the S2
 Write a repo-root README: what ClearDues is (2 paragraphs from the product brief),
 honest status ("pre-alpha, not yet deployed"), actual stack, quickstart
 (`docker compose up -d` + .env.example), repo layout (`cleardues/` = product,
-`_bmad*/` = AI process), link map to BMAD docs. Reduce cleardues/README.md to
+`_bmad*/` = AI process), link map to BMAD docs. Reduce README.md to
 dev-setup content; delete upstream badges/screenshots/clone-the-template sections;
 add an explicit LICENSE decision.
 
 ### H2 — backend/README.md documents the forbidden architecture — and the S3 bug
-**Where:** `cleardues/backend/README.md:30` ("Modify or add SQLModel models for data
+**Where:** `backend/README.md:30` ("Modify or add SQLModel models for data
 and SQL tables in `./backend/app/models.py` … CRUD utils in `./backend/app/crud.py`"),
 `:136` ("Alembic is already configured to import your SQLModel models from
 `./backend/app/models.py`").
@@ -179,7 +179,7 @@ Remove this block when the gates are green — it doubles as the checklist.
 ## MEDIUM
 
 ### M1 — SECURITY.md sends vulnerability reports to the template author
-**Where:** `cleardues/SECURITY.md:15` — "report it right away by sending an email to:
+**Where:** `SECURITY.md:15` — "report it right away by sending an email to:
 security@tiangolo.com."
 
 For a product that stores financial records and encrypted API keys, the only security
@@ -208,7 +208,7 @@ effort: 30 min):** Correct the three numbers; restructure so each fact appears o
 (status table only in the header; "Next Up" lists only the next story, no counters).
 
 ### M3 — Documented client-generation workflow silently abandoned
-**Where:** `cleardues/frontend/README.md:75–102`; `frontend/src/client/sdk.gen.ts`
+**Where:** `frontend/README.md:75–102`; `frontend/src/client/sdk.gen.ts`
 (services: Auth, Groups, Items, Login, Private, Users, Utils — nothing for expenses,
 splits, settlements, audit); `features/{expenses,dashboard,groups}/api/*.ts`
 (hand-written wrappers importing `request` from `@/client/core/request`).
@@ -259,8 +259,8 @@ response_models where dict is returned (S3 list), write a BYOK setup section in 
 README when the endpoint ships.
 
 ### M6 — Template exhaust presented as project history
-**Where:** `cleardues/release-notes.md` (755 lines of upstream changelog),
-`cleardues/img/` (7 template screenshots incl. `github-social-preview.png`),
+**Where:** `release-notes.md` (755 lines of upstream changelog),
+`img/` (7 template screenshots incl. `github-social-preview.png`),
 `.copier/` + `copier.yml` (S6-M4).
 
 The release-notes file chronicles another project's dependabot bumps as this

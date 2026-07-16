@@ -3,7 +3,7 @@
 **Date:** 2026-07-06
 **Scope:** Part 3a — backend architecture, API design, DB models/migrations, service
 layer, error handling, logging, backend tests, the pytest-blocking SQLAlchemy bug.
-**Inputs read:** architecture.md, entire `cleardues/backend/` tree (app + tests +
+**Inputs read:** architecture.md, entire `backend/` tree (app + tests +
 alembic), technical-debt-log.yaml, solution-patterns.yaml, findings 01–02.
 
 ---

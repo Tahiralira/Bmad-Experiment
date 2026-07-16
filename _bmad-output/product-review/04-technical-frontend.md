@@ -1,7 +1,7 @@
 # Session 4 — Technical Review: Frontend
 
 **Date:** 2026-07-06
-**Scope:** `cleardues/frontend/src/`, `package.json`, Vite/TS/Biome/Playwright configs
+**Scope:** `frontend/src/`, `package.json`, Vite/TS/Biome/Playwright configs
 **Method:** Full source read of app code (generated `src/client/` skimmed only), plus
 verification runs of `npm run typecheck` (FAILS, 17 errors) and `npm run build`
 (passes, 13.4s). Severity per CLAUDE.md review scoping. Cross-references use the

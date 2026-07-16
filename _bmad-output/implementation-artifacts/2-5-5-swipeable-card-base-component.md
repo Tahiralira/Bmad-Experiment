@@ -442,7 +442,7 @@ This is Story 5 of 7 in Epic 2.5 (UX Foundation & Design System):
 
 ```bash
 # Type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 
 # Build
 npm run build
@@ -585,7 +585,7 @@ No debugging issues encountered during story creation.
 - `_bmad-output/implementation-artifacts/2-5-5-swipeable-card-base-component.md` (this file)
 
 **Files Created During Implementation:**
-- `cleardues/frontend/src/components/ui/swipeable-card.tsx` (NEW - 377 lines)
+- `frontend/src/components/ui/swipeable-card.tsx` (NEW - 377 lines)
   - SwipeableCard component with full gesture support
   - SwipeableCardProps interface
   - ActionButton subcomponent

@@ -25,7 +25,7 @@ so that I can verify payment history and resolve disputes.
 ## Tasks / Subtasks
 
 - [ ] Task 1: Backend — Settlement history response schema (AC: #1, #2)
-  - [ ] 1.1 Add `SettlementHistoryEntry` schema to `cleardues/backend/app/features/expenses/models.py`:
+  - [ ] 1.1 Add `SettlementHistoryEntry` schema to `backend/app/features/expenses/models.py`:
     - Fields: `claim` (SettlementClaimPublic), `expense_description` (str), `expense_id` (uuid.UUID), `split_amount` (Decimal)
     - Groups all data needed for a single settlement history row
   - [ ] 1.2 Add `SettlementHistoryPublic` schema (pagination wrapper):
@@ -33,7 +33,7 @@ so that I can verify payment history and resolve disputes.
     - Follows existing `AuditLogsPublic` pattern from Story 4.4
 
 - [ ] Task 2: Backend — Settlement history service function (AC: #1, #2, #5, #6, #8)
-  - [ ] 2.1 Add `get_group_settlement_history(session, group_id, user_id, limit, offset)` to `cleardues/backend/app/features/expenses/service.py`:
+  - [ ] 2.1 Add `get_group_settlement_history(session, group_id, user_id, limit, offset)` to `backend/app/features/expenses/service.py`:
     - Verify group exists (return None → router: 404)
     - Verify user is group member via `is_user_group_member()` (return "FORBIDDEN" → router: 403)
     - JOIN query: `select(SettlementClaim, ExpenseSplit, Expense).join(ExpenseSplit).join(Expense).where(Expense.group_id == group_id)`
@@ -46,7 +46,7 @@ so that I can verify payment history and resolve disputes.
     - **FOLLOW the EXACT pattern from `get_claims_awaiting_owner_confirmation()`** — same 3-table JOIN, same batch user loading, same `_build_claim_public()` reuse
 
 - [ ] Task 3: Backend — Settlement history endpoint (AC: #1, #5, #6, #8)
-  - [ ] 3.1 Add `GET /expense-groups/{group_id}/settlements` endpoint to `cleardues/backend/app/features/groups/router.py`:
+  - [ ] 3.1 Add `GET /expense-groups/{group_id}/settlements` endpoint to `backend/app/features/groups/router.py`:
     - **NOTE: This goes in the GROUPS router**, not the expenses router (per AC endpoint path)
     - Requires `SessionDep` + `CurrentUser` dependencies
     - Query params: `limit: int = 20`, `offset: int = 0`
@@ -56,13 +56,13 @@ so that I can verify payment history and resolve disputes.
     - **FOLLOW the EXACT pattern from the existing `GET /expense-groups/{group_id}/audit-log` endpoint** in the groups router
 
 - [ ] Task 4: Frontend — TypeScript types for settlement history (AC: #1, #2)
-  - [ ] 4.1 Add `SettlementHistoryEntry` interface to `cleardues/frontend/src/features/expenses/types.ts`:
+  - [ ] 4.1 Add `SettlementHistoryEntry` interface to `frontend/src/features/expenses/types.ts`:
     - Fields: `claim` (SettlementClaimPublic), `expenseDescription` (string), `expenseId` (string), `splitAmount` (number)
   - [ ] 4.2 Add `SettlementHistoryResponse` interface:
     - Fields: `data` (SettlementHistoryEntry[]), `count` (number)
 
 - [ ] Task 5: Frontend — API hook for settlement history (AC: #1, #8)
-  - [ ] 5.1 Add `getGroupSettlementHistory(groupId, limit, offset)` async function to `cleardues/frontend/src/features/expenses/api/expenses.ts`:
+  - [ ] 5.1 Add `getGroupSettlementHistory(groupId, limit, offset)` async function to `frontend/src/features/expenses/api/expenses.ts`:
     - `GET /api/v1/expense-groups/{groupId}/settlements?limit={limit}&offset={offset}`
     - Error map: 403, 404
   - [ ] 5.2 Add `useGroupSettlementHistory(groupId)` query hook:
@@ -71,7 +71,7 @@ so that I can verify payment history and resolve disputes.
     - Stale time: 30s (settlement data changes infrequently)
 
 - [ ] Task 6: Frontend — SettlementHistoryList component (AC: #1, #2, #7, #8)
-  - [ ] 6.1 Create `cleardues/frontend/src/features/expenses/components/SettlementHistoryList.tsx`:
+  - [ ] 6.1 Create `frontend/src/features/expenses/components/SettlementHistoryList.tsx`:
     - Fetches data with `useGroupSettlementHistory(groupId)`
     - Each row shows: payer name, amount, expense description, claim date, confirmation/rejection date (if applicable), status badge
     - Status badge colors: pending (amber), confirmed (green/success), rejected (destructive/red)
@@ -88,7 +88,7 @@ so that I can verify payment history and resolve disputes.
     - Position: top-right of card or inline with status area
 
 - [ ] Task 8: Frontend — Integrate settlement history into group detail view (AC: #1)
-  - [ ] 8.1 Add "Settlement History" section to `cleardues/frontend/src/features/groups/components/GroupDetail.tsx`:
+  - [ ] 8.1 Add "Settlement History" section to `frontend/src/features/groups/components/GroupDetail.tsx`:
     - Place after SettlementClaimsList section
     - Section header with Banknote icon (consistent with settlement UI)
     - Renders `SettlementHistoryList` component
@@ -100,7 +100,7 @@ so that I can verify payment history and resolve disputes.
     - `useSettleExpense()` onSuccess
 
 - [ ] Task 10: Testing and validation
-  - [ ] 10.1 Backend: Write tests for `get_group_settlement_history()` in `cleardues/backend/tests/api/routes/test_settlement.py`:
+  - [ ] 10.1 Backend: Write tests for `get_group_settlement_history()` in `backend/tests/api/routes/test_settlement.py`:
     - Successful retrieval (returns all claims for group)
     - Pagination (limit/offset works correctly)
     - Not a group member (403)
@@ -108,7 +108,7 @@ so that I can verify payment history and resolve disputes.
     - Empty group (returns empty data list, count 0)
     - Claims from multiple expenses appear in the response
     - Confirmed claims show `confirmed_at`, rejected claims show `rejected_at`
-  - [ ] 10.2 Frontend: Run `cd cleardues/frontend && npm run typecheck && npm run build` — no errors
+  - [ ] 10.2 Frontend: Run `cd frontend && npm run typecheck && npm run build` — no errors
   - [ ] 10.3 Manual: Verify settlement history list shows correct data for a group with multiple settlements
   - [ ] 10.4 Manual: Verify "Settled" badge appears on settled expense cards
   - [ ] 10.5 Manual: Verify pagination "Load more" works
@@ -307,19 +307,19 @@ Recent commits show consistent patterns:
 **No new backend service files needed** — all code added to existing files:
 
 **New frontend files:**
-- `cleardues/frontend/src/features/expenses/components/SettlementHistoryList.tsx`
+- `frontend/src/features/expenses/components/SettlementHistoryList.tsx`
 
 **Files to modify:**
-- `cleardues/backend/app/features/expenses/models.py` — Add `SettlementHistoryEntry` + `SettlementHistoryPublic` schemas
-- `cleardues/backend/app/features/expenses/service.py` — Add `get_group_settlement_history()`
-- `cleardues/backend/app/features/groups/router.py` — Add `GET /expense-groups/{group_id}/settlements` endpoint
-- `cleardues/frontend/src/features/expenses/types.ts` — Add `SettlementHistoryEntry` + `SettlementHistoryResponse` types
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Add `useGroupSettlementHistory()` hook
-- `cleardues/frontend/src/features/expenses/components/index.ts` — Export `SettlementHistoryList`
-- `cleardues/frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx` (or similar) — Add "Settled" badge
-- `cleardues/frontend/src/features/groups/components/GroupDetail.tsx` — Add Settlement History section
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Add `["settlement-history"]` to existing mutation invalidation lists
-- `cleardues/backend/tests/api/routes/test_settlement.py` — Add Story 5.3 tests
+- `backend/app/features/expenses/models.py` — Add `SettlementHistoryEntry` + `SettlementHistoryPublic` schemas
+- `backend/app/features/expenses/service.py` — Add `get_group_settlement_history()`
+- `backend/app/features/groups/router.py` — Add `GET /expense-groups/{group_id}/settlements` endpoint
+- `frontend/src/features/expenses/types.ts` — Add `SettlementHistoryEntry` + `SettlementHistoryResponse` types
+- `frontend/src/features/expenses/api/expenses.ts` — Add `useGroupSettlementHistory()` hook
+- `frontend/src/features/expenses/components/index.ts` — Export `SettlementHistoryList`
+- `frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx` (or similar) — Add "Settled" badge
+- `frontend/src/features/groups/components/GroupDetail.tsx` — Add Settlement History section
+- `frontend/src/features/expenses/api/expenses.ts` — Add `["settlement-history"]` to existing mutation invalidation lists
+- `backend/tests/api/routes/test_settlement.py` — Add Story 5.3 tests
 
 **No Alembic migration needed** — All required tables and columns exist from Stories 5.1/5.2.
 
@@ -333,12 +333,12 @@ Recent commits show consistent patterns:
 - [Previous Story 5.2](_bmad-output/implementation-artifacts/5-2-owner-confirms-settlement.md)
 - [Previous Story 5.1](_bmad-output/implementation-artifacts/5-1-mark-debt-as-settled-claim-payment.md)
 - [Previous Story 4.4](_bmad-output/implementation-artifacts/4-4-immutable-audit-log-for-all-actions.md)
-- [SettlementClaim model](cleardues/backend/app/features/expenses/models.py)
-- [Expense service — JOIN query pattern](cleardues/backend/app/features/expenses/service.py)
-- [Groups router — audit-log endpoint pattern](cleardues/backend/app/features/groups/router.py)
-- [Frontend types](cleardues/frontend/src/features/expenses/types.ts)
-- [Frontend API hooks](cleardues/frontend/src/features/expenses/api/expenses.ts)
-- [Activity formatters](cleardues/frontend/src/features/expenses/utils/activityFormatters.ts)
+- [SettlementClaim model](backend/app/features/expenses/models.py)
+- [Expense service — JOIN query pattern](backend/app/features/expenses/service.py)
+- [Groups router — audit-log endpoint pattern](backend/app/features/groups/router.py)
+- [Frontend types](frontend/src/features/expenses/types.ts)
+- [Frontend API hooks](frontend/src/features/expenses/api/expenses.ts)
+- [Activity formatters](frontend/src/features/expenses/utils/activityFormatters.ts)
 - [Solution patterns](_bmad-output/implementation-artifacts/solution-patterns.yaml)
 
 ## Dev Agent Record

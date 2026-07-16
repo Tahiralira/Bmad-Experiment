@@ -125,7 +125,7 @@ frontend/src/
 
 **Install Framer Motion:**
 ```bash
-cd cleardues/frontend && npm install framer-motion
+cd frontend && npm install framer-motion
 ```
 
 **Component Interface:**
@@ -285,7 +285,7 @@ feat: Complete Story 2.5.2 - Agent Orb component
 
 ```bash
 # Install new dependency
-cd cleardues/frontend && npm install framer-motion
+cd frontend && npm install framer-motion
 
 # Type check
 npm run typecheck
@@ -374,8 +374,8 @@ This is Story 2 of 7 in Epic 2.5 (UX Foundation & Design System):
 - [Source: epics.md - Story 2.5.2](../_bmad-output/planning-artifacts/epics.md#story-252-agent-orb-component)
 - [Source: architecture.md - Frontend Structure](../_bmad-output/planning-artifacts/architecture.md)
 - [Previous Story: 2-5-1-design-system-token-migration.md](./2-5-1-design-system-token-migration.md)
-- [Existing Code: frontend/src/index.css](../../cleardues/frontend/src/index.css) - Design tokens
-- [Existing Code: frontend/src/routes/_layout.tsx](../../cleardues/frontend/src/routes/_layout.tsx) - Layout to modify
+- [Existing Code: frontend/src/index.css](../../frontend/src/index.css) - Design tokens
+- [Existing Code: frontend/src/routes/_layout.tsx](../../frontend/src/routes/_layout.tsx) - Layout to modify
 - [Framer Motion Docs](https://www.framer.com/motion/) - Animation library
 
 ## Senior Developer Review (AI)
@@ -456,10 +456,10 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 ### File List
 
 **New Files:**
-- cleardues/frontend/src/components/ui/agent-orb.tsx
+- frontend/src/components/ui/agent-orb.tsx
 
 **Modified Files:**
-- cleardues/frontend/src/routes/_layout.tsx (added AgentOrb import and component)
-- cleardues/frontend/package.json (added framer-motion dependency)
-- cleardues/frontend/package-lock.json (updated with framer-motion)
+- frontend/src/routes/_layout.tsx (added AgentOrb import and component)
+- frontend/package.json (added framer-motion dependency)
+- frontend/package-lock.json (updated with framer-motion)
 

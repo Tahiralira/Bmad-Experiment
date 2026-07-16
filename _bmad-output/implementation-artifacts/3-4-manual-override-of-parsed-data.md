@@ -631,19 +631,19 @@ describe('SmartInputModal with EditableExpensePreview', () => {
 
 ```bash
 # Frontend type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 
 # Frontend build
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Run unit tests
-cd cleardues/frontend && npm run test
+cd frontend && npm run test
 
 # Run tests in watch mode
-cd cleardues/frontend && npm run test:watch
+cd frontend && npm run test:watch
 
 # Test coverage
-cd cleardues/frontend && npm run test:coverage
+cd frontend && npm run test:coverage
 ```
 
 ### API Contract
@@ -836,16 +836,16 @@ The developer agent now has comprehensive guidance to implement flawless manual 
 - _bmad-output/implementation-artifacts/3-4-manual-override-of-parsed-data.md (this file)
 
 **Frontend Files to Create:**
-- cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx (NEW)
-- cleardues/frontend/src/features/expenses/hooks/useExpenseEdit.ts (NEW)
-- cleardues/frontend/src/features/expenses/hooks/useAutoConfirm.ts (NEW)
-- cleardues/frontend/src/components/ui/inline-input.tsx (NEW - if not exists)
-- ~~cleardues/frontend/src/components/ui/countdown-progress.tsx~~ (NOT CREATED - implementation decision: countdown shown as button text "Confirm (3s)" instead of separate component)
+- frontend/src/features/expenses/components/EditableExpensePreview.tsx (NEW)
+- frontend/src/features/expenses/hooks/useExpenseEdit.ts (NEW)
+- frontend/src/features/expenses/hooks/useAutoConfirm.ts (NEW)
+- frontend/src/components/ui/inline-input.tsx (NEW - if not exists)
+- ~~frontend/src/components/ui/countdown-progress.tsx~~ (NOT CREATED - implementation decision: countdown shown as button text "Confirm (3s)" instead of separate component)
 
 **Frontend Files to Modify:**
-- cleardues/frontend/src/features/expenses/components/ExpensePreviewCard.tsx (MODIFY - extend for editing)
-- cleardues/frontend/src/features/expenses/components/SmartInputModal.tsx (MODIFY - integrate editable preview)
-- cleardues/frontend/src/features/expenses/types.ts (MODIFY - add edit state types)
+- frontend/src/features/expenses/components/ExpensePreviewCard.tsx (MODIFY - extend for editing)
+- frontend/src/features/expenses/components/SmartInputModal.tsx (MODIFY - integrate editable preview)
+- frontend/src/features/expenses/types.ts (MODIFY - add edit state types)
 
 **Reference Documents:**
 - _bmad-output/planning-artifacts/epics.md (Epic 3 stories)
@@ -866,26 +866,26 @@ The developer agent now has comprehensive guidance to implement flawless manual 
 ### Files Implemented
 
 #### Created (NEW):
-1. **`cleardues/frontend/src/features/expenses/hooks/useExpenseEdit.ts`**
+1. **`frontend/src/features/expenses/hooks/useExpenseEdit.ts`**
    - Field change tracking with original vs edited state
    - Zod validation (amount positive, max 2 decimals; description 2-200 chars; payer required)
    - Change detection with `editedFields` Set
    - Per-field reset to AI suggestion
 
-2. **`cleardues/frontend/src/features/expenses/hooks/useAutoConfirm.ts`**
+2. **`frontend/src/features/expenses/hooks/useAutoConfirm.ts`**
    - 3-second countdown for auto-confirm preference
    - Cancel on user interaction
    - Cleanup on unmount
    - Respects enabled flag
 
-3. **`cleardues/frontend/src/components/ui/inline-input.tsx`**
+3. **`frontend/src/components/ui/inline-input.tsx`**
    - InlineEditableField component for amount and description
    - Visual highlight when edited (success-subtle background, action border)
    - Reset button with tooltip showing original AI value
    - Currency formatting with BalanceDisplay component
    - Inline validation errors
 
-4. **`cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx`**
+4. **`frontend/src/features/expenses/components/EditableExpensePreview.tsx`**
    - Main editable preview component
    - Amount and description inline editing
    - Payer dropdown from group members (useGroupMembers)
@@ -895,17 +895,17 @@ The developer agent now has comprehensive guidance to implement flawless manual 
    - User interaction cancels countdown
 
 #### Modified:
-1. **`cleardues/frontend/src/features/expenses/types.ts`**
+1. **`frontend/src/features/expenses/types.ts`**
    - Added `ExpenseParseResponse` interface (amount, description, payer_id, confidence_score, commentary)
    - Added `ExpenseEditState` interface (originalData, editedData, editedFields)
 
-2. **`cleardues/frontend/src/features/expenses/components/ExpensePreviewCard.tsx`**
+2. **`frontend/src/features/expenses/components/ExpensePreviewCard.tsx`**
    - Updated `data` prop type from `null` to `ExpenseParseResponse | null`
    - Added `onConfirm`, `onDiscard`, `groupId`, `autoConfirmEnabled` props
    - Implemented "ready" state with EditableExpensePreview
    - Implemented "error" state
 
-3. **`cleardues/frontend/src/features/expenses/components/SmartInputModal.tsx`**
+3. **`frontend/src/features/expenses/components/SmartInputModal.tsx`**
    - Added `parsedData`, `previewStatus`, `currentUserId` state
    - Added `handleConfirm`, `handleDiscard` handlers
    - Integrated with `useCreateExpense` mutation

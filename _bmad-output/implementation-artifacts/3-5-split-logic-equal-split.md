@@ -1162,15 +1162,15 @@ The developer agent now has comprehensive guidance to implement equal split func
 - backend/app/features/expenses/router.py (MODIFY - add PUT /expenses/{id}/split endpoint)
 
 **Frontend Files to Create:**
-- cleardues/frontend/src/features/expenses/components/SplitPicker.tsx (NEW)
-- cleardues/frontend/src/features/expenses/components/MemberChips.tsx (NEW)
-- cleardues/frontend/src/features/expenses/components/SplitAmountsDisplay.tsx (NEW)
-- cleardues/frontend/src/features/expenses/hooks/useSplitState.ts (NEW)
-- cleardues/frontend/src/features/expenses/api/useUpdateExpenseSplit.ts (NEW)
+- frontend/src/features/expenses/components/SplitPicker.tsx (NEW)
+- frontend/src/features/expenses/components/MemberChips.tsx (NEW)
+- frontend/src/features/expenses/components/SplitAmountsDisplay.tsx (NEW)
+- frontend/src/features/expenses/hooks/useSplitState.ts (NEW)
+- frontend/src/features/expenses/api/useUpdateExpenseSplit.ts (NEW)
 
 **Frontend Files to Modify:**
-- cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx (MODIFY - add complex edit mode)
-- cleardues/frontend/src/features/expenses/types.ts (MODIFY - add split types)
+- frontend/src/features/expenses/components/EditableExpensePreview.tsx (MODIFY - add complex edit mode)
+- frontend/src/features/expenses/types.ts (MODIFY - add split types)
 
 **Reference Documents:**
 - _bmad-output/planning-artifacts/epics.md (Epic 3 stories)

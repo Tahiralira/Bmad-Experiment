@@ -453,7 +453,7 @@ This is Story 6 of 7 in Epic 2.5 (UX Foundation & Design System):
 
 ```bash
 # Type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 
 # Build
 npm run build
@@ -549,7 +549,7 @@ No debugging issues encountered during story creation.
   - AC5: aria-label includes full context for screen readers
 
 **Implementation Details:**
-- Component: `cleardues/frontend/src/components/ui/balance-display.tsx`
+- Component: `frontend/src/components/ui/balance-display.tsx`
 - Currency formatting using Intl.NumberFormat with Indian locale
 - Neutral color strategy enforced (text-primary for amounts, text-secondary for labels)
 - Three variants implemented: display (32px), title (24px), body (16px)
@@ -593,7 +593,7 @@ No debugging issues encountered during story creation.
 - `_bmad-output/implementation-artifacts/2-5-6-balance-display-component.md` (this file)
 
 **Files Created During Implementation:**
-- `cleardues/frontend/src/components/ui/balance-display.tsx` (CREATED)
+- `frontend/src/components/ui/balance-display.tsx` (CREATED)
   - BalanceDisplay component
   - BalanceDisplayProps interface
   - Currency formatting utilities (formatCurrency function)
@@ -601,10 +601,10 @@ No debugging issues encountered during story creation.
   - Accessibility attributes (aria-label, role="text")
 
 **Files Modified During Code Review (2026-01-15):**
-- `cleardues/frontend/src/components/ui/balance-display.tsx` (FIXED)
+- `frontend/src/components/ui/balance-display.tsx` (FIXED)
   - Fixed: Replaced `tabular-nums` with `proportional-nums` (CRIT-1)
   - Fixed: Added zero edge case handling (-0 vs 0) (MED-3)
   - Fixed: Added decimal handling for amounts with paise (MED-5)
-- `cleardues/frontend/src/components/ui/index.ts` (CREATED - CRIT-2)
+- `frontend/src/components/ui/index.ts` (CREATED - CRIT-2)
   - Barrel export for all ClearDues UI components
   - Enables imports via `@/components/ui`

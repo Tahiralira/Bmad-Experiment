@@ -20,14 +20,14 @@ So that I can see who did what and when for transparency.
 ## Tasks / Subtasks
 
 - [x] Task 1: Replace Activity page placeholder with real group-level activity feed (AC: #1, #2, #3, #6)
-  - [x] 1.1 Replace the placeholder in `cleardues/frontend/src/routes/_layout/activity.tsx` with a full activity feed component
-  - [x] 1.2 Create `cleardues/frontend/src/features/expenses/components/ActivityFeed.tsx` - the main feed component that accepts a `groupId` and uses `useGroupAuditLog` hook
-  - [x] 1.3 Create `cleardues/frontend/src/features/expenses/components/ActivityFeedItem.tsx` - individual feed entry styled as a chat bubble with action-specific formatting and avatar
+  - [x] 1.1 Replace the placeholder in `frontend/src/routes/_layout/activity.tsx` with a full activity feed component
+  - [x] 1.2 Create `frontend/src/features/expenses/components/ActivityFeed.tsx` - the main feed component that accepts a `groupId` and uses `useGroupAuditLog` hook
+  - [x] 1.3 Create `frontend/src/features/expenses/components/ActivityFeedItem.tsx` - individual feed entry styled as a chat bubble with action-specific formatting and avatar
   - [x] 1.4 Implement chat-bubble styling using design system tokens (surface, border, muted colors) with fade-up animation for new entries (use CSS `@keyframes` or `framer-motion` if already a dependency)
   - [x] 1.5 Implement relative timestamps ("2 hours ago") with exact date on hover - reuse existing `formatRelativeTime` logic from `AuditLogList.tsx`
 
 - [x] Task 2: Add human-readable action formatting (AC: #3)
-  - [x] 2.1 Create `cleardues/frontend/src/features/expenses/utils/activityFormatters.ts` - centralized formatting functions for each `AuditActionType`
+  - [x] 2.1 Create `frontend/src/features/expenses/utils/activityFormatters.ts` - centralized formatting functions for each `AuditActionType`
   - [x] 2.2 Format strings: "Alex created expense 'Lunch' for Rs 60", "Sam confirmed their share", "Jordan rejected expense 'Dinner'", "Casey updated the split for 'Coffee'"
   - [x] 2.3 For "edited" action type, show before/after diff inline: "Alex changed description from 'Lunch' to 'Dinner'"
   - [x] 2.4 Include expense description and amount from `changes_json.after` where available
@@ -46,7 +46,7 @@ So that I can see who did what and when for transparency.
 - [x] Task 5: Update the Activity page route to support group-specific and all-groups views (AC: #1, #5)
   - [x] 5.1 For the top-level `/activity` route: show combined recent activity across all user's groups (may need a new backend endpoint or client-side aggregation)
   - [x] 5.2 For group-specific view: the existing `GET /api/v1/expense-groups/{group_id}/audit-log` endpoint already works
-  - [x] 5.3 If a combined "all groups" feed is needed, add a `GET /api/v1/expenses/activity` endpoint in `cleardues/backend/app/features/expenses/router.py` that returns audit logs across all groups the user is a member of (paginated, newest first)
+  - [x] 5.3 If a combined "all groups" feed is needed, add a `GET /api/v1/expenses/activity` endpoint in `backend/app/features/expenses/router.py` that returns audit logs across all groups the user is a member of (paginated, newest first)
 
 - [x] Task 6: Testing and validation
   - [x] 6.1 Verify activity feed displays correctly for groups with existing audit log entries
@@ -54,7 +54,7 @@ So that I can see who did what and when for transparency.
   - [x] 6.3 Verify pagination loads more entries correctly
   - [x] 6.4 Verify relative timestamps update correctly
   - [x] 6.5 Run `docker compose exec backend pytest` - all tests must pass
-  - [x] 6.6 Run `cd cleardues/frontend && npm run typecheck && npm run build` - no errors
+  - [x] 6.6 Run `cd frontend && npm run typecheck && npm run build` - no errors
 
 ## Dev Notes
 
@@ -64,15 +64,15 @@ Story 4.4 already built the complete data layer. The following are **DONE and wo
 
 | Component | File | Status |
 |-----------|------|--------|
-| AuditLog DB model | `cleardues/backend/app/features/expenses/models.py:276` | Done |
-| AuditLogPublic schema | `cleardues/backend/app/features/expenses/models.py:184` | Done |
-| `record_audit()` service | `cleardues/backend/app/features/expenses/service.py` | Done |
+| AuditLog DB model | `backend/app/features/expenses/models.py:276` | Done |
+| AuditLogPublic schema | `backend/app/features/expenses/models.py:184` | Done |
+| `record_audit()` service | `backend/app/features/expenses/service.py` | Done |
 | Expense audit-log endpoint | `GET /api/v1/expenses/{expense_id}/audit-log` | Done |
 | Group audit-log endpoint | `GET /api/v1/expense-groups/{group_id}/audit-log` | Done |
-| `useGroupAuditLog()` hook | `cleardues/frontend/src/features/expenses/api/expenses.ts:274` | Done |
-| `useExpenseAuditLog()` hook | `cleardues/frontend/src/features/expenses/api/expenses.ts:245` | Done |
-| `AuditLogList` component | `cleardues/frontend/src/features/expenses/components/AuditLogList.tsx` | Done |
-| Frontend types (AuditLog, AuditActionType, AuditLogsResponse) | `cleardues/frontend/src/features/expenses/types.ts:204-228` | Done |
+| `useGroupAuditLog()` hook | `frontend/src/features/expenses/api/expenses.ts:274` | Done |
+| `useExpenseAuditLog()` hook | `frontend/src/features/expenses/api/expenses.ts:245` | Done |
+| `AuditLogList` component | `frontend/src/features/expenses/components/AuditLogList.tsx` | Done |
+| Frontend types (AuditLog, AuditActionType, AuditLogsResponse) | `frontend/src/features/expenses/types.ts:204-228` | Done |
 | All mutation hooks invalidate audit-log queries | `expenses.ts` (all useMutation hooks) | Done |
 
 **The backend is feature-complete for this story.** No new backend work is required unless you need an "all groups combined" activity endpoint (Task 5.3).
@@ -81,7 +81,7 @@ Story 4.4 already built the complete data layer. The following are **DONE and wo
 
 - **API naming**: `snake_case` on the wire. Frontend types already match.
 - **State management**: Use TanStack Query (`useGroupAuditLog` hook already exists). Do NOT store audit data in Redux.
-- **Feature boundaries**: New components go in `cleardues/frontend/src/features/expenses/components/`. Shared utilities go in `cleardues/frontend/src/features/expenses/utils/`.
+- **Feature boundaries**: New components go in `frontend/src/features/expenses/components/`. Shared utilities go in `frontend/src/features/expenses/utils/`.
 - **Design system tokens**: Use the established token system (surface, border, muted, primary, foreground). See existing components like `AuditLogList.tsx` for patterns.
 - **TypeScript naming**: `camelCase` for variables/functions, `PascalCase` for components/types.
 - **Query invalidation**: All mutation hooks in `expenses.ts` already invalidate `["audit-log"]` and `["group-audit-log"]` query keys, so the feed stays fresh automatically.
@@ -96,7 +96,7 @@ Story 4.4 already built the complete data layer. The following are **DONE and wo
 
 4. **`AuditLogList` component** in `AuditLogList.tsx` - Existing timeline-style display. The new `ActivityFeed` should be a **separate** chat-styled component that replaces the placeholder page, not a modification of `AuditLogList`.
 
-5. **Activity page placeholder** at `cleardues/frontend/src/routes/_layout/activity.tsx` - This is the file to replace. It already has the route registered (`/_layout/activity`).
+5. **Activity page placeholder** at `frontend/src/routes/_layout/activity.tsx` - This is the file to replace. It already has the route registered (`/_layout/activity`).
 
 ### AuditActionType Values and Content Patterns
 
@@ -160,10 +160,10 @@ Purpose: Combined feed across all user's groups
 
 ### Project Structure Notes
 
-- New components: `cleardues/frontend/src/features/expenses/components/ActivityFeed.tsx`, `ActivityFeedItem.tsx`
-- New utils: `cleardues/frontend/src/features/expenses/utils/activityFormatters.ts`
-- Modified: `cleardues/frontend/src/routes/_layout/activity.tsx` (replace placeholder)
-- Optional new endpoint: `cleardues/backend/app/features/expenses/router.py`
+- New components: `frontend/src/features/expenses/components/ActivityFeed.tsx`, `ActivityFeedItem.tsx`
+- New utils: `frontend/src/features/expenses/utils/activityFormatters.ts`
+- Modified: `frontend/src/routes/_layout/activity.tsx` (replace placeholder)
+- Optional new endpoint: `backend/app/features/expenses/router.py`
 - Follow existing patterns: components use design system tokens, hooks use TanStack Query
 
 ### References
@@ -171,12 +171,12 @@ Purpose: Combined feed across all user's groups
 - [Epic 4 Story 4.5 definition](_bmad-output/planning-artifacts/epics.md - lines 771-791)
 - [AuditLog model](_bmad-output/planning-artifacts/architecture.md)
 - [Previous Story 4.4](_bmad-output/implementation-artifacts/4-4-immutable-audit-log-for-all-actions.md)
-- [Existing AuditLogList component](cleardues/frontend/src/features/expenses/components/AuditLogList.tsx)
-- [Existing API hooks](cleardues/frontend/src/features/expenses/api/expenses.ts)
-- [Activity page placeholder](cleardues/frontend/src/routes/_layout/activity.tsx)
-- [Frontend types](cleardues/frontend/src/features/expenses/types.ts)
-- [GroupSettings AI personality](cleardues/backend/app/features/groups/models.py:140-156)
-- [Dashboard with last_activity](cleardues/frontend/src/features/dashboard/components/Dashboard.tsx)
+- [Existing AuditLogList component](frontend/src/features/expenses/components/AuditLogList.tsx)
+- [Existing API hooks](frontend/src/features/expenses/api/expenses.ts)
+- [Activity page placeholder](frontend/src/routes/_layout/activity.tsx)
+- [Frontend types](frontend/src/features/expenses/types.ts)
+- [GroupSettings AI personality](backend/app/features/groups/models.py:140-156)
+- [Dashboard with last_activity](frontend/src/features/dashboard/components/Dashboard.tsx)
 
 ## Dev Agent Record
 
@@ -202,13 +202,13 @@ No new issues encountered. Docker prestart failed due to pre-existing Alembic mi
 ### File List
 
 **New files:**
-- cleardues/frontend/src/features/expenses/components/ActivityFeed.tsx
-- cleardues/frontend/src/features/expenses/components/ActivityFeedItem.tsx
-- cleardues/frontend/src/features/expenses/utils/activityFormatters.ts
-- cleardues/frontend/src/features/expenses/utils/timeFormat.ts
+- frontend/src/features/expenses/components/ActivityFeed.tsx
+- frontend/src/features/expenses/components/ActivityFeedItem.tsx
+- frontend/src/features/expenses/utils/activityFormatters.ts
+- frontend/src/features/expenses/utils/timeFormat.ts
 
 **Modified files:**
-- cleardues/frontend/src/routes/_layout/activity.tsx
-- cleardues/frontend/src/features/groups/components/GroupDetail.tsx
-- cleardues/frontend/src/features/expenses/components/AuditLogList.tsx (code review: imported shared formatRelativeTime)
-- cleardues/frontend/src/features/expenses/utils/activityFormatters.ts (code review: removed dead getActionIcon)
+- frontend/src/routes/_layout/activity.tsx
+- frontend/src/features/groups/components/GroupDetail.tsx
+- frontend/src/features/expenses/components/AuditLogList.tsx (code review: imported shared formatRelativeTime)
+- frontend/src/features/expenses/utils/activityFormatters.ts (code review: removed dead getActionIcon)

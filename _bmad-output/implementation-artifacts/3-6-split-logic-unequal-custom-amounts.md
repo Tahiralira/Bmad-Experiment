@@ -971,17 +971,17 @@ N/A - Story creation complete, implementation pending dev-story workflow.
 **Files Modified:**
 
 **Backend:**
-- `cleardues/backend/app/features/expenses/service.py` - Added calculate_unequal_split()
-- `cleardues/backend/app/features/expenses/router.py` - Updated split endpoint for unequal type
-- `cleardues/backend/app/features/expenses/models.py` - Added UnequalSplitItem and UnequalSplitRequest schemas
-- `cleardues/backend/tests/features/expenses/test_split_service.py` - Added TestCalculateUnequalSplit class with 6 test cases
+- `backend/app/features/expenses/service.py` - Added calculate_unequal_split()
+- `backend/app/features/expenses/router.py` - Updated split endpoint for unequal type
+- `backend/app/features/expenses/models.py` - Added UnequalSplitItem and UnequalSplitRequest schemas
+- `backend/tests/features/expenses/test_split_service.py` - Added TestCalculateUnequalSplit class with 6 test cases
 
 **Frontend:**
-- `cleardues/frontend/src/features/expenses/types.ts` - Enabled unequal split, added UnequalSplitRequest interface
-- `cleardues/frontend/src/features/expenses/components/UnequalSplitInputs.tsx` - NEW: Custom amount inputs component
-- `cleardues/frontend/src/features/expenses/hooks/useSplitState.ts` - Added customAmounts state, setCustomAmount, remainingAmount
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` - Updated to handle unequal split requests
-- `cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx` - Integrated UnequalSplitInputs with pre-population
+- `frontend/src/features/expenses/types.ts` - Enabled unequal split, added UnequalSplitRequest interface
+- `frontend/src/features/expenses/components/UnequalSplitInputs.tsx` - NEW: Custom amount inputs component
+- `frontend/src/features/expenses/hooks/useSplitState.ts` - Added customAmounts state, setCustomAmount, remainingAmount
+- `frontend/src/features/expenses/api/expenses.ts` - Updated to handle unequal split requests
+- `frontend/src/features/expenses/components/EditableExpensePreview.tsx` - Integrated UnequalSplitInputs with pre-population
 
 **Technical Decisions:**
 - Used `Body` parameter in router to accept both split types (FastAPI limitation)
@@ -999,7 +999,7 @@ N/A - Story creation complete, implementation pending dev-story workflow.
 1. Run backend tests: `pytest tests/features/expenses/test_split_service.py::TestCalculateUnequalSplit`
 2. Implement frontend tests (Task 11) if automated testing is configured
 3. Manual testing: Create expense with unequal split, verify validation and pre-population
-4. Run typecheck: `cd cleardues/frontend && npm run typecheck`
+4. Run typecheck: `cd frontend && npm run typecheck`
 5. Story ready for code review once tests pass
 
 ### Change Log
@@ -1059,11 +1059,11 @@ N/A - Story creation complete, implementation pending dev-story workflow.
 - Frontend automated tests (Task 11) - deferred to future sprint
 
 **Files Modified in Code Review:**
-- cleardues/backend/app/features/expenses/service.py (UUID conversion fix)
-- cleardues/backend/app/features/expenses/router.py (enhanced validation + Decimal import)
-- cleardues/frontend/src/features/expenses/components/UnequalSplitInputs.tsx (NaN + null fixes)
-- cleardues/frontend/src/features/expenses/hooks/useSplitState.ts (error messages + state reset)
-- cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx (loading state)
+- backend/app/features/expenses/service.py (UUID conversion fix)
+- backend/app/features/expenses/router.py (enhanced validation + Decimal import)
+- frontend/src/features/expenses/components/UnequalSplitInputs.tsx (NaN + null fixes)
+- frontend/src/features/expenses/hooks/useSplitState.ts (error messages + state reset)
+- frontend/src/features/expenses/components/EditableExpensePreview.tsx (loading state)
 
 ### File List
 
@@ -1071,19 +1071,19 @@ N/A - Story creation complete, implementation pending dev-story workflow.
 - _bmad-output/implementation-artifacts/3-6-split-logic-unequal-custom-amounts.md (this file)
 
 **Backend Files Modified:**
-- cleardues/backend/app/features/expenses/service.py (MODIFIED - added calculate_unequal_split())
-- cleardues/backend/app/features/expenses/router.py (MODIFIED - added unequal split handling)
-- cleardues/backend/app/features/expenses/models.py (MODIFIED - added UnequalSplitItem and UnequalSplitRequest schemas)
-- cleardues/backend/tests/features/expenses/test_split_service.py (MODIFIED - added TestCalculateUnequalSplit class)
+- backend/app/features/expenses/service.py (MODIFIED - added calculate_unequal_split())
+- backend/app/features/expenses/router.py (MODIFIED - added unequal split handling)
+- backend/app/features/expenses/models.py (MODIFIED - added UnequalSplitItem and UnequalSplitRequest schemas)
+- backend/tests/features/expenses/test_split_service.py (MODIFIED - added TestCalculateUnequalSplit class)
 
 **Frontend Files Created:**
-- cleardues/frontend/src/features/expenses/components/UnequalSplitInputs.tsx (NEW - custom amount inputs component)
+- frontend/src/features/expenses/components/UnequalSplitInputs.tsx (NEW - custom amount inputs component)
 
 **Frontend Files Modified:**
-- cleardues/frontend/src/features/expenses/types.ts (MODIFIED - enabled unequal split, added UnequalSplitRequest interface)
-- cleardues/frontend/src/features/expenses/hooks/useSplitState.ts (MODIFIED - added customAmounts state, setCustomAmount, remainingAmount)
-- cleardues/frontend/src/features/expenses/api/expenses.ts (MODIFIED - updated useUpdateExpenseSplit to handle unequal type)
-- cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx (MODIFIED - integrated UnequalSplitInputs with pre-population)
+- frontend/src/features/expenses/types.ts (MODIFIED - enabled unequal split, added UnequalSplitRequest interface)
+- frontend/src/features/expenses/hooks/useSplitState.ts (MODIFIED - added customAmounts state, setCustomAmount, remainingAmount)
+- frontend/src/features/expenses/api/expenses.ts (MODIFIED - updated useUpdateExpenseSplit to handle unequal type)
+- frontend/src/features/expenses/components/EditableExpensePreview.tsx (MODIFIED - integrated UnequalSplitInputs with pre-population)
 
 **Reference Documents:**
 - _bmad-output/planning-artifacts/epics.md (Epic 3 stories)

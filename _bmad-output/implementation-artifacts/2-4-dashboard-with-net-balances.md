@@ -463,10 +463,10 @@ curl http://localhost:8000/api/v1/users/me/dashboard \
   -H "Authorization: Bearer <token>"
 
 # Frontend build check
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Frontend type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ### API Contract
@@ -532,8 +532,8 @@ Authorization: Bearer <jwt_token>
 - [Source: architecture.md - API Patterns](../_bmad-output/planning-artifacts/architecture.md#api--communication-patterns)
 - [Source: architecture.md - Frontend Architecture](../_bmad-output/planning-artifacts/architecture.md#frontend-architecture)
 - [Source: prd.md - FR3](../_bmad-output/planning-artifacts/prd.md#user--group-management)
-- [Existing Code: features/auth/router.py](../../cleardues/backend/app/features/auth/router.py)
-- [Existing Code: features/groups/models.py](../../cleardues/backend/app/features/groups/models.py)
+- [Existing Code: features/auth/router.py](../../backend/app/features/auth/router.py)
+- [Existing Code: features/groups/models.py](../../backend/app/features/groups/models.py)
 - [Previous Story: 2-3-view-group-members-list.md](./2-3-view-group-members-list.md)
 
 ## Dev Agent Record
@@ -565,22 +565,22 @@ None - implementation proceeded without issues
 ### File List
 
 **Backend (Modified):**
-- cleardues/backend/app/features/auth/models.py - Added GroupBalanceSummary, DashboardResponse schemas
-- cleardues/backend/app/features/auth/service.py - Added get_user_dashboard() function
-- cleardues/backend/app/features/auth/router.py - Added GET /me/dashboard endpoint
-- cleardues/backend/tests/api/routes/test_users.py - Added 6 dashboard tests
+- backend/app/features/auth/models.py - Added GroupBalanceSummary, DashboardResponse schemas
+- backend/app/features/auth/service.py - Added get_user_dashboard() function
+- backend/app/features/auth/router.py - Added GET /me/dashboard endpoint
+- backend/tests/api/routes/test_users.py - Added 6 dashboard tests
 
 **Frontend (Created):**
-- cleardues/frontend/src/features/dashboard/types.ts - TypeScript interfaces
-- cleardues/frontend/src/features/dashboard/api/dashboard.ts - useDashboard hook
-- cleardues/frontend/src/features/dashboard/api/index.ts - API exports
-- cleardues/frontend/src/features/dashboard/components/Dashboard.tsx - Main component
-- cleardues/frontend/src/features/dashboard/components/index.ts - Component exports
+- frontend/src/features/dashboard/types.ts - TypeScript interfaces
+- frontend/src/features/dashboard/api/dashboard.ts - useDashboard hook
+- frontend/src/features/dashboard/api/index.ts - API exports
+- frontend/src/features/dashboard/components/Dashboard.tsx - Main component
+- frontend/src/features/dashboard/components/index.ts - Component exports
 
 **Frontend (Modified):**
-- cleardues/frontend/src/features/dashboard/index.ts - Updated exports
-- cleardues/frontend/src/routes/_layout/index.tsx - Integrated Dashboard component
-- cleardues/frontend/src/components/Sidebar/AppSidebar.tsx - Added Groups navigation link
+- frontend/src/features/dashboard/index.ts - Updated exports
+- frontend/src/routes/_layout/index.tsx - Integrated Dashboard component
+- frontend/src/components/Sidebar/AppSidebar.tsx - Added Groups navigation link
 
 ## Senior Developer Review (AI)
 
@@ -633,8 +633,8 @@ All 8 tasks verified as actually implemented. No false claims.
 
 ### Files Modified in Review
 
-- cleardues/backend/app/features/auth/service.py - Added circular import comment
-- cleardues/frontend/src/features/dashboard/components/Dashboard.tsx - Fixed M2-M5 + dark mode
+- backend/app/features/auth/service.py - Added circular import comment
+- frontend/src/features/dashboard/components/Dashboard.tsx - Fixed M2-M5 + dark mode
 
 ## Change Log
 

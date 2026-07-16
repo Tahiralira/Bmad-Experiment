@@ -1,7 +1,7 @@
 # Render Blueprint for the ClearDues API (WS9.5 — Vercel/Render/Neon stack).
 # In the Render dashboard: New → Blueprint → pick this repo. Render reads this
 # file, creates the service, and prompts for every `sync: false` value below.
-# Full walkthrough: cleardues/deployment.md.
+# Full walkthrough: deployment.md.
 #
 # Free-plan notes:
 # - No preDeployCommand on free instances, so migrations run at startup
@@ -13,13 +13,12 @@ services:
     name: cleardues-api
     runtime: python
     plan: free
-    # The repo is a monorepo (product lives under cleardues/) — rootDir makes
-    # Render treat the backend folder as the service root, and the uv.lock
-    # there switches Render's Python runtime to uv automatically.
-    rootDir: cleardues/backend
+    # rootDir makes Render treat the backend folder as the service root, and
+    # the uv.lock there switches Render's Python runtime to uv automatically.
+    rootDir: backend
     buildFilters:
       paths:
-        - cleardues/backend/**
+        - backend/**
     buildCommand: uv sync --locked --no-dev
     # --no-sync: don't let `uv run` re-sync (it would pull dev deps back in).
     startCommand: uv run --no-sync alembic upgrade head && uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port $PORT

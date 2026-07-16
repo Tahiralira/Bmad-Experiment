@@ -1080,7 +1080,7 @@ All 7 tasks completed successfully:
 - ✅ Task 7: Build verification complete, cleanup done (removed unused Sidebar/ directory)
 
 **Key Changes Made:**
-- Updated `cleardues/frontend/src/features/dashboard/components/Dashboard.tsx`:
+- Updated `frontend/src/features/dashboard/components/Dashboard.tsx`:
   - Replaced hardcoded colors with design tokens (bg-surface, bg-surface-elevated, text-primary, text-secondary, etc.)
   - Replaced custom balance formatting with BalanceDisplay component
   - Wrapped group cards in SwipeableCard with swipe actions (Edit, Settle)
@@ -1092,7 +1092,7 @@ All 7 tasks completed successfully:
   - `shared/hooks/useLongPress.ts`: Trailing comma added to function signature
   - All changes were formatting-related, no functional changes
 - Removed unused components:
-  - `cleardues/frontend/src/components/Sidebar/` directory (AppSidebar, Main, User components)
+  - `frontend/src/components/Sidebar/` directory (AppSidebar, Main, User components)
   - These were old sidebar components not used in current layout (OrbitalNav replaced them)
 - Kept working components:
   - `Appearance.tsx` - theme toggle used by AuthLayout in authentication screens
@@ -1149,34 +1149,34 @@ All 5 code review follow-up tasks (8-12) completed successfully:
 - `_bmad-output/implementation-artifacts/2-5-7-update-existing-screens-to-new-design-system.md` (this file)
 
 **Design System Components (Already Created, Will Be Used):**
-- `cleardues/frontend/src/components/ui/balance-display.tsx` (EXISTS from 2.5.6)
-- `cleardues/frontend/src/components/ui/swipeable-card.tsx` (EXISTS from 2.5.5)
-- `cleardues/frontend/src/components/ui/smart-input-modal.tsx` (EXISTS from 2.5.4)
-- `cleardues/frontend/src/components/ui/orbital-nav.tsx` (EXISTS from 2.5.3)
-- `cleardues/frontend/src/components/ui/agent-orb.tsx` (EXISTS from 2.5.2)
-- `cleardues/frontend/src/components/ui/index.ts` (EXISTS - barrel export)
+- `frontend/src/components/ui/balance-display.tsx` (EXISTS from 2.5.6)
+- `frontend/src/components/ui/swipeable-card.tsx` (EXISTS from 2.5.5)
+- `frontend/src/components/ui/smart-input-modal.tsx` (EXISTS from 2.5.4)
+- `frontend/src/components/ui/orbital-nav.tsx` (EXISTS from 2.5.3)
+- `frontend/src/components/ui/agent-orb.tsx` (EXISTS from 2.5.2)
+- `frontend/src/components/ui/index.ts` (EXISTS - barrel export)
 
 **Files Modified (This Story):**
-- `cleardues/frontend/src/features/dashboard/components/Dashboard.tsx` (MODIFIED - Applied new design system)
+- `frontend/src/features/dashboard/components/Dashboard.tsx` (MODIFIED - Applied new design system)
   - Replaced hardcoded colors with design tokens (bg-surface, bg-surface-elevated, text-primary, text-secondary, etc.)
   - Replaced custom balance formatting with BalanceDisplay component
   - Wrapped group cards in SwipeableCard with Edit (left) and Settle (right) actions
   - Updated typography to use design tokens (text-heading, text-title, text-body, text-body-small)
   - Fixed button type attribute for accessibility
-- `cleardues/frontend/src/routes/_layout.tsx` (MODIFIED - Import reordering and formatting)
+- `frontend/src/routes/_layout.tsx` (MODIFIED - Import reordering and formatting)
   - Auto-formatted imports (prettier/eslint) - no functional changes
   - Export reordering with trailing comma added
-- `cleardues/frontend/src/shared/hooks/index.ts` (MODIFIED - Export reordering)
+- `frontend/src/shared/hooks/index.ts` (MODIFIED - Export reordering)
   - Reordered exports with trailing comma added (formatting)
-- `cleardues/frontend/src/shared/hooks/useLongPress.ts` (MODIFIED - Trailing comma added)
+- `frontend/src/shared/hooks/useLongPress.ts` (MODIFIED - Trailing comma added)
   - Added trailing comma after default parameter in function signature (formatting)
 
 **Files Deleted (Cleanup):**
-- `cleardues/frontend/src/components/Sidebar/AppSidebar.tsx` (DELETED - Unused, replaced by OrbitalNav)
-- `cleardues/frontend/src/components/Sidebar/Main.tsx` (DELETED - Unused sidebar component)
-- `cleardues/frontend/src/components/Sidebar/User.tsx` (DELETED - Unused sidebar component)
-- `cleardues/frontend/src/components/Sidebar/` directory (DELETED - All unused sidebar components)
+- `frontend/src/components/Sidebar/AppSidebar.tsx` (DELETED - Unused, replaced by OrbitalNav)
+- `frontend/src/components/Sidebar/Main.tsx` (DELETED - Unused sidebar component)
+- `frontend/src/components/Sidebar/User.tsx` (DELETED - Unused sidebar component)
+- `frontend/src/components/Sidebar/` directory (DELETED - All unused sidebar components)
 
 **Files Kept (Not Modified - Still Used):**
-- `cleardues/frontend/src/components/ui/sidebar.tsx` (KEPT - Generic UI component, may be used elsewhere)
-- `cleardues/frontend/src/components/Common/Appearance.tsx` (KEPT - Theme toggle used by AuthLayout)
+- `frontend/src/components/ui/sidebar.tsx` (KEPT - Generic UI component, may be used elsewhere)
+- `frontend/src/components/Common/Appearance.tsx` (KEPT - Theme toggle used by AuthLayout)

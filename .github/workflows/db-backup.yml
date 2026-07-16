@@ -3,7 +3,7 @@
 # so this workflow IS the real backup: pg_dump every night at 03:00 UTC,
 # stored as a private Actions artifact for 30 days.
 #
-# Setup (one-time, see cleardues/deployment.md §6):
+# Setup (one-time, see deployment.md §6):
 # 1. Repo Settings → Secrets and variables → Actions → new secret
 #    NEON_DIRECT_URL = the Neon DIRECT connection string (host WITHOUT
 #    "-pooler"), e.g. postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require

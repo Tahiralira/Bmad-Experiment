@@ -26,7 +26,7 @@ plus this file, writes findings to its own numbered file, and checks itself off 
 - [x] **Session 3 — Technical Review: Backend** (Part 3a)
       Covers: architecture, API design, DB models/migrations, service layer,
       error handling, logging, backend tests, the pytest-blocking SQLAlchemy bug.
-      Inputs: architecture.md, cleardues/backend/, technical-debt-log.yaml,
+      Inputs: architecture.md, backend/, technical-debt-log.yaml,
       solution-patterns.yaml
       Output: `03-technical-backend.md`
       Status: DONE 2026-07-06
@@ -34,7 +34,7 @@ plus this file, writes findings to its own numbered file, and checks itself off 
 - [x] **Session 4 — Technical Review: Frontend** (Part 3b)
       Covers: state management (Redux vs TanStack Query split), component structure,
       type safety, performance, frontend testing (currently none?), PWA/offline readiness.
-      Inputs: cleardues/frontend/src/, package.json, vite config
+      Inputs: frontend/src/, package.json, vite config
       Output: `04-technical-frontend.md`
       Status: DONE 2026-07-06
 

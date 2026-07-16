@@ -123,7 +123,7 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 -   **Deployment Target:** Vercel (frontend) + Render (backend) + Neon (Postgres),
     free tiers until rollout (OWNER DECISION WS9.5, 2026-07-16 — supersedes both the
     original Railway selection and WS9's compose-on-VPS, which is kept as fallback in
-    `cleardues/deployment-vps.md`). WS12's Redis/Celery lands on Render Key Value +
+    `deployment-vps.md`). WS12's Redis/Celery lands on Render Key Value +
     background workers.
 
 ### Data Architecture
@@ -157,14 +157,14 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 
 -   **Platform:** **Vercel (SPA) + Render (FastAPI) + Neon (Postgres 17)** — owner
     decision WS9.5, 2026-07-16, chosen for genuinely free tiers until rollout.
-    -   *Artifacts:* `render.yaml` blueprint (repo root), `cleardues/frontend/vercel.json`
+    -   *Artifacts:* `render.yaml` blueprint (repo root), `frontend/vercel.json`
         (SPA rewrite + security headers), nightly Neon pg_dump via GitHub Actions
-        (`.github/workflows/db-backup.yml`), first-deploy guide `cleardues/deployment.md`.
+        (`.github/workflows/db-backup.yml`), first-deploy guide `deployment.md`.
     -   *Cost:* $0 until rollout; upgrade triggers documented in deployment.md §8
         (Render Starter $7/mo at first real users; Vercel Pro or Cloudflare Pages at
         monetization; Neon Launch at >0.5 GB).
     -   *Fallback:* the WS9 compose-on-VPS stack, verified end-to-end, in
-        `cleardues/deployment-vps.md`.
+        `deployment-vps.md`.
 -   **CI/CD:** GitHub Actions (root-level `ci.yml`, live since WS1) as the quality gate;
     Vercel/Render auto-deploy `main` on push (monorepo Root Directory + build filters).
 
@@ -172,7 +172,7 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 
 **Implementation Sequence:**
 1.  Init Project (FastAPI + Redux Starter).
-2.  Wire Neon + Render + Vercel per the WS9.5 guide (`cleardues/deployment.md`); Redis lands with WS12 (Render Key Value).
+2.  Wire Neon + Render + Vercel per the WS9.5 guide (`deployment.md`); Redis lands with WS12 (Render Key Value).
 3.  Implement "Real-time" socket layer (Redis connection).
 4.  Build "Offline" Mutation Queue (TanStack).
 

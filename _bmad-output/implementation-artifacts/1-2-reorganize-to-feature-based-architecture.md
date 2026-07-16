@@ -228,13 +228,13 @@ import { Button } from "@/shared/components/ui/button"
 docker compose exec backend pytest
 
 # Frontend build (catches import errors)
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Type checking
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 
 # Lint
-cd cleardues/frontend && npm run lint
+cd frontend && npm run lint
 ```
 
 ### Project Structure Notes
@@ -278,57 +278,57 @@ Claude Opus 4.5 (claude-opus-4-5-20251101) via Claude Code CLI
 ### File List
 
 **Backend - New Files:**
-- `cleardues/backend/app/features/__init__.py`
-- `cleardues/backend/app/features/auth/__init__.py`
-- `cleardues/backend/app/features/auth/models.py`
-- `cleardues/backend/app/features/auth/service.py`
-- `cleardues/backend/app/features/auth/router.py`
-- `cleardues/backend/app/features/expenses/__init__.py`
-- `cleardues/backend/app/features/expenses/models.py`
-- `cleardues/backend/app/features/expenses/service.py`
-- `cleardues/backend/app/features/expenses/router.py`
-- `cleardues/backend/app/features/groups/__init__.py`
-- `cleardues/backend/app/features/groups/models.py`
-- `cleardues/backend/app/features/groups/service.py`
-- `cleardues/backend/app/features/groups/router.py`
-- `cleardues/backend/app/features/notifications/__init__.py`
-- `cleardues/backend/app/features/notifications/models.py`
-- `cleardues/backend/app/features/notifications/service.py`
-- `cleardues/backend/app/features/notifications/router.py`
+- `backend/app/features/__init__.py`
+- `backend/app/features/auth/__init__.py`
+- `backend/app/features/auth/models.py`
+- `backend/app/features/auth/service.py`
+- `backend/app/features/auth/router.py`
+- `backend/app/features/expenses/__init__.py`
+- `backend/app/features/expenses/models.py`
+- `backend/app/features/expenses/service.py`
+- `backend/app/features/expenses/router.py`
+- `backend/app/features/groups/__init__.py`
+- `backend/app/features/groups/models.py`
+- `backend/app/features/groups/service.py`
+- `backend/app/features/groups/router.py`
+- `backend/app/features/notifications/__init__.py`
+- `backend/app/features/notifications/models.py`
+- `backend/app/features/notifications/service.py`
+- `backend/app/features/notifications/router.py`
 
 **Backend - Modified Files:**
-- `cleardues/backend/app/models.py` (now re-exports from features/auth/models.py)
-- `cleardues/backend/app/crud.py` (now re-exports from features/auth/service.py)
-- `cleardues/backend/app/api/main.py` (now imports from feature routers)
+- `backend/app/models.py` (now re-exports from features/auth/models.py)
+- `backend/app/crud.py` (now re-exports from features/auth/service.py)
+- `backend/app/api/main.py` (now imports from feature routers)
 
 **Backend - Deleted Files (moved to feature routers):**
-- `cleardues/backend/app/api/routes/login.py`
-- `cleardues/backend/app/api/routes/users.py`
-- `cleardues/backend/app/api/routes/items.py`
+- `backend/app/api/routes/login.py`
+- `backend/app/api/routes/users.py`
+- `backend/app/api/routes/items.py`
 
 **Frontend - New Files:**
-- `cleardues/frontend/src/features/index.ts`
-- `cleardues/frontend/src/features/auth/index.ts`
-- `cleardues/frontend/src/features/auth/components/index.ts`
-- `cleardues/frontend/src/features/auth/hooks/index.ts`
-- `cleardues/frontend/src/features/auth/hooks/useAuth.ts`
-- `cleardues/frontend/src/features/dashboard/index.ts`
-- `cleardues/frontend/src/features/expenses/index.ts`
-- `cleardues/frontend/src/shared/index.ts`
-- `cleardues/frontend/src/shared/components/index.ts`
-- `cleardues/frontend/src/shared/hooks/index.ts`
-- `cleardues/frontend/src/shared/hooks/useCopyToClipboard.ts`
-- `cleardues/frontend/src/shared/hooks/useCustomToast.ts`
-- `cleardues/frontend/src/shared/hooks/useMobile.ts`
-- `cleardues/frontend/src/shared/api/index.ts`
-- `cleardues/frontend/src/shared/api/client/index.ts`
-- `cleardues/frontend/src/shared/store/index.ts`
+- `frontend/src/features/index.ts`
+- `frontend/src/features/auth/index.ts`
+- `frontend/src/features/auth/components/index.ts`
+- `frontend/src/features/auth/hooks/index.ts`
+- `frontend/src/features/auth/hooks/useAuth.ts`
+- `frontend/src/features/dashboard/index.ts`
+- `frontend/src/features/expenses/index.ts`
+- `frontend/src/shared/index.ts`
+- `frontend/src/shared/components/index.ts`
+- `frontend/src/shared/hooks/index.ts`
+- `frontend/src/shared/hooks/useCopyToClipboard.ts`
+- `frontend/src/shared/hooks/useCustomToast.ts`
+- `frontend/src/shared/hooks/useMobile.ts`
+- `frontend/src/shared/api/index.ts`
+- `frontend/src/shared/api/client/index.ts`
+- `frontend/src/shared/store/index.ts`
 
 **Frontend - Modified Files:**
-- `cleardues/frontend/src/hooks/useAuth.ts` (now re-exports from features/auth/hooks)
-- `cleardues/frontend/src/hooks/useCopyToClipboard.ts` (now re-exports from shared/hooks)
-- `cleardues/frontend/src/hooks/useCustomToast.ts` (now re-exports from shared/hooks)
-- `cleardues/frontend/src/hooks/useMobile.ts` (now re-exports from shared/hooks)
+- `frontend/src/hooks/useAuth.ts` (now re-exports from features/auth/hooks)
+- `frontend/src/hooks/useCopyToClipboard.ts` (now re-exports from shared/hooks)
+- `frontend/src/hooks/useCustomToast.ts` (now re-exports from shared/hooks)
+- `frontend/src/hooks/useMobile.ts` (now re-exports from shared/hooks)
 
 ## Change Log
 

@@ -7,11 +7,11 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-07-15 (WS8: TEST-004 GET->POST semantic changes, TEST-005 slowapi in tests)
+# Last Updated: 2026-07-16 (WS9.6: GIT-002 gitignore-hidden source files, DOCKER-006 stale image vs mounted tests)
 
 metadata:
   version: "1.0"
-  total_patterns: 28
+  total_patterns: 30
   categories:
     - docker
     - database
@@ -564,6 +564,25 @@ testing:
     stories_encountered: ["WS9"]
     tokens_saved_estimate: "~600 per occurrence"
 
+  - id: "DOCKER-006"
+    title: "Tests are volume-mounted but app code runs from a stale image"
+    symptoms:
+      - "A test asserting brand-new behavior fails although the source clearly implements it"
+      - "pytest failure output shows values only the OLD code could produce"
+    root_cause: |
+      docker-compose.override.yml mounts only backend/tests (and htmlcov)
+      into the container — app/ code executes from the built image. After
+      changing app code (or switching branches), pytest runs NEW tests
+      against OLD application code (WS9.6: WS9.5's sslmode DSN test failed
+      because the image predated the config change).
+    solution: |
+      docker compose build backend && docker compose up -d backend, then
+      re-run pytest. Verify what the container actually runs with:
+      docker compose exec backend grep <new-symbol> //app/app/<file>.py
+    prevention: "Before trusting an in-container test result after app-code changes, rebuild the backend image; only tests/ hot-reloads"
+    stories_encountered: ["WS9.6"]
+    tokens_saved_estimate: "~500 per occurrence"
+
   - id: "FE-007"
     title: "nginx location-level add_header silently drops security headers"
     symptoms:
@@ -649,6 +668,28 @@ git:
     prevention: "Configure exclusions when adding code generation"
     stories_encountered: []
     tokens_saved_estimate: "~200 per occurrence"
+
+  - id: "GIT-002"
+    title: "Broad .gitignore patterns silently keep source files out of git"
+    symptoms:
+      - "File exists locally and everything works, but a fresh clone / CI can't build"
+      - "git ls-files doesn't show a file that's clearly part of the app"
+    root_cause: |
+      Unanchored template patterns match legitimate source paths. WS9.6 found
+      three never-committed files: `package.json` (a literal ignore line!)
+      hid frontend/package.json, `lib/` hid frontend/src/lib/utils.ts (the
+      shadcn cn() helper imported by ~20 components), `build/` hid
+      backend/app/email-templates/build/*.html. CI never caught it because it
+      only runs on main pushes + PRs, and neither had happened since the
+      files appeared.
+    solution: |
+      Anchor or scope build-output patterns (`/frontend/dist/`, not `dist/`;
+      never bare `lib/`/`build/`/`package.json`). Audit for silent victims:
+      git ls-files --others --ignored --exclude-standard backend frontend/src
+      (anything listed that is source code is a rescue candidate).
+    prevention: "After editing .gitignore, run the ls-files audit above; treat any ignored file inside a source directory as a bug"
+    stories_encountered: ["WS9.6"]
+    tokens_saved_estimate: "~1000 per occurrence"
 
 # =============================================================================
 # QUICK REFERENCE (Most Common Issues)

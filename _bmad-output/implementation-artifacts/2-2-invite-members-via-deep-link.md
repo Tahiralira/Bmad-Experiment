@@ -805,10 +805,10 @@ curl http://localhost:8000/api/v1/expense-groups/invite/{invite_token} \
   -H "Authorization: Bearer <token>"
 
 # Frontend build check
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Frontend type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ### API Contract
@@ -883,10 +883,10 @@ Authorization: Bearer <jwt_token>
 - [Source: epics.md - Story 2.2](../_bmad-output/planning-artifacts/epics.md#story-22-invite-members-via-deep-link)
 - [Source: architecture.md - API Patterns](../_bmad-output/planning-artifacts/architecture.md#api--communication-patterns)
 - [Source: architecture.md - Naming Conventions](../_bmad-output/planning-artifacts/architecture.md#naming-patterns)
-- [Existing Code: features/groups/models.py](../../cleardues/backend/app/features/groups/models.py)
-- [Existing Code: features/groups/service.py](../../cleardues/backend/app/features/groups/service.py)
-- [Existing Code: features/groups/router.py](../../cleardues/backend/app/features/groups/router.py)
-- [Existing Code: features/auth/models.py - MagicLinkToken](../../cleardues/backend/app/features/auth/models.py)
+- [Existing Code: features/groups/models.py](../../backend/app/features/groups/models.py)
+- [Existing Code: features/groups/service.py](../../backend/app/features/groups/service.py)
+- [Existing Code: features/groups/router.py](../../backend/app/features/groups/router.py)
+- [Existing Code: features/auth/models.py - MagicLinkToken](../../backend/app/features/auth/models.py)
 - [Previous Story: 2-1-create-expense-group.md](./2-1-create-expense-group.md)
 
 ### Important Notes for Developer
@@ -923,21 +923,21 @@ Claude Opus 4.5
 ### File List
 
 **Backend - Modified:**
-- `cleardues/backend/app/features/groups/models.py` - Added GroupInvite model, schemas
-- `cleardues/backend/app/features/groups/router.py` - Added invite endpoints
-- `cleardues/backend/app/features/groups/service.py` - Added invite service functions
-- `cleardues/backend/tests/api/routes/test_groups.py` - Added invite tests
-- `cleardues/backend/tests/conftest.py` - Added GroupInvite to cleanup, second_user fixture
+- `backend/app/features/groups/models.py` - Added GroupInvite model, schemas
+- `backend/app/features/groups/router.py` - Added invite endpoints
+- `backend/app/features/groups/service.py` - Added invite service functions
+- `backend/tests/api/routes/test_groups.py` - Added invite tests
+- `backend/tests/conftest.py` - Added GroupInvite to cleanup, second_user fixture
 
 **Backend - Created:**
-- `cleardues/backend/app/alembic/versions/d7e8f9a0b1c2_add_group_invite.py` - Migration for group_invite table
+- `backend/app/alembic/versions/d7e8f9a0b1c2_add_group_invite.py` - Migration for group_invite table
 
 **Frontend - Modified:**
-- `cleardues/frontend/src/features/groups/api/groups.ts` - Added invite API hooks
-- `cleardues/frontend/src/features/groups/components/index.ts` - Export GenerateInviteButton
-- `cleardues/frontend/src/features/groups/types.ts` - Added GroupInvite types
-- `cleardues/frontend/src/routes/login.verify.$token.tsx` - Process pending invite after login (code review fix)
+- `frontend/src/features/groups/api/groups.ts` - Added invite API hooks
+- `frontend/src/features/groups/components/index.ts` - Export GenerateInviteButton
+- `frontend/src/features/groups/types.ts` - Added GroupInvite types
+- `frontend/src/routes/login.verify.$token.tsx` - Process pending invite after login (code review fix)
 
 **Frontend - Created:**
-- `cleardues/frontend/src/features/groups/components/GenerateInviteButton.tsx` - Invite generation UI
-- `cleardues/frontend/src/routes/invite.$token.tsx` - Invite acceptance page
+- `frontend/src/features/groups/components/GenerateInviteButton.tsx` - Invite generation UI
+- `frontend/src/routes/invite.$token.tsx` - Invite acceptance page

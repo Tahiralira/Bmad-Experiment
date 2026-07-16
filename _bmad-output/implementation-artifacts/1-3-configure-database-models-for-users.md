@@ -199,8 +199,8 @@ docker compose exec backend alembic history
 - [Source: architecture.md - Data Architecture](../_bmad-output/planning-artifacts/architecture.md#data-architecture)
 - [Source: epics.md - Story 1.3](../_bmad-output/planning-artifacts/epics.md#story-13-configure-database-models-for-users)
 - [Source: Story 1.2 - Previous Story](./1-2-reorganize-to-feature-based-architecture.md)
-- [Existing Code: features/auth/models.py](../../cleardues/backend/app/features/auth/models.py)
-- [Existing Migration: e2412789c190](../../cleardues/backend/app/alembic/versions/e2412789c190_initialize_models.py)
+- [Existing Code: features/auth/models.py](../../backend/app/features/auth/models.py)
+- [Existing Migration: e2412789c190](../../backend/app/alembic/versions/e2412789c190_initialize_models.py)
 
 ## Dev Agent Record
 
@@ -251,13 +251,13 @@ Claude Opus 4.5 (claude-opus-4-5-20251101) via Claude Code CLI
 ### File List
 
 **Modified Files:**
-- `cleardues/backend/app/features/auth/models.py` - Added `created_at` and `updated_at` fields with utc_now helper, explicit `__tablename__`
-- `cleardues/backend/app/models.py` - Added SQLModel re-export for backward compatibility
-- `cleardues/backend/tests/crud/test_user.py` - Added 3 tests for timestamp behavior
+- `backend/app/features/auth/models.py` - Added `created_at` and `updated_at` fields with utc_now helper, explicit `__tablename__`
+- `backend/app/models.py` - Added SQLModel re-export for backward compatibility
+- `backend/tests/crud/test_user.py` - Added 3 tests for timestamp behavior
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - Updated story status to "review"
 
 **New Files:**
-- `cleardues/backend/app/alembic/versions/848b1a80cc28_add_created_at_updated_at_to_user.py` - Migration for timestamp columns with timezone support, server defaults, and auto-update trigger
+- `backend/app/alembic/versions/848b1a80cc28_add_created_at_updated_at_to_user.py` - Migration for timestamp columns with timezone support, server defaults, and auto-update trigger
 
 ## Change Log
 

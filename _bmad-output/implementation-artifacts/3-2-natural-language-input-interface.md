@@ -905,19 +905,19 @@ No issues encountered during implementation. All TypeScript errors resolved clea
 - _bmad-output/implementation-artifacts/3-2-natural-language-input-interface.md (this file)
 
 **Frontend Files Created:**
-- cleardues/frontend/src/features/expenses/components/SmartInputModal.tsx (NEW)
-- cleardues/frontend/src/features/expenses/components/AICommentaryBubble.tsx (NEW)
-- cleardues/frontend/src/features/expenses/components/ExpensePreviewCard.tsx (NEW)
-- cleardues/frontend/src/features/expenses/hooks/useStreamingText.ts (NEW)
-- cleardues/frontend/src/features/expenses/hooks/index.ts (NEW)
-- cleardues/frontend/src/features/expenses/components/SmartInputModal.test.tsx (NEW)
-- cleardues/frontend/src/features/expenses/components/AICommentaryBubble.test.tsx (NEW)
-- cleardues/frontend/src/features/expenses/components/ExpensePreviewCard.test.tsx (NEW)
-- cleardues/frontend/src/features/expenses/hooks/useStreamingText.test.ts (NEW)
+- frontend/src/features/expenses/components/SmartInputModal.tsx (NEW)
+- frontend/src/features/expenses/components/AICommentaryBubble.tsx (NEW)
+- frontend/src/features/expenses/components/ExpensePreviewCard.tsx (NEW)
+- frontend/src/features/expenses/hooks/useStreamingText.ts (NEW)
+- frontend/src/features/expenses/hooks/index.ts (NEW)
+- frontend/src/features/expenses/components/SmartInputModal.test.tsx (NEW)
+- frontend/src/features/expenses/components/AICommentaryBubble.test.tsx (NEW)
+- frontend/src/features/expenses/components/ExpensePreviewCard.test.tsx (NEW)
+- frontend/src/features/expenses/hooks/useStreamingText.test.ts (NEW)
 
 **Frontend Files Modified:**
-- cleardues/frontend/src/features/expenses/components/index.ts (UPDATE - export new components)
-- cleardues/frontend/src/routes/_layout.tsx (UPDATE - use expense-specific SmartInputModal)
+- frontend/src/features/expenses/components/index.ts (UPDATE - export new components)
+- frontend/src/routes/_layout.tsx (UPDATE - use expense-specific SmartInputModal)
 
 **Note on Tests:**
 Test files created and comprehensive test coverage added for all components and hooks:

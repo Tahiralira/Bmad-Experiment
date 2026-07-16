@@ -22,7 +22,7 @@ build green. Commit after each task.
 
 ```bash
 git checkout -b ws3/quiet-ink
-cd cleardues/frontend && npm run typecheck && npm run test && npm run build
+cd frontend && npm run typecheck && npm run test && npm run build
 ```
 All three must be green BEFORE starting (they were on 2026-07-07). Record the current
 `dist/assets/*.js` gzip sizes from the build output — you'll report the delta at the end.
@@ -34,7 +34,7 @@ All three must be green BEFORE starting (they were on 2026-07-07). Record the cu
 ### 1a. package.json
 
 ```bash
-cd cleardues/frontend
+cd frontend
 npm uninstall framer-motion react-icons
 npm uninstall @tanstack/react-query-devtools @tanstack/react-router-devtools
 npm install -D @tanstack/react-query-devtools @tanstack/react-router-devtools
@@ -520,11 +520,11 @@ Gate: `npm run build` green. The app will already look ~80% Quiet Ink.
 ### 3c. Delete template assets
 
 ```bash
-git rm cleardues/frontend/public/assets/images/fastapi-icon.svg \
-       cleardues/frontend/public/assets/images/fastapi-icon-light.svg \
-       cleardues/frontend/public/assets/images/fastapi-logo.svg \
-       cleardues/frontend/public/assets/images/fastapi-logo-light.svg \
-       cleardues/frontend/public/assets/images/favicon.png
+git rm frontend/public/assets/images/fastapi-icon.svg \
+       frontend/public/assets/images/fastapi-icon-light.svg \
+       frontend/public/assets/images/fastapi-logo.svg \
+       frontend/public/assets/images/fastapi-logo-light.svg \
+       frontend/public/assets/images/favicon.png
 ```
 
 ### 3d. `src/components/Common/Logo.tsx` — replace entire file (wordmark, no images)
@@ -583,7 +583,7 @@ export function Logo({ variant = "full", className, asLink = true }: LogoProps) 
 ### 3e. Delete the template footer
 
 ```bash
-git rm cleardues/frontend/src/components/Common/Footer.tsx
+git rm frontend/src/components/Common/Footer.tsx
 ```
 
 Then remove its two usages (both files are fully replaced below anyway):
@@ -995,8 +995,8 @@ Task 7 updates assertions).
 ### 5a. Delete the orb and its hook
 
 ```bash
-git rm cleardues/frontend/src/components/ui/agent-orb.tsx
-git rm cleardues/frontend/src/shared/hooks/useLongPress.ts
+git rm frontend/src/components/ui/agent-orb.tsx
+git rm frontend/src/shared/hooks/useLongPress.ts
 ```
 
 Remove the `useLongPress` export line from `src/shared/hooks/index.ts`.
@@ -1261,7 +1261,7 @@ function formatLastActivity(dateString: string): string {
 ### 5e. Delete SwipeableCard (framer-motion consumer; dead gestures)
 
 ```bash
-git rm cleardues/frontend/src/components/ui/swipeable-card.tsx
+git rm frontend/src/components/ui/swipeable-card.tsx
 ```
 
 Remove its export lines from `src/components/ui/index.ts` (already gone if you pasted
@@ -1327,7 +1327,7 @@ AnimatePresence exit completion. No other component gets this animation.
 After the purge:
 
 ```bash
-grep -r "framer-motion" cleardues/frontend/src   # MUST return nothing
+grep -r "framer-motion" frontend/src   # MUST return nothing
 npm uninstall framer-motion                      # if not already done in Task 1
 ```
 

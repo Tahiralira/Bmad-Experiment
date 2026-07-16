@@ -1207,16 +1207,16 @@ N/A - Story creation complete, implementation pending dev-story workflow.
 - _bmad-output/implementation-artifacts/3-8-exclude-members-from-expense.md (this file)
 
 **Backend Files to Modify:**
-- cleardues/backend/app/features/expenses/service.py (MODIFY - add excluded_user_ids to all split functions)
-- cleardues/backend/app/features/expenses/router.py (MODIFY - accept excluded_user_ids for all split types)
+- backend/app/features/expenses/service.py (MODIFY - add excluded_user_ids to all split functions)
+- backend/app/features/expenses/router.py (MODIFY - accept excluded_user_ids for all split types)
 
 **Frontend Files to Modify:**
-- cleardues/frontend/src/features/expenses/components/MemberChips.tsx (VERIFY - exclusion UX from Story 3.5)
-- cleardues/frontend/src/features/expenses/components/UnequalSplitInputs.tsx (MODIFY - filter excluded members)
-- cleardues/frontend/src/features/expenses/components/PercentageSplitInputs.tsx (MODIFY - filter excluded members)
-- cleardues/frontend/src/features/expenses/hooks/useSplitState.ts (MODIFY - filter members in all calculations)
-- cleardues/frontend/src/features/expenses/api/expenses.ts (MODIFY - send excluded_user_ids in requests)
-- cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx (MODIFY - show MemberChips for all split types)
+- frontend/src/features/expenses/components/MemberChips.tsx (VERIFY - exclusion UX from Story 3.5)
+- frontend/src/features/expenses/components/UnequalSplitInputs.tsx (MODIFY - filter excluded members)
+- frontend/src/features/expenses/components/PercentageSplitInputs.tsx (MODIFY - filter excluded members)
+- frontend/src/features/expenses/hooks/useSplitState.ts (MODIFY - filter members in all calculations)
+- frontend/src/features/expenses/api/expenses.ts (MODIFY - send excluded_user_ids in requests)
+- frontend/src/features/expenses/components/EditableExpensePreview.tsx (MODIFY - show MemberChips for all split types)
 
 **Reference Documents:**
 - _bmad-output/planning-artifacts/epics.md (Epic 3 stories)

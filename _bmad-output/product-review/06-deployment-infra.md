@@ -4,7 +4,7 @@
 **Scope:** Docker setup, Railway readiness, CI/CD, monitoring, backups, environment
 management, scaling (NFR7: 1k WebSocket connections), cost.
 **Inputs reviewed:** docker-compose.yml / .override.yml / .traefik.yml, backend and
-frontend Dockerfiles, deployment.md, cleardues/scripts/, backend/scripts/, hooks/,
+frontend Dockerfiles, deployment.md, scripts/, backend/scripts/, hooks/,
 cleardues/.github/workflows/ (13 files), .env.example, .pre-commit-config.yaml,
 nginx.conf, git repo layout. Prior-session facts cross-referenced, not re-derived.
 **Method:** Adversarial. Severity per CLAUDE.md review scoping; every recommendation
@@ -277,7 +277,7 @@ already enumerate what they need); keep it only on backend/prestart or enumerate
 too. ~30 min.
 
 ### M2 — There is no accurate deployment runbook (deployment.md is untouched template)
-**Where:** `cleardues/deployment.md` (entire file).
+**Where:** `deployment.md` (entire file).
 
 deployment.md still says `fastapi-project.example.com` throughout, documents the
 self-hosted-runner + Traefik recipe that C1/C3 show is dead, references GitHub secrets

@@ -421,10 +421,10 @@ curl http://localhost:8000/api/v1/expense-groups/{group_id}/members \
   -H "Authorization: Bearer <token>"
 
 # Frontend build check
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Frontend type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ### API Contract
@@ -474,9 +474,9 @@ Authorization: Bearer <jwt_token>
 - [Source: epics.md - Story 2.3](../_bmad-output/planning-artifacts/epics.md#story-23-view-group-members-list)
 - [Source: architecture.md - API Patterns](../_bmad-output/planning-artifacts/architecture.md#api--communication-patterns)
 - [Source: architecture.md - Naming Conventions](../_bmad-output/planning-artifacts/architecture.md#naming-patterns)
-- [Existing Code: features/groups/models.py](../../cleardues/backend/app/features/groups/models.py)
-- [Existing Code: features/groups/service.py](../../cleardues/backend/app/features/groups/service.py)
-- [Existing Code: features/groups/router.py](../../cleardues/backend/app/features/groups/router.py)
+- [Existing Code: features/groups/models.py](../../backend/app/features/groups/models.py)
+- [Existing Code: features/groups/service.py](../../backend/app/features/groups/service.py)
+- [Existing Code: features/groups/router.py](../../backend/app/features/groups/router.py)
 - [Previous Story: 2-2-invite-members-via-deep-link.md](./2-2-invite-members-via-deep-link.md)
 
 ### Important Notes for Developer

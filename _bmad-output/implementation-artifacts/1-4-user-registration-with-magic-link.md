@@ -308,10 +308,10 @@ docker compose exec backend pytest -v tests/
 open http://localhost:1080
 
 # Frontend build (catches import errors)
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Run frontend type checking
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ### Previous Story Intelligence
@@ -352,9 +352,9 @@ cd cleardues/frontend && npm run typecheck
 - [Source: architecture.md - Naming Patterns](../_bmad-output/planning-artifacts/architecture.md#naming-patterns)
 - [Source: prd.md - FR1](../_bmad-output/planning-artifacts/prd.md#user--group-management)
 - [Source: Story 1.3](./1-3-configure-database-models-for-users.md)
-- [Existing Code: features/auth/models.py](../../cleardues/backend/app/features/auth/models.py)
-- [Existing Code: features/auth/router.py](../../cleardues/backend/app/features/auth/router.py)
-- [Existing Code: utils.py - Email utilities](../../cleardues/backend/app/utils.py)
+- [Existing Code: features/auth/models.py](../../backend/app/features/auth/models.py)
+- [Existing Code: features/auth/router.py](../../backend/app/features/auth/router.py)
+- [Existing Code: utils.py - Email utilities](../../backend/app/utils.py)
 
 ### API Contract
 

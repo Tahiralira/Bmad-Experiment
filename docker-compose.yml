@@ -2,6 +2,11 @@
 # Traefik (decided WS9; see deployment.md for the runbook). Local dev layers
 # docker-compose.override.yml on top automatically.
 
+# Pinned project name: the stack predates the WS9.6 repo flattening (the app
+# used to live in a `cleardues/` subfolder, which named the project). Keeping
+# it pinned preserves existing volumes (app-db-data) and container names.
+name: cleardues
+
 # Bounded container logs on every service (S6-H3): the default json-file
 # driver is unbounded and fills a VPS disk.
 x-logging: &default-logging

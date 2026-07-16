@@ -31,11 +31,11 @@ Each platform connects to your GitHub repo and redeploys itself on every push
 2. **Get this code onto `main`.** Render/Vercel default to deploying the
    `main` branch, and GitHub only runs *scheduled* workflows (our nightly DB
    backup) from the default branch. The product currently lives on the
-   `ws9.5/replatform` branch chain, so:
+   `ws9.6/repo-restructure` branch chain, so:
 
    ```bash
    git checkout main
-   git merge ws9.5/replatform
+   git merge ws9.6/repo-restructure
    git push origin main
    ```
 
@@ -76,7 +76,7 @@ you'll never notice.
 ## §2 Render (backend API) — ~10 minutes
 
 1. Render dashboard → **New → Blueprint** → connect GitHub → pick this repo.
-   Render finds [render.yaml](../render.yaml) at the repo root and shows the
+   Render finds [render.yaml](./render.yaml) at the repo root and shows the
    `cleardues-api` service it's about to create.
 2. It prompts for every "ask me" variable. Fill from §1 plus:
    - `FIRST_SUPERUSER` — your email
@@ -106,7 +106,7 @@ Starter ($7/mo).
 ## §3 Vercel (frontend) — ~5 minutes
 
 1. Vercel dashboard → **Add New → Project** → import this repo.
-2. The one setting that matters: **Root Directory = `cleardues/frontend`**
+2. The one setting that matters: **Root Directory = `frontend`**
    (Framework Preset auto-detects Vite from there).
 3. Environment variable: `VITE_API_URL` = `https://api.cleardues.site`
    (until DNS is live: `https://cleardues-api.onrender.com`). This is baked
@@ -159,7 +159,7 @@ OAuth is your first working login path:
 ## §6 Backups (do this before inviting anyone) — ~5 minutes
 
 Neon's free plan only keeps a ~6-hour restore history — the nightly
-[db-backup workflow](../.github/workflows/db-backup.yml) is your real backup.
+[db-backup workflow](./.github/workflows/db-backup.yml) is your real backup.
 
 1. GitHub repo → Settings → Secrets and variables → Actions → **New secret**:
    `NEON_DIRECT_URL` = the full direct connection string from §1.
@@ -211,6 +211,6 @@ Neon's free plan only keeps a ~6-hour restore history — the nightly
 | API works, browser console shows CORS errors | `BACKEND_CORS_ORIGINS` doesn't contain the exact origin shown in the error (scheme + host, no trailing slash) |
 | `password authentication failed` in Render logs | Neon password pasted with whitespace, or you used the pooled host — use the direct host, no `-pooler` |
 | First request after idle takes ~1 min | Render free-tier cold start (§8), not a bug |
-| 404 when refreshing a sub-route on Vercel | `vercel.json` rewrite missing — confirm Root Directory is `cleardues/frontend` so the file is picked up |
+| 404 when refreshing a sub-route on Vercel | `vercel.json` rewrite missing — confirm Root Directory is `frontend` so the file is picked up |
 | Google login redirects to an error | Redirect URI in the Google console must match `OAUTH_REDIRECT_BASE_URL` + `/api/v1/auth/oauth/google/callback` **exactly** |
 | `pg_dump: server version mismatch` in backup action | Neon project wasn't created as Postgres 17 (§1) — recreate or bump the client in the workflow |

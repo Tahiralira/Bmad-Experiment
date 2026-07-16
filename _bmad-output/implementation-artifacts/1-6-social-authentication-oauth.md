@@ -538,10 +538,10 @@ docker compose exec backend pytest -v tests/
 open "http://localhost:8000/api/v1/auth/oauth/google/login"
 
 # Frontend build
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Run frontend type checking
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ### Previous Story Intelligence
@@ -622,11 +622,11 @@ Sources:
 - [Source: prd.md - FR1 (Walled Garden)](../_bmad-output/planning-artifacts/prd.md)
 - [Source: Story 1.5 - User Login with JWT](./1-5-user-login-with-jwt-authentication.md)
 - [Source: Story 1.4 - Magic Link Registration](./1-4-user-registration-with-magic-link.md)
-- [Existing Code: features/auth/router.py](../../cleardues/backend/app/features/auth/router.py)
-- [Existing Code: features/auth/service.py](../../cleardues/backend/app/features/auth/service.py)
-- [Existing Code: features/auth/models.py](../../cleardues/backend/app/features/auth/models.py)
-- [Existing Code: core/config.py](../../cleardues/backend/app/core/config.py)
-- [Existing Code: core/security.py](../../cleardues/backend/app/core/security.py)
+- [Existing Code: features/auth/router.py](../../backend/app/features/auth/router.py)
+- [Existing Code: features/auth/service.py](../../backend/app/features/auth/service.py)
+- [Existing Code: features/auth/models.py](../../backend/app/features/auth/models.py)
+- [Existing Code: core/config.py](../../backend/app/core/config.py)
+- [Existing Code: core/security.py](../../backend/app/core/security.py)
 
 ### API Contract
 

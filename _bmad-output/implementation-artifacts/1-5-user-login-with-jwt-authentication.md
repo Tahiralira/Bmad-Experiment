@@ -400,10 +400,10 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 open http://localhost:1080
 
 # Frontend build (catches import errors)
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Run frontend type checking
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ### Previous Story Intelligence
@@ -469,10 +469,10 @@ Sources:
 - [Source: architecture.md - Authentication & Security](../_bmad-output/planning-artifacts/architecture.md#authentication--security)
 - [Source: prd.md - FR1 (Walled Garden)](../_bmad-output/planning-artifacts/prd.md#user--group-management)
 - [Source: Story 1.4 - Magic Link Registration](./1-4-user-registration-with-magic-link.md)
-- [Existing Code: features/auth/router.py](../../cleardues/backend/app/features/auth/router.py)
-- [Existing Code: features/auth/service.py](../../cleardues/backend/app/features/auth/service.py)
-- [Existing Code: core/config.py](../../cleardues/backend/app/core/config.py)
-- [Existing Code: core/security.py](../../cleardues/backend/app/core/security.py)
+- [Existing Code: features/auth/router.py](../../backend/app/features/auth/router.py)
+- [Existing Code: features/auth/service.py](../../backend/app/features/auth/service.py)
+- [Existing Code: core/config.py](../../backend/app/core/config.py)
+- [Existing Code: core/security.py](../../backend/app/core/security.py)
 
 ### API Contract
 

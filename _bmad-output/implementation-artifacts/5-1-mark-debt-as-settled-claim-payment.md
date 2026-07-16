@@ -24,7 +24,7 @@ So that I can notify the expense creator that payment is complete.
 ## Tasks / Subtasks
 
 - [x] Task 1: Create SettlementClaim database model and migration (AC: #1)
-  - [x] 1.1 Add `SettlementClaimStatus` enum to `cleardues/backend/app/features/expenses/models.py` with values: `PENDING = "pending"`, `CONFIRMED = "confirmed"`, `REJECTED = "rejected"`
+  - [x] 1.1 Add `SettlementClaimStatus` enum to `backend/app/features/expenses/models.py` with values: `PENDING = "pending"`, `CONFIRMED = "confirmed"`, `REJECTED = "rejected"`
   - [x] 1.2 Add `SettlementClaim` SQLModel table model with fields: `id` (UUID PK), `expense_split_id` (UUID FK to `expense_split.id`), `claimant_user_id` (UUID FK to `user.id`), `amount` (Decimal 10,2), `status` (SettlementClaimStatus, default PENDING), `claimed_at` (datetime), `confirmed_at` (datetime nullable), `rejected_at` (datetime nullable), `created_at` (datetime)
   - [x] 1.3 Add unique constraint on `expense_split_id` to prevent duplicate claims (one claim per split)
   - [x] 1.4 Add relationship from `SettlementClaim` to `ExpenseSplit` and `User`
@@ -34,14 +34,14 @@ So that I can notify the expense creator that payment is complete.
   - [x] 1.8 Verify migration: `docker compose exec backend alembic upgrade head` (deferred - requires Docker)
 
 - [x] Task 2: Implement backend settle endpoint and service logic (AC: #1, #3, #4, #5, #6)
-  - [x] 2.1 Add `settle_expense_split()` function to `cleardues/backend/app/features/expenses/service.py`:
+  - [x] 2.1 Add `settle_expense_split()` function to `backend/app/features/expenses/service.py`:
     - Validate expense status is CONFIRMED (not draft/pending_confirmation/settled)
     - Validate current user has a split in the expense (403 if not involved)
     - Validate no existing settlement claim for this split (409 if duplicate)
     - Create SettlementClaim with status PENDING, set claimed_at = datetime.now(timezone.utc)
     - Record audit log with action_type "settled" and changes_json: `{"after": {"amount": split.amount_owed, "status": "pending"}}`
     - Return SettlementClaimPublic
-  - [x] 2.2 Add `POST /api/v1/expenses/{expense_id}/settle` endpoint to `cleardues/backend/app/features/expenses/router.py`:
+  - [x] 2.2 Add `POST /api/v1/expenses/{expense_id}/settle` endpoint to `backend/app/features/expenses/router.py`:
     - Requires authenticated user (get_current_user_id dependency)
     - Calls `settle_expense_split(session, expense_id, current_user_id)`
     - Returns 201 Created with SettlementClaimPublic
@@ -50,9 +50,9 @@ So that I can notify the expense creator that payment is complete.
   - [x] 2.4 Add `GET /api/v1/expenses/pending-settlements` endpoint for the payer's view of pending claims
 
 - [x] Task 3: Add frontend types and API hooks (AC: #1, #3)
-  - [x] 3.1 Add `SettlementClaimStatus` type and `SettlementClaim` interface to `cleardues/frontend/src/features/expenses/types.ts`
+  - [x] 3.1 Add `SettlementClaimStatus` type and `SettlementClaim` interface to `frontend/src/features/expenses/types.ts`
   - [x] 3.2 Add `SettlementClaimPublic` interface matching backend schema
-  - [x] 3.3 Add `useSettleExpense()` mutation hook to `cleardues/frontend/src/features/expenses/api/expenses.ts`:
+  - [x] 3.3 Add `useSettleExpense()` mutation hook to `frontend/src/features/expenses/api/expenses.ts`:
     - Calls `POST /api/v1/expenses/{expense_id}/settle`
     - On success: invalidate `["expenses"]`, `["dashboard"]`, `["audit-log"]`, `["group-audit-log"]`, `["pending-settlements"]`
     - On error: toast with error message
@@ -68,14 +68,14 @@ So that I can notify the expense creator that payment is complete.
   - [x] 4.7 Display "Awaiting confirmation from [Owner Name]" state after successful claim
 
 - [x] Task 5: Add "Pending Settlement Confirmation" list view (AC: #2)
-  - [x] 5.1 Create `cleardues/frontend/src/features/expenses/components/PendingSettlementsList.tsx` component
+  - [x] 5.1 Create `frontend/src/features/expenses/components/PendingSettlementsList.tsx` component
   - [x] 5.2 Display expenses where user has pending settlement claims with: expense description, amount owed, claim date, owner name
   - [x] 5.3 Show status badge: "Pending" (amber/warning color)
   - [x] 5.4 Integrate into appropriate dashboard section or navigation tab
   - [x] 5.5 Add empty state message: "No pending settlements"
 
 - [x] Task 6: Update activity feed to display settlement actions (AC: #7)
-  - [x] 6.1 Add "settled" action type formatting to `cleardues/frontend/src/features/expenses/utils/activityFormatters.ts`
+  - [x] 6.1 Add "settled" action type formatting to `frontend/src/features/expenses/utils/activityFormatters.ts`
   - [x] 6.2 Format: "Sam marked Rs 30 as settled" for payer action
   - [x] 6.3 Verify ActivityFeedItem displays settled action correctly with appropriate icon
 
@@ -83,7 +83,7 @@ So that I can notify the expense creator that payment is complete.
   - [x] 7.1 Backend: Write tests for `settle_expense_split()` service function covering: successful claim, duplicate claim (409), not involved (403), wrong status (400), not found (404)
   - [x] 7.2 Backend: Write tests for `GET /api/v1/expenses/pending-settlements` endpoint
   - [x] 7.3 Backend: Verify audit log entry created on settlement claim
-  - [x] 7.4 Frontend: Run `cd cleardues/frontend && npm run typecheck && npm run build` - no errors
+  - [x] 7.4 Frontend: Run `cd frontend && npm run typecheck && npm run build` - no errors
   - [x] 7.5 Backend: Run `docker compose exec backend pytest` - tests written; all test suite fails due to pre-existing `GroupSettings | None` SQLAlchemy relationship error in ExpenseGroup model (NOT from Story 5.1). Backend server runs correctly, models/service/router verified programmatically.
   - [ ] 7.6 Manual: Verify swipe-to-settle UX works on mobile viewport
   - [ ] 7.7 Manual: Verify optimistic update and undo toast work correctly
@@ -97,19 +97,19 @@ The following infrastructure is **DONE and working** from previous stories:
 
 | Component | File | Status | Notes |
 |-----------|------|--------|-------|
-| Expense model (with `settled` status) | `cleardues/backend/app/features/expenses/models.py:14-20` | Done | `ExpenseStatus.SETTLED = "settled"` already exists |
-| ExpenseSplit model (with `settled` status) | `cleardues/backend/app/features/expenses/models.py:23-28` | Done | `SplitStatus.SETTLED = "settled"` already exists |
-| AuditLog model + `record_audit()` | `cleardues/backend/app/features/expenses/service.py` | Done | Non-blocking, action_type "settled" already in enum |
-| `AuditActionType.SETTLED` | `cleardues/backend/app/features/expenses/models.py:180` | Done | Enum value already exists |
-| Expense confirmation workflow | `cleardues/backend/app/features/expenses/service.py:550+` | Done | Expenses reach "confirmed" status via confirm flow |
-| Expense router (7 endpoints) | `cleardues/backend/app/features/expenses/router.py` | Done | Add new endpoint alongside existing ones |
-| Frontend expense types | `cleardues/frontend/src/features/expenses/types.ts` | Done | Extend with settlement types |
-| Frontend API hooks | `cleardues/frontend/src/features/expenses/api/expenses.ts` | Done | Follow existing mutation/query patterns |
-| Activity feed + formatters | `cleardues/frontend/src/features/expenses/utils/activityFormatters.ts` | Done | Extend with settlement formatting |
-| `formatRelativeTime()` utility | `cleardues/frontend/src/features/expenses/utils/timeFormat.ts` | Done | Reuse for settlement timestamps |
+| Expense model (with `settled` status) | `backend/app/features/expenses/models.py:14-20` | Done | `ExpenseStatus.SETTLED = "settled"` already exists |
+| ExpenseSplit model (with `settled` status) | `backend/app/features/expenses/models.py:23-28` | Done | `SplitStatus.SETTLED = "settled"` already exists |
+| AuditLog model + `record_audit()` | `backend/app/features/expenses/service.py` | Done | Non-blocking, action_type "settled" already in enum |
+| `AuditActionType.SETTLED` | `backend/app/features/expenses/models.py:180` | Done | Enum value already exists |
+| Expense confirmation workflow | `backend/app/features/expenses/service.py:550+` | Done | Expenses reach "confirmed" status via confirm flow |
+| Expense router (7 endpoints) | `backend/app/features/expenses/router.py` | Done | Add new endpoint alongside existing ones |
+| Frontend expense types | `frontend/src/features/expenses/types.ts` | Done | Extend with settlement types |
+| Frontend API hooks | `frontend/src/features/expenses/api/expenses.ts` | Done | Follow existing mutation/query patterns |
+| Activity feed + formatters | `frontend/src/features/expenses/utils/activityFormatters.ts` | Done | Extend with settlement formatting |
+| `formatRelativeTime()` utility | `frontend/src/features/expenses/utils/timeFormat.ts` | Done | Reuse for settlement timestamps |
 | Toast notifications (sonner) | Already imported in `expenses.ts` | Done | Use `toast()` for success/error |
 | framer-motion | Already installed | Done | Use for swipe animations |
-| SwipeableCard pattern | `cleardues/frontend/src/features/expenses/components/` | Done | Reference pattern from Story 2.5.5 |
+| SwipeableCard pattern | `frontend/src/features/expenses/components/` | Done | Reference pattern from Story 2.5.5 |
 | Design system tokens | Tailwind config | Done | Use surface, border, muted, primary tokens |
 
 ### Data Model Design
@@ -152,7 +152,7 @@ The PRD (FR13) says "User can Mark as Settled (claim payment)" and FR14 says "Ow
 - **Table naming**: `settlement_claim` (singular, matches existing `expense`, `expense_split`, `audit_log` pattern)
 - **Foreign key naming**: `expense_split_id`, `claimant_user_id` (matches `snake_case_singular_id` convention)
 - **State management**: TanStack Query for server state (settlement claims). Do NOT store in Redux.
-- **Feature boundaries**: All settlement code stays in `cleardues/backend/app/features/expenses/` and `cleardues/frontend/src/features/expenses/`. Settlement is tightly coupled to expenses — no separate feature module.
+- **Feature boundaries**: All settlement code stays in `backend/app/features/expenses/` and `frontend/src/features/expenses/`. Settlement is tightly coupled to expenses — no separate feature module.
 - **Service layer**: ALL database access goes through service functions. Router handlers call service functions, never direct DB queries.
 - **TypeScript naming**: `camelCase` for variables/functions, `PascalCase` for components/types/interfaces.
 - **Query invalidation**: After settlement mutation, invalidate: `["expenses"]`, `["dashboard"]`, `["pending-settlements"]`, `["audit-log"]`, `["group-audit-log"]`
@@ -296,19 +296,19 @@ Story 5.2 will add the **owner confirmation** of settlement claims. When buildin
 - No new files for model (add to existing `models.py`)
 - No new files for service (add to existing `service.py`)
 - No new files for router (add to existing `router.py`)
-- `cleardues/frontend/src/features/expenses/components/PendingSettlementsList.tsx`
-- Potentially: `cleardues/frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx` (if separate from ExpensePreviewCard)
+- `frontend/src/features/expenses/components/PendingSettlementsList.tsx`
+- Potentially: `frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx` (if separate from ExpensePreviewCard)
 
 **Files to modify:**
-- `cleardues/backend/app/features/expenses/models.py` — Add SettlementClaim model + schemas
-- `cleardues/backend/app/features/expenses/service.py` — Add `settle_expense_split()` + `get_pending_settlements_for_user()`
-- `cleardues/backend/app/features/expenses/router.py` — Add 2 new endpoints
-- `cleardues/frontend/src/features/expenses/types.ts` — Add settlement types
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Add `useSettleExpense()` + `usePendingSettlements()` hooks
-- `cleardues/frontend/src/features/expenses/utils/activityFormatters.ts` — Add "settled" formatting
+- `backend/app/features/expenses/models.py` — Add SettlementClaim model + schemas
+- `backend/app/features/expenses/service.py` — Add `settle_expense_split()` + `get_pending_settlements_for_user()`
+- `backend/app/features/expenses/router.py` — Add 2 new endpoints
+- `frontend/src/features/expenses/types.ts` — Add settlement types
+- `frontend/src/features/expenses/api/expenses.ts` — Add `useSettleExpense()` + `usePendingSettlements()` hooks
+- `frontend/src/features/expenses/utils/activityFormatters.ts` — Add "settled" formatting
 
 **Alembic migration:**
-- New file in `cleardues/backend/app/alembic/versions/` — `add_settlement_claim_table.py`
+- New file in `backend/app/alembic/versions/` — `add_settlement_claim_table.py`
 
 ### References
 
@@ -318,12 +318,12 @@ Story 5.2 will add the **owner confirmation** of settlement claims. When buildin
 - [Architecture: API patterns](_bmad-output/planning-artifacts/architecture.md - lines 188-198)
 - [Architecture: Project structure](_bmad-output/planning-artifacts/architecture.md - lines 260-297)
 - [Architecture: Event system](_bmad-output/planning-artifacts/architecture.md - lines 209-226)
-- [Expense model](cleardues/backend/app/features/expenses/models.py)
-- [Expense service - confirm pattern](cleardues/backend/app/features/expenses/service.py)
-- [Expense router](cleardues/backend/app/features/expenses/router.py)
-- [Frontend types](cleardues/frontend/src/features/expenses/types.ts)
-- [Frontend API hooks](cleardues/frontend/src/features/expenses/api/expenses.ts)
-- [Activity formatters](cleardues/frontend/src/features/expenses/utils/activityFormatters.ts)
+- [Expense model](backend/app/features/expenses/models.py)
+- [Expense service - confirm pattern](backend/app/features/expenses/service.py)
+- [Expense router](backend/app/features/expenses/router.py)
+- [Frontend types](frontend/src/features/expenses/types.ts)
+- [Frontend API hooks](frontend/src/features/expenses/api/expenses.ts)
+- [Activity formatters](frontend/src/features/expenses/utils/activityFormatters.ts)
 - [Previous Story 4.2](4-2-expense-confirmation-workflow.md)
 - [Previous Story 4.5](4-5-activity-feed-display.md)
 - [Solution patterns](solution-patterns.yaml)
@@ -358,21 +358,21 @@ Claude Opus 4.8 (glm-5.1)
 ### File List
 
 **New files:**
-- `cleardues/backend/app/alembic/versions/a6b7c8d9e0f1_add_settlement_claim_table.py`
-- `cleardues/backend/tests/api/routes/test_settlement.py`
-- `cleardues/frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx`
-- `cleardues/frontend/src/features/expenses/components/PendingSettlementsList.tsx`
+- `backend/app/alembic/versions/a6b7c8d9e0f1_add_settlement_claim_table.py`
+- `backend/tests/api/routes/test_settlement.py`
+- `frontend/src/features/expenses/components/ConfirmedExpenseCard.tsx`
+- `frontend/src/features/expenses/components/PendingSettlementsList.tsx`
 
 **Modified files:**
-- `cleardues/backend/app/features/expenses/models.py` — Added SettlementClaimStatus enum, SettlementClaim table model, schemas
-- `cleardues/backend/app/features/expenses/service.py` — Added settle_expense_split(), get_pending_settlements_for_user()
-- `cleardues/backend/app/features/expenses/router.py` — Added POST /settle and GET /pending-settlements endpoints
-- `cleardues/backend/tests/conftest.py` — Added SettlementClaim to teardown order
-- `cleardues/backend/app/api/main.py` — Fixed pre-existing bug: `ai_parser_router.router` → `ai_parser_router` (line 19)
-- `cleardues/frontend/src/features/expenses/types.ts` — Added settlement types
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` — Added useSettleExpense() and usePendingSettlements() hooks
-- `cleardues/frontend/src/features/expenses/utils/activityFormatters.ts` — Updated formatSettledEntry() message format
-- `cleardues/frontend/src/features/expenses/components/index.ts` — Added exports for new components
+- `backend/app/features/expenses/models.py` — Added SettlementClaimStatus enum, SettlementClaim table model, schemas
+- `backend/app/features/expenses/service.py` — Added settle_expense_split(), get_pending_settlements_for_user()
+- `backend/app/features/expenses/router.py` — Added POST /settle and GET /pending-settlements endpoints
+- `backend/tests/conftest.py` — Added SettlementClaim to teardown order
+- `backend/app/api/main.py` — Fixed pre-existing bug: `ai_parser_router.router` → `ai_parser_router` (line 19)
+- `frontend/src/features/expenses/types.ts` — Added settlement types
+- `frontend/src/features/expenses/api/expenses.ts` — Added useSettleExpense() and usePendingSettlements() hooks
+- `frontend/src/features/expenses/utils/activityFormatters.ts` — Updated formatSettledEntry() message format
+- `frontend/src/features/expenses/components/index.ts` — Added exports for new components
 
 ## Change Log
 

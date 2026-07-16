@@ -15,7 +15,7 @@ Story 3.7 successfully implements percentage-based expense splitting, allowing u
 ## Tasks Completed
 
 ### ✅ Task 1: Backend Percentage Split Calculation
-**File:** [service.py](../../cleardues/backend/app/features/expenses/service.py)
+**File:** [service.py](../../backend/app/features/expenses/service.py)
 
 - **Created** `calculate_percentage_split()` function
 - **Accepts:** `total_amount: Decimal`, `splits: list[dict]` with `user_id` and `percentage`
@@ -42,9 +42,9 @@ else:
 ```
 
 ### ✅ Task 2: Backend Split API Enhancement
-**File:** [router.py](../../cleardues/backend/app/features/expenses/router.py)
+**File:** [router.py](../../backend/app/features/expenses/router.py)
 
-- **Added** `PercentageSplitItem` and `PercentageSplitRequest` schemas to [models.py](../../cleardues/backend/app/features/expenses/models.py)
+- **Added** `PercentageSplitItem` and `PercentageSplitRequest` schemas to [models.py](../../backend/app/features/expenses/models.py)
 - **Extended** `PUT /api/v1/expenses/{expense_id}/split` endpoint to handle percentage split
 - **Validates:**
   - Expense exists
@@ -68,14 +68,14 @@ if percentage < 0 or percentage > 100:
 ```
 
 ### ✅ Task 3: Frontend SplitPicker Update
-**File:** [types.ts](../../cleardues/frontend/src/features/expenses/types.ts)
+**File:** [types.ts](../../frontend/src/features/expenses/types.ts)
 
 - **Enabled** Percentage split option (removed `disabled: true` and `disabledReason`)
 - **Added** `PercentageSplitItem` and `PercentageSplitRequest` interfaces
 - **Split card now clickable** with visual feedback
 
 ### ✅ Task 4: Frontend Percentage Split Inputs
-**File:** [PercentageSplitInputs.tsx](../../cleardues/frontend/src/features/expenses/components/PercentageSplitInputs.tsx) (NEW)
+**File:** [PercentageSplitInputs.tsx](../../frontend/src/features/expenses/components/PercentageSplitInputs.tsx) (NEW)
 
 - **Created** new component following pattern from `UnequalSplitInputs.tsx`
 - **Features:**
@@ -100,7 +100,7 @@ if percentage < 0 or percentage > 100:
 ```
 
 ### ✅ Task 5: Frontend Real-Time Calculation
-**File:** [PercentageSplitInputs.tsx](../../cleardues/frontend/src/features/expenses/components/PercentageSplitInputs.tsx)
+**File:** [PercentageSplitInputs.tsx](../../frontend/src/features/expenses/components/PercentageSplitInputs.tsx)
 
 - **Calculates** amounts in real-time: `(totalAmount * percentage) / 100`
 - **Displays** calculated amounts using `BalanceDisplay` component
@@ -108,7 +108,7 @@ if percentage < 0 or percentage > 100:
 - **Shows** validation messages based on total percentage
 
 ### ✅ Task 6: Frontend Split State Management
-**File:** [useSplitState.ts](../../cleardues/frontend/src/features/expenses/hooks/useSplitState.ts)
+**File:** [useSplitState.ts](../../frontend/src/features/expenses/hooks/useSplitState.ts)
 
 - **Extended** hook to support percentage split
 - **Added** `percentages` state: `Map<string, number>` (user_id → percentage)
@@ -144,8 +144,8 @@ if (splitType === "percentage") {
 
 ### ✅ Task 7: Frontend Validation & Error Display
 **Files:**
-- [useSplitState.ts](../../cleardues/frontend/src/features/expenses/hooks/useSplitState.ts) (validation logic)
-- [PercentageSplitInputs.tsx](../../cleardues/frontend/src/features/expenses/components/PercentageSplitInputs.tsx) (error display)
+- [useSplitState.ts](../../frontend/src/features/expenses/hooks/useSplitState.ts) (validation logic)
+- [PercentageSplitInputs.tsx](../../frontend/src/features/expenses/components/PercentageSplitInputs.tsx) (error display)
 
 - **Validates** percentages sum to 100 in `useSplitState` hook
 - **Shows** error message: "Split percentages (X%) must equal 100%"
@@ -154,7 +154,7 @@ if (splitType === "percentage") {
 - **Shows** "Allocate X% more" or "Over-allocated by X%" messages
 
 ### ✅ Task 8: Frontend Split Mutation Enhancement
-**File:** [expenses.ts](../../cleardues/frontend/src/features/expenses/api/expenses.ts)
+**File:** [expenses.ts](../../frontend/src/features/expenses/api/expenses.ts)
 
 - **Updated** `updateExpenseSplit()` function to accept `PercentageSplitRequest`
 - **Updated** `useUpdateExpenseSplit()` mutation to handle percentage split type
@@ -163,7 +163,7 @@ if (splitType === "percentage") {
 - **Shows** error toast on failure
 
 ### ✅ Task 9: Frontend Integration with EditableExpensePreview
-**File:** [EditableExpensePreview.tsx](../../cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx)
+**File:** [EditableExpensePreview.tsx](../../frontend/src/features/expenses/components/EditableExpensePreview.tsx)
 
 - **Added** import for `PercentageSplitInputs` component
 - **Extended** `useSplitState` hook usage to include `percentages` and `setPercentage`
@@ -184,7 +184,7 @@ if (splitType === "percentage") {
 ```
 
 ### ✅ Task 10: Backend Testing
-**File:** [test_split_service.py](../../cleardues/backend/tests/features/expenses/test_split_service.py)
+**File:** [test_split_service.py](../../backend/tests/features/expenses/test_split_service.py)
 
 - **Created** `TestCalculatePercentageSplit` test class with 8 test methods:
   1. `test_percentage_split_exact_100` - Validates exact 100% split
@@ -214,7 +214,7 @@ if (splitType === "percentage") {
 - Test switch from Equal to Percentage: percentages pre-populate
 
 ### ✅ Additional Component Created
-**File:** [progress.tsx](../../cleardues/frontend/src/components/ui/progress.tsx) (NEW)
+**File:** [progress.tsx](../../frontend/src/components/ui/progress.tsx) (NEW)
 
 - **Created** shadcn/ui-style `Progress` component
 - **Accepts:** `value` (0-100) and `className` props
@@ -226,18 +226,18 @@ if (splitType === "percentage") {
 ## Files Modified/Created
 
 ### Backend (4 files)
-1. ✅ `cleardues/backend/app/features/expenses/service.py` - Added `calculate_percentage_split()`
-2. ✅ `cleardues/backend/app/features/expenses/models.py` - Added percentage split schemas
-3. ✅ `cleardues/backend/app/features/expenses/router.py` - Added percentage split handling
-4. ✅ `cleardues/backend/tests/features/expenses/test_split_service.py` - Added 8 test methods
+1. ✅ `backend/app/features/expenses/service.py` - Added `calculate_percentage_split()`
+2. ✅ `backend/app/features/expenses/models.py` - Added percentage split schemas
+3. ✅ `backend/app/features/expenses/router.py` - Added percentage split handling
+4. ✅ `backend/tests/features/expenses/test_split_service.py` - Added 8 test methods
 
 ### Frontend (7 files)
-1. ✅ `cleardues/frontend/src/features/expenses/types.ts` - Enabled percentage split, added types
-2. ✅ `cleardues/frontend/src/features/expenses/hooks/useSplitState.ts` - Extended for percentage support
-3. ✅ `cleardues/frontend/src/features/expenses/components/PercentageSplitInputs.tsx` - NEW component
-4. ✅ `cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx` - Integrated percentage split
-5. ✅ `cleardues/frontend/src/features/expenses/api/expenses.ts` - Updated mutation for percentage split
-6. ✅ `cleardues/frontend/src/components/ui/progress.tsx` - NEW Progress component
+1. ✅ `frontend/src/features/expenses/types.ts` - Enabled percentage split, added types
+2. ✅ `frontend/src/features/expenses/hooks/useSplitState.ts` - Extended for percentage support
+3. ✅ `frontend/src/features/expenses/components/PercentageSplitInputs.tsx` - NEW component
+4. ✅ `frontend/src/features/expenses/components/EditableExpensePreview.tsx` - Integrated percentage split
+5. ✅ `frontend/src/features/expenses/api/expenses.ts` - Updated mutation for percentage split
+6. ✅ `frontend/src/components/ui/progress.tsx` - NEW Progress component
 7. ⏸️ Frontend automated tests - Pending Docker availability
 
 ---
@@ -267,7 +267,7 @@ if (splitType === "percentage") {
 ## Testing Evidence
 
 ### Backend Tests (Written, Execution Pending Docker)
-**Test File:** [test_split_service.py](../../cleardues/backend/tests/features/expenses/test_split_service.py)
+**Test File:** [test_split_service.py](../../backend/tests/features/expenses/test_split_service.py)
 
 **Test Coverage:**
 - ✅ Exact 100% split validation
@@ -345,7 +345,7 @@ if (splitType === "percentage") {
 3. **After Code Review:** Fix any issues found by code review
 4. **When Docker Available:**
    - Execute backend tests: `docker compose exec backend pytest tests/features/expenses/test_split_service.py::TestCalculatePercentageSplit -v`
-   - Execute frontend type check: `cd cleardues/frontend && npm run typecheck`
+   - Execute frontend type check: `cd frontend && npm run typecheck`
    - Perform manual end-to-end testing in browser
    - Run full test suite: `docker compose exec backend pytest -v`
 

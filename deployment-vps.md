@@ -23,8 +23,8 @@ it publishes Postgres/Adminer and runs Traefik with `--api.insecure`.
    SSH keys only.
 2. DNS A records → VPS IP: `api.<domain>`, `dashboard.<domain>`,
    `traefik.<domain>`.
-3. Clone the repo on the box (after the repo extraction below, this is the
-   ClearDues repo; until then, the experiment repo — work in `cleardues/`).
+3. Clone the repo on the box (the app lives at the repo root since the WS9.6
+   flattening — compose files, backend/ and frontend/ are all top-level).
 4. Traefik bootstrap (once per box):
 
    ```bash
@@ -139,15 +139,14 @@ docker compose -f docker-compose.yml exec db psql -U postgres -d postgres -c \
    recreate). It sat in plaintext in `.git/config` and printed in tool logs.
 2. **Repoint the remote without the token** (Git Credential Manager then
    handles auth): `git remote set-url origin https://github.com/Tahiralira/Bmad-Experiment.git`
-3. **Extract `cleardues/` to its own repository** (S6-M4 — do before the first
-   real deploy; drilled successfully in WS9, 55 commits preserved):
+3. **Extract ClearDues to its own repository** (S6-M4 — optional since the
+   WS9.6 flattening put the app at the repo root; a subtree split was drilled
+   successfully in WS9 against the old `cleardues/` prefix, 55 commits
+   preserved). Today the extraction is just pushing this repo to a new remote —
+   optionally dropping the BMAD artifacts first:
 
    ```bash
-   git subtree split --prefix=cleardues -b cleardues-extract
-   mkdir ../cleardues && cd ../cleardues && git init -b main
-   git pull ../Bmad-Experiment cleardues-extract
-   # move CI in: copy .github/workflows/ci.yml from the old repo root and
-   # delete its two `working-directory: cleardues/...` prefixes (paths become
-   # backend/ and frontend/), and the cache-dependency-path prefix.
-   git remote add origin <new-empty-github-repo-url> && git push -u origin main
+   git remote add cleardues <new-empty-github-repo-url>
+   git push -u cleardues main
+   # optional slimming afterwards: git rm -r _bmad-output && commit
    ```

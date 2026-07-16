@@ -71,7 +71,7 @@
 **Command:**
 ```bash
 # Find all console.log statements
-grep -r "console.log" cleardues/frontend/src --include="*.ts" --include="*.tsx"
+grep -r "console.log" frontend/src --include="*.ts" --include="*.tsx"
 ```
 
 ---
@@ -245,8 +245,8 @@ cp docker-compose.yml.backup docker-compose.yml
 4. Configure coverage reporting
 
 **Files:**
-- `cleardues/backend/pyproject.toml` (pytest config)
-- `cleardues/backend/tests/conftest.py` (fixtures)
+- `backend/pyproject.toml` (pytest config)
+- `backend/tests/conftest.py` (fixtures)
 
 **Step 2: CI Pipeline Setup (Dana) - 2 hours**
 1. Configure GitHub Actions workflow for CI
@@ -263,9 +263,9 @@ cp docker-compose.yml.backup docker-compose.yml
 4. Ensure all tests pass
 
 **Files:**
-- `cleardues/backend/tests/test_expenses.py`
-- `cleardues/backend/tests/test_ai_parsing.py`
-- `cleardues/backend/tests/test_split_logic.py`
+- `backend/tests/test_expenses.py`
+- `backend/tests/test_ai_parsing.py`
+- `backend/tests/test_split_logic.py`
 
 **Step 4: Run Tests and Verify (Charlie) - 1 hour**
 1. Execute full test suite
@@ -276,7 +276,7 @@ cp docker-compose.yml.backup docker-compose.yml
 **Commands:**
 ```bash
 # Run backend tests
-cd cleardues/backend
+cd backend
 docker compose exec backend pytest -v --cov=app --cov-report=html
 
 # Run specific test file
@@ -301,8 +301,8 @@ docker compose exec backend pytest tests/test_expenses.py -v
 4. Test navigation flow end-to-end
 
 **File to investigate:**
-- `cleardues/frontend/src/features/groups/components/GroupCard.tsx` (or similar)
-- `cleardues/frontend/src/router/index.tsx` (routing configuration)
+- `frontend/src/features/groups/components/GroupCard.tsx` (or similar)
+- `frontend/src/router/index.tsx` (routing configuration)
 
 ---
 

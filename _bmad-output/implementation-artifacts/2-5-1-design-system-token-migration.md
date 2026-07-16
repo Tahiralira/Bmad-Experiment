@@ -464,13 +464,13 @@ feat: Complete Story 2.5.1 - Design system token migration
 
 ```bash
 # Frontend type check
-cd cleardues/frontend && npm run typecheck
+cd frontend && npm run typecheck
 
 # Frontend build
-cd cleardues/frontend && npm run build
+cd frontend && npm run build
 
 # Start dev server for visual testing
-cd cleardues/frontend && npm run dev
+cd frontend && npm run dev
 
 # Manual verification checklist:
 # 1. Open http://localhost:5173
@@ -522,8 +522,8 @@ This is Story 1 of 7 in Epic 2.5 (UX Foundation & Design System):
 - [Source: epics.md - Story 2.5.1](../_bmad-output/planning-artifacts/epics.md#story-251-design-system-token-migration)
 - [Source: ux-design-specification.md - Design Tokens](../_bmad-output/planning-artifacts/ux-design-specification.md)
 - [Source: architecture.md - Frontend Stack](../_bmad-output/planning-artifacts/architecture.md)
-- [Existing Code: frontend/src/index.css](../../cleardues/frontend/src/index.css)
-- [Existing Code: components/ui/button.tsx](../../cleardues/frontend/src/components/ui/button.tsx)
+- [Existing Code: frontend/src/index.css](../../frontend/src/index.css)
+- [Existing Code: components/ui/button.tsx](../../frontend/src/components/ui/button.tsx)
 - [Previous Story: 3-1-create-expense-model-and-basic-entry.md](./3-1-create-expense-model-and-basic-entry.md)
 
 ## Dev Agent Record

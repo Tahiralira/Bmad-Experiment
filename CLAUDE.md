@@ -41,8 +41,8 @@ the execution plan (`10-execution-plan.md`) first.
 - **Infra**: local dev = Docker Compose (override adds Adminer/mailcatcher/
   hot-reload); staging/production = **Vercel (SPA) + Render (API) + Neon
   (Postgres)** on free tiers (decided WS9.5, 2026-07-16; guide:
-  `cleardues/deployment.md`; compose-on-VPS kept as fallback in
-  `cleardues/deployment-vps.md`)
+  `deployment.md`; compose-on-VPS kept as fallback in
+  `deployment-vps.md`)
 
 **Planned but NOT yet present** (do not assume these exist): WebSockets, Redis
 Pub/Sub, Celery workers (all arrive with the nudge engine in WS12), PWA service
@@ -62,14 +62,14 @@ worker (WS11).
 ## 🚀 Commands
 
 ```bash
-# Start everything (from cleardues/)
+# Start everything (from the repo root)
 docker compose up -d
 
 # Backend tests — runs against a dedicated <db>_test database (auto-created);
 # refuses to run unless ENVIRONMENT=local
 docker compose exec backend pytest -q
 
-# Frontend checks (from cleardues/frontend/)
+# Frontend checks (from frontend/)
 npm run typecheck && npm run test && npm run build
 
 # Dependency lock must stay in sync (CI enforces this)
@@ -79,9 +79,8 @@ docker compose exec backend uv lock --check
 docker compose exec backend alembic upgrade head
 ```
 
-CI (`.github/workflows/ci.yml` at the **repo root** — GitHub ignores nested
-`.github/` dirs) runs: backend pytest + lock check, frontend typecheck + unit tests
-+ build, on pushes to `main` and all PRs.
+CI (`.github/workflows/ci.yml`) runs: backend pytest + lock check, frontend
+typecheck + unit tests + build, on pushes to `main` and all PRs.
 
 ## ✅ Definition of Done v2 (every story, no exceptions)
 
@@ -158,6 +157,8 @@ naming, or personal preferences unless they cause bugs or maintenance burden.
 | Mapper "failed to locate a name" | Add the feature models module to `app/models.py` imports |
 | `PendingRollbackError` cascade in tests | Already handled by conftest's autouse rollback fixture |
 | jsdom: focus-trap "no tabbable node" | Handled via `tabbableOptions.displayCheck` in test mode |
+| File exists locally but missing in fresh clone/CI | Broad .gitignore pattern — audit with `git ls-files --others --ignored --exclude-standard` (GIT-002) |
+| New test fails against clearly-correct app code | Container runs stale image — only `tests/` is volume-mounted; `docker compose build backend` (DOCKER-006) |
 
 **Full solutions:** `_bmad-output/implementation-artifacts/solution-patterns.yaml`
 

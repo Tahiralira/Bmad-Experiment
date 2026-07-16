@@ -477,8 +477,8 @@ feat: Complete Story 4.1 - Creator-only edit restriction
 - [Source: epics.md - Story 4.1](_bmad-output/planning-artifacts/epics.md#story-41-creator-only-edit-restriction)
 - [Source: architecture.md - API Patterns](_bmad-output/planning-artifacts/architecture.md#api--communication-patterns)
 - [Source: prd.md - FR9](_bmad-output/planning-artifacts/prd.md#transaction-logic--workflow) — "Only the Creator of an expense can edit its details"
-- [Source: models.py](cleardues/backend/app/features/expenses/models.py) — Expense model with `created_by` and `ExpenseStatus`
-- [Source: router.py:91-95](cleardues/backend/app/features/expenses/router.py#L91-L95) — Existing creator check pattern
+- [Source: models.py](backend/app/features/expenses/models.py) — Expense model with `created_by` and `ExpenseStatus`
+- [Source: router.py:91-95](backend/app/features/expenses/router.py#L91-L95) — Existing creator check pattern
 - [Previous Story: 3-8](_bmad-output/implementation-artifacts/3-8-exclude-members-from-expense.md) — Latest code review findings and patterns
 - [Epic 4 Preparation](_bmad-output/implementation-artifacts/epic-4-preparation-action-items.md) — Pre-epic action items
 
@@ -508,12 +508,12 @@ N/A - Implementation proceeded without blockers
 - (none - all changes were modifications)
 
 **Modified:**
-- `cleardues/backend/app/features/expenses/models.py` - Added ExpenseUpdate schema
-- `cleardues/backend/app/features/expenses/service.py` - Added update_expense() function
-- `cleardues/backend/app/features/expenses/router.py` - Added PATCH endpoint + split status guard
-- `cleardues/frontend/src/features/expenses/types.ts` - Added ExpenseUpdate type
-- `cleardues/frontend/src/features/expenses/api/expenses.ts` - Added updateExpense + useUpdateExpense
-- `cleardues/frontend/src/features/expenses/components/EditableExpensePreview.tsx` - Creator/status checks
+- `backend/app/features/expenses/models.py` - Added ExpenseUpdate schema
+- `backend/app/features/expenses/service.py` - Added update_expense() function
+- `backend/app/features/expenses/router.py` - Added PATCH endpoint + split status guard
+- `frontend/src/features/expenses/types.ts` - Added ExpenseUpdate type
+- `frontend/src/features/expenses/api/expenses.ts` - Added updateExpense + useUpdateExpense
+- `frontend/src/features/expenses/components/EditableExpensePreview.tsx` - Creator/status checks
 
 ## Testing Evidence
 
