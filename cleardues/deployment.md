@@ -1,309 +1,148 @@
-# FastAPI Project - Deployment
+# ClearDues Deployment Runbook
 
-You can deploy the project using Docker Compose to a remote server.
+**Decision (WS9, 2026-07-15):** ClearDues deploys as **Docker Compose on a single
+VPS behind Traefik** for the private beta. The former Railway plan and the Docker
+Swarm script are void and deleted (S6-C3). Revisit a managed platform only if the
+WS12 Redis/Celery tier outgrows one box.
 
-This project expects you to have a Traefik proxy handling communication to the outside world and HTTPS certificates.
+Stack: `docker-compose.traefik.yml` (shared Traefik, TLS via Let's Encrypt) +
+`docker-compose.yml` (db, db-backup, pre-migrate-dump, prestart, backend,
+frontend). Local dev additionally layers `docker-compose.override.yml`
+(Adminer, mailcatcher, hot-reload) — **never run the override on a public box**:
+it publishes Postgres/Adminer and runs Traefik with `--api.insecure`.
 
-You can use CI/CD (continuous integration and continuous deployment) systems to deploy automatically, there are already configurations to do it with GitHub Actions.
+## 1. Provision (one-time)
 
-But you have to configure a couple things first. 🤓
+1. VPS: 4 GB RAM / 2 vCPU (Hetzner CX22-class, ~€6/mo), Ubuntu 24.04 LTS.
+   Install Docker Engine + compose plugin; enable unattended security upgrades;
+   SSH keys only.
+2. DNS A records → VPS IP: `api.<domain>`, `dashboard.<domain>`,
+   `traefik.<domain>`.
+3. Clone the repo on the box (after the repo extraction below, this is the
+   ClearDues repo; until then, the experiment repo — work in `cleardues/`).
+4. Traefik bootstrap (once per box):
 
-## Preparation
+   ```bash
+   docker network create traefik-public
+   export USERNAME=admin EMAIL=<you> DOMAIN=<domain>
+   export HASHED_PASSWORD=$(openssl passwd -apr1)   # dashboard basic-auth
+   docker compose -f docker-compose.traefik.yml up -d
+   ```
 
-* Have a remote server ready and available.
-* Configure the DNS records of your domain to point to the IP of the server you just created.
-* Configure a wildcard subdomain for your domain, so that you can have multiple subdomains for different services, e.g. `*.fastapi-project.example.com`. This will be useful for accessing different components, like `dashboard.fastapi-project.example.com`, `api.fastapi-project.example.com`, `traefik.fastapi-project.example.com`, `adminer.fastapi-project.example.com`, etc. And also for `staging`, like `dashboard.staging.fastapi-project.example.com`, `adminer.staging.fastapi-project.example.com`, etc.
-* Install and configure [Docker](https://docs.docker.com/engine/install/) on the remote server (Docker Engine, not Docker Desktop).
+## 2. Secrets checklist (`.env` on the VPS, mode 600, NEVER committed)
 
-## Public Traefik
+Copy `.env.example` and set — generators in parentheses:
 
-We need a Traefik proxy to handle incoming connections and HTTPS certificates.
+| Variable | Notes |
+|----------|-------|
+| `ENVIRONMENT` | `staging` or `production` — gates HSTS, key validation, docs |
+| `DOMAIN`, `FRONTEND_HOST` | your domain; `https://dashboard.<domain>` |
+| `SECRET_KEY` | (`python -c "import secrets; print(secrets.token_urlsafe(32))"`) — signs JWTs; **changing it logs everyone out** |
+| `ENCRYPTION_KEY` | same generator. **WARNING (S5-C1): losing or rotating this permanently bricks every stored user Gemini key** — users must re-enter them. Keep a copy in your password manager, not only in `.env`. |
+| `POSTGRES_PASSWORD` | same generator; only the db/backup/backend containers see it |
+| `FIRST_SUPERUSER`, `FIRST_SUPERUSER_PASSWORD` | bootstrap admin identity |
+| `GOOGLE_CLIENT_ID/SECRET` | Google Cloud Console → OAuth client. Authorized redirect URI: `https://api.<domain>/api/v1/auth/oauth/google/callback`. Set `OAUTH_REDIRECT_BASE_URL=https://api.<domain>` |
+| `GITHUB_CLIENT_ID/SECRET` | GitHub Developer settings; callback as above with `github` |
+| `GEMINI_API_KEY` | hosted AI parsing; empty disables hosted parses (BYOK still works) |
+| `SMTP_*`, `EMAILS_FROM_EMAIL` | transactional email (magic links). SES/Mailgun free tiers fine |
+| `SENTRY_DSN` | error reporting (SDK 2.x, `send_default_pii=False`) |
+| `STACK_NAME`, `DOCKER_IMAGE_*`, `TAG` | e.g. `cleardues`, `cleardues-backend`, `cleardues-frontend`, git SHA for `TAG` |
+| `BACKUP_KEEP_DAYS`, `BACKUP_TIME` | optional; defaults 14 days, 03:00 UTC |
 
-You need to do these next steps only once.
-
-### Traefik Docker Compose
-
-* Create a remote directory to store your Traefik Docker Compose file:
+## 3. Deploy (staging and production are the same procedure, different `.env`)
 
 ```bash
-mkdir -p /root/code/traefik-public/
+git pull
+export TAG=$(git rev-parse --short HEAD)
+docker compose -f docker-compose.yml build
+docker compose -f docker-compose.yml up -d
+curl -fsS https://api.<domain>/api/v1/utils/health-check/   # expect 200 true
 ```
 
-Copy the Traefik Docker Compose file to your server. You could do it by running the command `rsync` in your local terminal:
+Startup order is enforced by compose: db (healthy) → **pre-migrate-dump** (a
+fresh `pg_dump` MUST succeed or the deploy stops) → prestart (`alembic upgrade
+head`) → backend. The frontend is static nginx and starts independently.
+
+## 4. Rollback
+
+Application code (no bad migration): `git checkout <last-good-sha>`, rebuild,
+`up -d` — images are immutable per-TAG, so re-running with the old TAG works too.
+
+Bad migration: every deploy took a dump seconds before migrating.
 
 ```bash
-rsync -a docker-compose.traefik.yml root@your-server.example.com:/root/code/traefik-public/
-```
-
-### Traefik Public Network
-
-This Traefik will expect a Docker "public network" named `traefik-public` to communicate with your stack(s).
-
-This way, there will be a single public Traefik proxy that handles the communication (HTTP and HTTPS) with the outside world, and then behind that, you could have one or more stacks with different domains, even if they are on the same single server.
-
-To create a Docker "public network" named `traefik-public` run the following command in your remote server:
-
-```bash
-docker network create traefik-public
-```
-
-### Traefik Environment Variables
-
-The Traefik Docker Compose file expects some environment variables to be set in your terminal before starting it. You can do it by running the following commands in your remote server.
-
-* Create the username for HTTP Basic Auth, e.g.:
-
-```bash
-export USERNAME=admin
-```
-
-* Create an environment variable with the password for HTTP Basic Auth, e.g.:
-
-```bash
-export PASSWORD=changethis
-```
-
-* Use openssl to generate the "hashed" version of the password for HTTP Basic Auth and store it in an environment variable:
-
-```bash
-export HASHED_PASSWORD=$(openssl passwd -apr1 $PASSWORD)
-```
-
-To verify that the hashed password is correct, you can print it:
-
-```bash
-echo $HASHED_PASSWORD
-```
-
-* Create an environment variable with the domain name for your server, e.g.:
-
-```bash
-export DOMAIN=fastapi-project.example.com
-```
-
-* Create an environment variable with the email for Let's Encrypt, e.g.:
-
-```bash
-export EMAIL=admin@example.com
-```
-
-**Note**: you need to set a different email, an email `@example.com` won't work.
-
-### Start the Traefik Docker Compose
-
-Go to the directory where you copied the Traefik Docker Compose file in your remote server:
-
-```bash
-cd /root/code/traefik-public/
-```
-
-Now with the environment variables set and the `docker-compose.traefik.yml` in place, you can start the Traefik Docker Compose running the following command:
-
-```bash
-docker compose -f docker-compose.traefik.yml up -d
-```
-
-## Deploy the FastAPI Project
-
-Now that you have Traefik in place you can deploy your FastAPI project with Docker Compose.
-
-**Note**: You might want to jump ahead to the section about Continuous Deployment with GitHub Actions.
-
-## Environment Variables
-
-You need to set some environment variables first.
-
-Set the `ENVIRONMENT`, by default `local` (for development), but when deploying to a server you would put something like `staging` or `production`:
-
-```bash
-export ENVIRONMENT=production
-```
-
-Set the `DOMAIN`, by default `localhost` (for development), but when deploying you would use your own domain, for example:
-
-```bash
-export DOMAIN=fastapi-project.example.com
-```
-
-You can set several variables, like:
-
-* `PROJECT_NAME`: The name of the project, used in the API for the docs and emails.
-* `STACK_NAME`: The name of the stack used for Docker Compose labels and project name, this should be different for `staging`, `production`, etc. You could use the same domain replacing dots with dashes, e.g. `fastapi-project-example-com` and `staging-fastapi-project-example-com`.
-* `BACKEND_CORS_ORIGINS`: A list of allowed CORS origins separated by commas.
-* `SECRET_KEY`: The secret key for the FastAPI project, used to sign tokens.
-* `FIRST_SUPERUSER`: The email of the first superuser, this superuser will be the one that can create new users.
-* `FIRST_SUPERUSER_PASSWORD`: The password of the first superuser.
-* `SMTP_HOST`: The SMTP server host to send emails, this would come from your email provider (E.g. Mailgun, Sparkpost, Sendgrid, etc).
-* `SMTP_USER`: The SMTP server user to send emails.
-* `SMTP_PASSWORD`: The SMTP server password to send emails.
-* `EMAILS_FROM_EMAIL`: The email account to send emails from.
-* `POSTGRES_SERVER`: The hostname of the PostgreSQL server. You can leave the default of `db`, provided by the same Docker Compose. You normally wouldn't need to change this unless you are using a third-party provider.
-* `POSTGRES_PORT`: The port of the PostgreSQL server. You can leave the default. You normally wouldn't need to change this unless you are using a third-party provider.
-* `POSTGRES_PASSWORD`: The Postgres password.
-* `POSTGRES_USER`: The Postgres user, you can leave the default.
-* `POSTGRES_DB`: The database name to use for this application. You can leave the default of `app`.
-* `SENTRY_DSN`: The DSN for Sentry, if you are using it.
-
-## GitHub Actions Environment Variables
-
-There are some environment variables only used by GitHub Actions that you can configure:
-
-* `LATEST_CHANGES`: Used by the GitHub Action [latest-changes](https://github.com/tiangolo/latest-changes) to automatically add release notes based on the PRs merged. It's a personal access token, read the docs for details.
-* `SMOKESHOW_AUTH_KEY`: Used to handle and publish the code coverage using [Smokeshow](https://github.com/samuelcolvin/smokeshow), follow their instructions to create a (free) Smokeshow key.
-
-### Generate secret keys
-
-Some environment variables in the `.env` file have a default value of `changethis`.
-
-You have to change them with a secret key, to generate secret keys you can run the following command:
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-Copy the content and use that as password / secret key. And run that again to generate another secure key.
-
-### Deploy with Docker Compose
-
-With the environment variables in place, you can deploy with Docker Compose:
-
-```bash
+docker compose -f docker-compose.yml stop backend prestart
+docker compose -f docker-compose.yml exec db-backup bash -c \
+  'export PGPASSWORD="$POSTGRES_PASSWORD";
+   pg_restore -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists \
+   $(ls -t /backups/pre-migrate-*.dump | head -1)'
+git checkout <last-good-sha> && docker compose -f docker-compose.yml build backend
 docker compose -f docker-compose.yml up -d
 ```
 
-For production you wouldn't want to have the overrides in `docker-compose.override.yml`, that's why we explicitly specify `docker-compose.yml` as the file to use.
+## 5. Backups (S6-C2)
 
-## Continuous Deployment (CD)
+- **Nightly:** the `db-backup` sidecar (postgres:17 + `scripts/db-backup.sh`)
+  dumps to the `app-db-backups` volume at `BACKUP_TIME` UTC, keeps
+  `BACKUP_KEEP_DAYS` days. **Pre-migration:** `pre-migrate-dump` gates every
+  deploy (above).
+- **Offsite (host cron, REQUIRED before real users):** sync the volume to
+  object storage, e.g. Backblaze B2 via rclone:
 
-You can use GitHub Actions to deploy your project automatically. 😎
+  ```bash
+  # /etc/cron.d/cleardues-backup-offsite  (04:00 UTC, after the nightly dump)
+  0 4 * * * root docker run --rm -v cleardues_app-db-backups:/backups:ro \
+    -v /root/.config/rclone:/config/rclone rclone/rclone \
+    sync /backups b2:cleardues-backups
+  ```
 
-You can have multiple environment deployments.
+- **Manual dump any time:**
+  `docker compose -f docker-compose.yml exec db-backup bash /usr/local/bin/db-backup.sh once manual`
 
-There are already two environments configured, `staging` and `production`. 🚀
-
-### Install GitHub Actions Runner
-
-* On your remote server, create a user for your GitHub Actions:
-
-```bash
-sudo adduser github
-```
-
-* Add Docker permissions to the `github` user:
-
-```bash
-sudo usermod -aG docker github
-```
-
-* Temporarily switch to the `github` user:
+### Restore drill (run once per quarter — an untested backup is not a backup)
 
 ```bash
-sudo su - github
+# 1. restore newest dump into a scratch database
+docker compose -f docker-compose.yml exec db-backup bash -c '
+  export PGPASSWORD="$POSTGRES_PASSWORD";
+  latest=$(ls -t /backups/*.dump | head -1); echo "restoring $latest";
+  psql -h db -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS restore_drill" &&
+  psql -h db -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE restore_drill" &&
+  pg_restore -h db -U "$POSTGRES_USER" -d restore_drill "$latest"'
+# 2. sanity: row counts match production expectations
+docker compose -f docker-compose.yml exec db psql -U postgres -d restore_drill -c \
+  'SELECT (SELECT count(*) FROM "user") users, (SELECT count(*) FROM expense) expenses;'
+# 3. clean up
+docker compose -f docker-compose.yml exec db psql -U postgres -d postgres -c \
+  'DROP DATABASE restore_drill;'
 ```
 
-* Go to the `github` user's home directory:
+## 6. Monitoring & logs (S6-H3)
 
-```bash
-cd
-```
+- **Uptime (do this on day one):** free UptimeRobot/Better Stack monitor on
+  `https://api.<domain>/api/v1/utils/health-check/` AND
+  `https://dashboard.<domain>/` — alert to email/phone. A container healthcheck
+  only restarts; the monitor is what tells a human.
+- **Logs:** every service (Traefik included) uses `json-file` capped at
+  10 MB × 3 files — `docker compose logs backend --since 1h` is the tool.
+- **Sentry:** set `SENTRY_DSN`; PII is not sent by default.
 
-* [Install a GitHub Action self-hosted runner following the official guide](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/adding-self-hosted-runners#adding-a-self-hosted-runner-to-a-repository).
+## 7. One-time credential/repo actions (WS9 — owner to-do)
 
-* When asked about labels, add a label for the environment, e.g. `production`. You can also add labels later.
+1. **Rotate the GitHub PAT** that was embedded in the old remote URL
+   (github.com → Settings → Developer settings → Fine-grained tokens → revoke +
+   recreate). It sat in plaintext in `.git/config` and printed in tool logs.
+2. **Repoint the remote without the token** (Git Credential Manager then
+   handles auth): `git remote set-url origin https://github.com/Tahiralira/Bmad-Experiment.git`
+3. **Extract `cleardues/` to its own repository** (S6-M4 — do before the first
+   real deploy; drilled successfully in WS9, 55 commits preserved):
 
-After installing, the guide would tell you to run a command to start the runner. Nevertheless, it would stop once you terminate that process or if your local connection to your server is lost.
-
-To make sure it runs on startup and continues running, you can install it as a service. To do that, exit the `github` user and go back to the `root` user:
-
-```bash
-exit
-```
-
-After you do it, you will be on the previous user again. And you will be on the previous directory, belonging to that user.
-
-Before being able to go the `github` user directory, you need to become the `root` user (you might already be):
-
-```bash
-sudo su
-```
-
-* As the `root` user, go to the `actions-runner` directory inside of the `github` user's home directory:
-
-```bash
-cd /home/github/actions-runner
-```
-
-* Install the self-hosted runner as a service with the user `github`:
-
-```bash
-./svc.sh install github
-```
-
-* Start the service:
-
-```bash
-./svc.sh start
-```
-
-* Check the status of the service:
-
-```bash
-./svc.sh status
-```
-
-You can read more about it in the official guide: [Configuring the self-hosted runner application as a service](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service).
-
-### Set Secrets
-
-On your repository, configure secrets for the environment variables you need, the same ones described above, including `SECRET_KEY`, etc. Follow the [official GitHub guide for setting repository secrets](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions#creating-secrets-for-a-repository).
-
-The current Github Actions workflows expect these secrets:
-
-* `DOMAIN_PRODUCTION`
-* `DOMAIN_STAGING`
-* `STACK_NAME_PRODUCTION`
-* `STACK_NAME_STAGING`
-* `EMAILS_FROM_EMAIL`
-* `FIRST_SUPERUSER`
-* `FIRST_SUPERUSER_PASSWORD`
-* `POSTGRES_PASSWORD`
-* `SECRET_KEY`
-* `LATEST_CHANGES`
-* `SMOKESHOW_AUTH_KEY`
-
-## GitHub Action Deployment Workflows
-
-There are GitHub Action workflows in the `.github/workflows` directory already configured for deploying to the environments (GitHub Actions runners with the labels):
-
-* `staging`: after pushing (or merging) to the branch `master`.
-* `production`: after publishing a release.
-
-If you need to add extra environments you could use those as a starting point.
-
-## URLs
-
-Replace `fastapi-project.example.com` with your domain.
-
-### Main Traefik Dashboard
-
-Traefik UI: `https://traefik.fastapi-project.example.com`
-
-### Production
-
-Frontend: `https://dashboard.fastapi-project.example.com`
-
-Backend API docs: `https://api.fastapi-project.example.com/docs`
-
-Backend API base URL: `https://api.fastapi-project.example.com`
-
-Adminer: `https://adminer.fastapi-project.example.com`
-
-### Staging
-
-Frontend: `https://dashboard.staging.fastapi-project.example.com`
-
-Backend API docs: `https://api.staging.fastapi-project.example.com/docs`
-
-Backend API base URL: `https://api.staging.fastapi-project.example.com`
-
-Adminer: `https://adminer.staging.fastapi-project.example.com`
+   ```bash
+   git subtree split --prefix=cleardues -b cleardues-extract
+   mkdir ../cleardues && cd ../cleardues && git init -b main
+   git pull ../Bmad-Experiment cleardues-extract
+   # move CI in: copy .github/workflows/ci.yml from the old repo root and
+   # delete its two `working-directory: cleardues/...` prefixes (paths become
+   # backend/ and frontend/), and the cache-dependency-path prefix.
+   git remote add origin <new-empty-github-repo-url> && git push -u origin main
+   ```

@@ -1,3 +1,15 @@
+# ClearDues production/staging stack — Docker Compose on a single VPS behind
+# Traefik (decided WS9; see deployment.md for the runbook). Local dev layers
+# docker-compose.override.yml on top automatically.
+
+# Bounded container logs on every service (S6-H3): the default json-file
+# driver is unbounded and fills a VPS disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   db:
@@ -11,36 +23,73 @@ services:
       timeout: 10s
     volumes:
       - app-db-data:/var/lib/postgresql/data/pgdata
-    env_file:
-      - .env
+    # No env_file here (S6-M1): the Postgres container gets ONLY what it
+    # needs — the full .env (SMTP/OAuth/SECRET_KEY) does not belong in it.
     environment:
       - PGDATA=/var/lib/postgresql/data/pgdata
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_DB=${POSTGRES_DB?Variable not set}
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
-  adminer:
-    image: adminer
+  # Adminer was removed from this file (S5-H3): a public DB console has no
+  # place in production. Local dev still gets it via the override file.
+
+  # Nightly pg_dump sidecar (S6-C2). Runs the postgres:17 image so pg_dump
+  # always matches the server; dumps land in the app-db-backups volume.
+  # Offsite sync + restore drill: deployment.md ("Backups").
+  db-backup:
+    image: postgres:17
     restart: always
-    networks:
-      - traefik-public
-      - default
+    entrypoint: ["bash", "/usr/local/bin/db-backup.sh"]
+    command: ["daemon"]
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    volumes:
+      - ./scripts/db-backup.sh:/usr/local/bin/db-backup.sh:ro
+      - app-db-backups:/backups
     environment:
-      - ADMINER_DESIGN=pepa-linha-dark
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=traefik-public
-      - traefik.constraint-label=traefik-public
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-http.rule=Host(`adminer.${DOMAIN?Variable not set}`)
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-http.entrypoints=http
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-http.middlewares=https-redirect
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-https.rule=Host(`adminer.${DOMAIN?Variable not set}`)
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-https.entrypoints=https
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-https.tls=true
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-https.tls.certresolver=le
-      - traefik.http.services.${STACK_NAME?Variable not set}-adminer.loadbalancer.server.port=8080
+      - POSTGRES_SERVER=db
+      - POSTGRES_DB=${POSTGRES_DB?Variable not set}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS-14}
+      - BACKUP_TIME=${BACKUP_TIME-03:00}
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # Pre-migration dump gate (S6-M5): prestart (alembic upgrade head) will not
+  # run unless a fresh backup just succeeded — a bad migration can always be
+  # rolled back to the dump taken seconds before it.
+  pre-migrate-dump:
+    image: postgres:17
+    entrypoint: ["bash", "/usr/local/bin/db-backup.sh"]
+    command: ["once", "pre-migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./scripts/db-backup.sh:/usr/local/bin/db-backup.sh:ro
+      - app-db-backups:/backups
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_DB=${POSTGRES_DB?Variable not set}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS-14}
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
   prestart:
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
@@ -53,6 +102,8 @@ services:
       db:
         condition: service_healthy
         restart: true
+      pre-migrate-dump:
+        condition: service_completed_successfully
     command: bash scripts/prestart.sh
     env_file:
       - .env
@@ -74,6 +125,11 @@ services:
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   backend:
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
@@ -108,14 +164,21 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
 
+    # python instead of curl: the hardened python:3.13-slim image (S6-H4)
+    # ships no curl, and installing one just for a healthcheck widens the image.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/utils/health-check/', timeout=5)"]
       interval: 10s
       timeout: 5s
       retries: 5
 
     build:
       context: ./backend
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     labels:
       - traefik.enable=true
       - traefik.docker.network=traefik-public
@@ -145,6 +208,11 @@ services:
       args:
         - VITE_API_URL=https://api.${DOMAIN?Variable not set}
         - NODE_ENV=production
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 128m
     labels:
       - traefik.enable=true
       - traefik.docker.network=traefik-public
@@ -164,6 +232,8 @@ services:
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.middlewares=https-redirect
 volumes:
   app-db-data:
+  # pg_dump archives (nightly + pre-migration). Offsite sync: deployment.md.
+  app-db-backups:
 
 networks:
   traefik-public:

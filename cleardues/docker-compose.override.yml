@@ -50,10 +50,20 @@ services:
     ports:
       - "5432:5432"
 
+  db-backup:
+    restart: "no"
+
+  # Adminer is LOCAL DEV ONLY (S5-H3): it was removed from docker-compose.yml
+  # so a DB console never ships to staging/production.
   adminer:
+    image: adminer
     restart: "no"
     ports:
       - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      - ADMINER_DESIGN=pepa-linha-dark
 
   backend:
     restart: "no"
@@ -61,6 +71,9 @@ services:
       - "8000:8000"
     build:
       context: ./backend
+      args:
+        # Local image keeps pytest/mypy/ruff; production builds without them.
+        - INSTALL_DEV=true
     # command: sleep infinity  # Infinite loop to keep container alive doing nothing
     command:
       - fastapi
@@ -80,6 +93,9 @@ services:
     # TODO: remove once coverage is done locally
     volumes:
       - ./backend/htmlcov:/app/htmlcov
+      # tests/ is no longer baked into the image (S6-H4) — mount it so
+      # `docker compose exec backend pytest` keeps working locally.
+      - ./backend/tests:/app/tests
     environment:
       SMTP_HOST: "mailcatcher"
       SMTP_PORT: "1025"
@@ -113,8 +129,8 @@ services:
     depends_on:
       - backend
       - mailcatcher
-    env_file:
-      - .env
+    # No env_file (S6-M1): the e2e container enumerates what it needs below —
+    # it has no business holding SMTP/OAuth/SECRET_KEY secrets.
     environment:
       - VITE_API_URL=http://backend:8000
       - MAILCATCHER_HOST=http://mailcatcher:1080

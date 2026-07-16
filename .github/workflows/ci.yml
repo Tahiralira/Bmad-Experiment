@@ -43,9 +43,8 @@ jobs:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: app
-      # Match the runtime the Docker image ships (python:3.10) until WS9
-      # bumps both together.
-      UV_PYTHON: "3.10"
+      # Match the runtime the Docker image ships (python:3.13-slim, WS9).
+      UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

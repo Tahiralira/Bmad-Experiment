@@ -1,33 +1,24 @@
 from unittest.mock import MagicMock, patch
 
-from sqlmodel import select
-
 from app.backend_pre_start import init, logger
 
 
 def test_init_successful_connection() -> None:
+    # WS9: this test was doubly fake — it patched "sqlmodel.Session" (the
+    # module does `from sqlmodel import Session`, so the patch never
+    # intercepted) and "asserted" via the misspelled non-assertion
+    # `.called_once_with(...)` (always truthy; Python 3.13's mock rejects it).
     engine_mock = MagicMock()
-
     session_mock = MagicMock()
-    exec_mock = MagicMock(return_value=True)
-    session_mock.configure_mock(**{"exec.return_value": exec_mock})
+    # `with Session(engine) as session:` binds __enter__'s return value.
+    session_mock.__enter__.return_value = session_mock
 
     with (
-        patch("sqlmodel.Session", return_value=session_mock),
+        patch("app.backend_pre_start.Session", return_value=session_mock),
         patch.object(logger, "info"),
         patch.object(logger, "error"),
         patch.object(logger, "warn"),
     ):
-        try:
-            init(engine_mock)
-            connection_successful = True
-        except Exception:
-            connection_successful = False
+        init(engine_mock)
 
-        assert (
-            connection_successful
-        ), "The database connection should be successful and not raise an exception."
-
-        assert session_mock.exec.called_once_with(
-            select(1)
-        ), "The session should execute a select statement once."
+    session_mock.exec.assert_called_once()

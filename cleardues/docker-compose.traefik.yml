@@ -1,6 +1,17 @@
 services:
   traefik:
     image: traefik:3.0
+    # Bounded logs (S6-H3): Traefik's access log otherwise grows without limit
+    # on the VPS disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
     ports:
       # Listen on port 80, default for HTTP, necessary to redirect to HTTPS
       - 80:80
