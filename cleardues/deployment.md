@@ -1,148 +1,216 @@
-# ClearDues Deployment Runbook
+# ClearDues Deployment Guide — Vercel + Render + Neon
 
-**Decision (WS9, 2026-07-15):** ClearDues deploys as **Docker Compose on a single
-VPS behind Traefik** for the private beta. The former Railway plan and the Docker
-Swarm script are void and deleted (S6-C3). Revisit a managed platform only if the
-WS12 Redis/Celery tier outgrows one box.
+**Decision (WS9.5, 2026-07-16):** frontend on **Vercel**, API on **Render**,
+Postgres on **Neon**, domain **cleardues.site**. Everything runs on free tiers
+until real users arrive (upgrade triggers in §8). The previous compose-on-VPS
+runbook survives as a fallback in [deployment-vps.md](./deployment-vps.md);
+local development via `docker compose up -d` is unchanged.
 
-Stack: `docker-compose.traefik.yml` (shared Traefik, TLS via Let's Encrypt) +
-`docker-compose.yml` (db, db-backup, pre-migrate-dump, prestart, backend,
-frontend). Local dev additionally layers `docker-compose.override.yml`
-(Adminer, mailcatcher, hot-reload) — **never run the override on a public box**:
-it publishes Postgres/Adminer and runs Traefik with `--api.insecure`.
+**The shape of what you're deploying:**
 
-## 1. Provision (one-time)
+```
+browser ──▶ Vercel  (static React SPA, cleardues.site)
+               │ fetch()
+               ▼
+            Render  (FastAPI, api.cleardues.site, free instance)
+               │ psycopg + TLS
+               ▼
+            Neon    (Postgres 17, scale-to-zero)
+```
 
-1. VPS: 4 GB RAM / 2 vCPU (Hetzner CX22-class, ~€6/mo), Ubuntu 24.04 LTS.
-   Install Docker Engine + compose plugin; enable unattended security upgrades;
-   SSH keys only.
-2. DNS A records → VPS IP: `api.<domain>`, `dashboard.<domain>`,
-   `traefik.<domain>`.
-3. Clone the repo on the box (after the repo extraction below, this is the
-   ClearDues repo; until then, the experiment repo — work in `cleardues/`).
-4. Traefik bootstrap (once per box):
+Each platform connects to your GitHub repo and redeploys itself on every push
+— you never copy files anywhere. Total hands-on time: ~45 minutes.
+
+---
+
+## §0 Prerequisites (one-time)
+
+1. Accounts (all free, sign up with your GitHub account so repo access is
+   one click): [neon.com](https://neon.com), [render.com](https://render.com),
+   [vercel.com](https://vercel.com).
+2. **Get this code onto `main`.** Render/Vercel default to deploying the
+   `main` branch, and GitHub only runs *scheduled* workflows (our nightly DB
+   backup) from the default branch. The product currently lives on the
+   `ws9.5/replatform` branch chain, so:
 
    ```bash
-   docker network create traefik-public
-   export USERNAME=admin EMAIL=<you> DOMAIN=<domain>
-   export HASHED_PASSWORD=$(openssl passwd -apr1)   # dashboard basic-auth
-   docker compose -f docker-compose.traefik.yml up -d
+   git checkout main
+   git merge ws9.5/replatform
+   git push origin main
    ```
 
-## 2. Secrets checklist (`.env` on the VPS, mode 600, NEVER committed)
+   (CI runs automatically on that push — wait for the green check.)
+3. Buy `cleardues.site` at a registrar (Porkbun/Namecheap — ~$3–10 the first
+   year; check the *renewal* price before buying). You can do all of §1–§3
+   before the domain exists and add it in §4 later.
 
-Copy `.env.example` and set — generators in parentheses:
+## §1 Neon (database) — ~5 minutes
 
-| Variable | Notes |
-|----------|-------|
-| `ENVIRONMENT` | `staging` or `production` — gates HSTS, key validation, docs |
-| `DOMAIN`, `FRONTEND_HOST` | your domain; `https://dashboard.<domain>` |
-| `SECRET_KEY` | (`python -c "import secrets; print(secrets.token_urlsafe(32))"`) — signs JWTs; **changing it logs everyone out** |
-| `ENCRYPTION_KEY` | same generator. **WARNING (S5-C1): losing or rotating this permanently bricks every stored user Gemini key** — users must re-enter them. Keep a copy in your password manager, not only in `.env`. |
-| `POSTGRES_PASSWORD` | same generator; only the db/backup/backend containers see it |
-| `FIRST_SUPERUSER`, `FIRST_SUPERUSER_PASSWORD` | bootstrap admin identity |
-| `GOOGLE_CLIENT_ID/SECRET` | Google Cloud Console → OAuth client. Authorized redirect URI: `https://api.<domain>/api/v1/auth/oauth/google/callback`. Set `OAUTH_REDIRECT_BASE_URL=https://api.<domain>` |
-| `GITHUB_CLIENT_ID/SECRET` | GitHub Developer settings; callback as above with `github` |
-| `GEMINI_API_KEY` | hosted AI parsing; empty disables hosted parses (BYOK still works) |
-| `SMTP_*`, `EMAILS_FROM_EMAIL` | transactional email (magic links). SES/Mailgun free tiers fine |
-| `SENTRY_DSN` | error reporting (SDK 2.x, `send_default_pii=False`) |
-| `STACK_NAME`, `DOCKER_IMAGE_*`, `TAG` | e.g. `cleardues`, `cleardues-backend`, `cleardues-frontend`, git SHA for `TAG` |
-| `BACKUP_KEEP_DAYS`, `BACKUP_TIME` | optional; defaults 14 days, 03:00 UTC |
+1. Neon dashboard → **New Project**: name `cleardues`, **Postgres version
+   17** (must match our tooling — don't leave whatever default is selected),
+   region close to your users (and ideally the same one you'll pick on Render).
+2. On the project dashboard, open **Connect** and toggle the connection
+   string to **Direct** (host **without** `-pooler` — the pooled string
+   breaks migrations). It looks like:
 
-## 3. Deploy (staging and production are the same procedure, different `.env`)
+   ```
+   postgresql://neondb_owner:PASSWORD@ep-xxx-xxx.REGION.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+   ```
 
-```bash
-git pull
-export TAG=$(git rev-parse --short HEAD)
-docker compose -f docker-compose.yml build
-docker compose -f docker-compose.yml up -d
-curl -fsS https://api.<domain>/api/v1/utils/health-check/   # expect 200 true
-```
+3. Save two things somewhere safe:
+   - the **whole string** (you'll paste it into GitHub for backups, §6), and
+   - its **parts**, which map to the Render env vars you'll fill in §2:
 
-Startup order is enforced by compose: db (healthy) → **pre-migrate-dump** (a
-fresh `pg_dump` MUST succeed or the deploy stops) → prestart (`alembic upgrade
-head`) → backend. The frontend is static nginx and starts independently.
+   | Piece of the string | Render env var |
+   |---|---|
+   | `neondb_owner` | `POSTGRES_USER` |
+   | `PASSWORD` | `POSTGRES_PASSWORD` |
+   | `ep-xxx-xxx.REGION.aws.neon.tech` | `POSTGRES_SERVER` |
+   | `neondb` | `POSTGRES_DB` |
+   | (already set in render.yaml) | `POSTGRES_SSLMODE=require` |
 
-## 4. Rollback
+Good to know: Neon's free plan suspends compute after ~5 idle minutes and
+resumes in well under a second — the backend handles this (`pool_pre_ping`),
+you'll never notice.
 
-Application code (no bad migration): `git checkout <last-good-sha>`, rebuild,
-`up -d` — images are immutable per-TAG, so re-running with the old TAG works too.
+## §2 Render (backend API) — ~10 minutes
 
-Bad migration: every deploy took a dump seconds before migrating.
+1. Render dashboard → **New → Blueprint** → connect GitHub → pick this repo.
+   Render finds [render.yaml](../render.yaml) at the repo root and shows the
+   `cleardues-api` service it's about to create.
+2. It prompts for every "ask me" variable. Fill from §1 plus:
+   - `FIRST_SUPERUSER` — your email
+   - `FRONTEND_HOST` — `https://cleardues.site` (if no domain yet, put the
+     Vercel URL from §3 and update later)
+   - `BACKEND_CORS_ORIGINS` — `https://cleardues.site,https://www.cleardues.site`
+     (plus the `https://….vercel.app` URL while testing)
+   - `OAUTH_REDIRECT_BASE_URL` — `https://api.cleardues.site` (until DNS is
+     live: `https://cleardues-api.onrender.com`)
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — from §5 (you can paste
+     placeholders now and fix after §5, but you can't log in until §5 is done)
+   - Leave `GITHUB_*`, `GEMINI_API_KEY`, `SENTRY_DSN` blank for now.
+3. Click **Apply**. First build takes a few minutes: `uv sync --locked`
+   installs deps, then the start command runs `alembic upgrade head` (your
+   schema lands in Neon) and boots uvicorn. Watch the **Logs** tab — this is
+   the best way to *learn* what a deploy actually does.
+4. **Immediately** copy the generated `ENCRYPTION_KEY` (service →
+   Environment) into your password manager. If this value is ever lost or
+   changed, every stored user Gemini key is permanently unreadable.
+5. Verify: `https://cleardues-api.onrender.com/api/v1/utils/health-check/`
+   in your browser → `true`.
 
-```bash
-docker compose -f docker-compose.yml stop backend prestart
-docker compose -f docker-compose.yml exec db-backup bash -c \
-  'export PGPASSWORD="$POSTGRES_PASSWORD";
-   pg_restore -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists \
-   $(ls -t /backups/pre-migrate-*.dump | head -1)'
-git checkout <last-good-sha> && docker compose -f docker-compose.yml build backend
-docker compose -f docker-compose.yml up -d
-```
+Free-plan reality: the instance spins down after 15 idle minutes; the next
+request takes ~1 minute while it wakes. Normal, and gone the day you move to
+Starter ($7/mo).
 
-## 5. Backups (S6-C2)
+## §3 Vercel (frontend) — ~5 minutes
 
-- **Nightly:** the `db-backup` sidecar (postgres:17 + `scripts/db-backup.sh`)
-  dumps to the `app-db-backups` volume at `BACKUP_TIME` UTC, keeps
-  `BACKUP_KEEP_DAYS` days. **Pre-migration:** `pre-migrate-dump` gates every
-  deploy (above).
-- **Offsite (host cron, REQUIRED before real users):** sync the volume to
-  object storage, e.g. Backblaze B2 via rclone:
+1. Vercel dashboard → **Add New → Project** → import this repo.
+2. The one setting that matters: **Root Directory = `cleardues/frontend`**
+   (Framework Preset auto-detects Vite from there).
+3. Environment variable: `VITE_API_URL` = `https://api.cleardues.site`
+   (until DNS is live: `https://cleardues-api.onrender.com`). This is baked
+   in at build time — changing it later means clicking **Redeploy**.
+4. **Deploy.** You get a live `https://cleardues-xxx.vercel.app` URL.
+   [vercel.json](./frontend/vercel.json) rides along automatically: SPA
+   deep-links, security headers, and asset caching are already configured.
+5. Quick test: open the URL, hard-refresh on a sub-route (no 404 = the SPA
+   rewrite works).
 
-  ```bash
-  # /etc/cron.d/cleardues-backup-offsite  (04:00 UTC, after the nightly dump)
-  0 4 * * * root docker run --rm -v cleardues_app-db-backups:/backups:ro \
-    -v /root/.config/rclone:/config/rclone rclone/rclone \
-    sync /backups b2:cleardues-backups
-  ```
+## §4 Domain — cleardues.site (~10 minutes + DNS wait)
 
-- **Manual dump any time:**
-  `docker compose -f docker-compose.yml exec db-backup bash /usr/local/bin/db-backup.sh once manual`
+At your registrar's DNS panel, create:
 
-### Restore drill (run once per quarter — an untested backup is not a backup)
+| Host | Type | Value | Points at |
+|------|------|-------|-----------|
+| `@` (apex) | A | the IP Vercel shows you (76.76.21.21) | Vercel — frontend |
+| `www` | CNAME | `cname.vercel-dns.com` (copy exact value from Vercel) | Vercel |
+| `api` | CNAME | `cleardues-api.onrender.com` (copy exact from Render) | Render — API |
 
-```bash
-# 1. restore newest dump into a scratch database
-docker compose -f docker-compose.yml exec db-backup bash -c '
-  export PGPASSWORD="$POSTGRES_PASSWORD";
-  latest=$(ls -t /backups/*.dump | head -1); echo "restoring $latest";
-  psql -h db -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS restore_drill" &&
-  psql -h db -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE restore_drill" &&
-  pg_restore -h db -U "$POSTGRES_USER" -d restore_drill "$latest"'
-# 2. sanity: row counts match production expectations
-docker compose -f docker-compose.yml exec db psql -U postgres -d restore_drill -c \
-  'SELECT (SELECT count(*) FROM "user") users, (SELECT count(*) FROM expense) expenses;'
-# 3. clean up
-docker compose -f docker-compose.yml exec db psql -U postgres -d postgres -c \
-  'DROP DATABASE restore_drill;'
-```
+Then:
+1. Vercel → project → Settings → **Domains** → add `cleardues.site` (accept
+   its offer to add `www` too). Vercel shows the exact records it wants —
+   trust its panel over this table if they differ.
+2. Render → service → Settings → **Custom Domains** → add
+   `api.cleardues.site`. (Render is IPv4 — delete any AAAA records for these
+   hosts if your registrar created them.)
+3. Both platforms issue TLS certificates automatically once DNS propagates
+   (minutes to a few hours).
+4. Update the three URL env vars to the real domain — Vercel: `VITE_API_URL`
+   → redeploy; Render: `FRONTEND_HOST`, `BACKEND_CORS_ORIGINS`,
+   `OAUTH_REDIRECT_BASE_URL` → it redeploys itself.
 
-## 6. Monitoring & logs (S6-H3)
+## §5 Google login (required for the first login) — ~10 minutes
 
-- **Uptime (do this on day one):** free UptimeRobot/Better Stack monitor on
-  `https://api.<domain>/api/v1/utils/health-check/` AND
-  `https://dashboard.<domain>/` — alert to email/phone. A container healthcheck
-  only restarts; the monitor is what tells a human.
-- **Logs:** every service (Traefik included) uses `json-file` capped at
-  10 MB × 3 files — `docker compose logs backend --since 1h` is the tool.
-- **Sentry:** set `SENTRY_DSN`; PII is not sent by default.
+Magic-link email needs an SMTP provider you haven't set up yet, so Google
+OAuth is your first working login path:
 
-## 7. One-time credential/repo actions (WS9 — owner to-do)
+1. [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
+   → Create Credentials → **OAuth client ID** → Web application.
+2. Authorized redirect URI — exactly:
+   `https://api.cleardues.site/api/v1/auth/oauth/google/callback`
+   (add the `https://cleardues-api.onrender.com/...` variant too while DNS
+   isn't live).
+3. Copy the client ID + secret into Render's environment variables.
+4. Later, for magic links: add `SMTP_HOST/SMTP_USER/SMTP_PASSWORD/
+   EMAILS_FROM_EMAIL` env vars on Render (Resend/Mailgun/SES all have free
+   tiers) — no code change needed.
 
-1. **Rotate the GitHub PAT** that was embedded in the old remote URL
-   (github.com → Settings → Developer settings → Fine-grained tokens → revoke +
-   recreate). It sat in plaintext in `.git/config` and printed in tool logs.
-2. **Repoint the remote without the token** (Git Credential Manager then
-   handles auth): `git remote set-url origin https://github.com/Tahiralira/Bmad-Experiment.git`
-3. **Extract `cleardues/` to its own repository** (S6-M4 — do before the first
-   real deploy; drilled successfully in WS9, 55 commits preserved):
+## §6 Backups (do this before inviting anyone) — ~5 minutes
+
+Neon's free plan only keeps a ~6-hour restore history — the nightly
+[db-backup workflow](../.github/workflows/db-backup.yml) is your real backup.
+
+1. GitHub repo → Settings → Secrets and variables → Actions → **New secret**:
+   `NEON_DIRECT_URL` = the full direct connection string from §1.
+2. Actions tab → **DB backup (Neon)** → **Run workflow** (manual test).
+   Green run = a `.dump` artifact is attached to the run (kept 30 days).
+   The nightly 03:00 UTC schedule runs by itself from `main`.
+3. **Restore drill** (run it once now, quarterly after — an untested backup
+   is not a backup): download the artifact, then from the repo directory:
 
    ```bash
-   git subtree split --prefix=cleardues -b cleardues-extract
-   mkdir ../cleardues && cd ../cleardues && git init -b main
-   git pull ../Bmad-Experiment cleardues-extract
-   # move CI in: copy .github/workflows/ci.yml from the old repo root and
-   # delete its two `working-directory: cleardues/...` prefixes (paths become
-   # backend/ and frontend/), and the cache-dependency-path prefix.
-   git remote add origin <new-empty-github-repo-url> && git push -u origin main
+   docker compose up -d db   # any Postgres 17 with pg_restore works; local dev db is one
+   docker compose cp ./cleardues-YYYYMMDD.dump db:/tmp/restore-test.dump
+   docker compose exec db bash -c 'createdb -U postgres restore_test &&
+     pg_restore -U postgres -d restore_test /tmp/restore-test.dump &&
+     psql -U postgres -d restore_test -c "SELECT count(*) FROM \"user\";" &&
+     dropdb -U postgres restore_test'
    ```
+
+   To restore *production*, point pg_restore at Neon instead:
+   `pg_restore -d "<NEON_DIRECT_URL>" --clean --if-exists <file>.dump`
+   (Neon Pro alternative: restore the branch from its history window.)
+
+## §7 Verify the whole thing
+
+- [ ] `https://api.cleardues.site/api/v1/utils/health-check/` → `true`
+- [ ] `https://cleardues.site` loads; hard-refresh on a sub-route → no 404
+- [ ] Log in with Google → dashboard renders
+- [ ] Create a group + expense → appears in the ledger (this proves
+      Neon + migrations + CORS end-to-end)
+- [ ] Backup workflow ran green; restore drill done once
+- [ ] Free uptime monitor (uptimerobot.com) pinging the health-check URL and
+      `https://cleardues.site` — the monitor, not you, should be the first to
+      know it's down. (Bonus: pinging keeps the Render instance warm.)
+
+## §8 When (and only when) to start paying
+
+| Trigger | Upgrade | Cost |
+|---|---|---|
+| Real beta users hit 1-min cold starts | Render Starter | $7/mo |
+| Real money flows through the app | Vercel Pro **or** move SPA to Cloudflare Pages | $20/mo or $0 |
+| Data > 0.5 GB or you want >6h point-in-time restore | Neon Launch | ~$19/mo |
+| You want backups off GitHub artifacts | rclone the dump to Cloudflare R2 (10 GB free) | $0 |
+
+## Troubleshooting first deploys
+
+| Symptom | Cause / fix |
+|---|---|
+| Render build fails on `uv sync` | `uv.lock` out of sync — run CI first; it catches this (`uv lock --check`) |
+| API works, browser console shows CORS errors | `BACKEND_CORS_ORIGINS` doesn't contain the exact origin shown in the error (scheme + host, no trailing slash) |
+| `password authentication failed` in Render logs | Neon password pasted with whitespace, or you used the pooled host — use the direct host, no `-pooler` |
+| First request after idle takes ~1 min | Render free-tier cold start (§8), not a bug |
+| 404 when refreshing a sub-route on Vercel | `vercel.json` rewrite missing — confirm Root Directory is `cleardues/frontend` so the file is picked up |
+| Google login redirects to an error | Redirect URI in the Google console must match `OAUTH_REDIRECT_BASE_URL` + `/api/v1/auth/oauth/google/callback` **exactly** |
+| `pg_dump: server version mismatch` in backup action | Neon project wasn't created as Postgres 17 (§1) — recreate or bump the client in the workflow |

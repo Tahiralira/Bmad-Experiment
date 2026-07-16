@@ -120,9 +120,11 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 **Critical Decisions (Block Implementation):**
 -   **State Management:** Redux Toolkit (Selected for scalability).
 -   **Offline Strategy:** TanStack Query + Persist (Selected for "Medium" complexity).
--   **Deployment Target:** Docker Compose on a single VPS behind Traefik (DECIDED WS9,
-    2026-07-15 — supersedes the original Railway selection; see S6-C3). Revisit a managed
-    platform only if the WS12 Redis/Celery tier outgrows one box.
+-   **Deployment Target:** Vercel (frontend) + Render (backend) + Neon (Postgres),
+    free tiers until rollout (OWNER DECISION WS9.5, 2026-07-16 — supersedes both the
+    original Railway selection and WS9's compose-on-VPS, which is kept as fallback in
+    `cleardues/deployment-vps.md`). WS12's Redis/Celery lands on Render Key Value +
+    background workers.
 
 ### Data Architecture
 
@@ -153,21 +155,24 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 
 ### Infrastructure & Deployment
 
--   **Platform:** **Docker Compose on a single VPS behind Traefik** (DECIDED WS9, 2026-07-15).
-    -   *Rationale:* The repo's compose stack (Traefik TLS via Let's Encrypt, prestart
-        migrations, healthchecked Postgres) is the closest-to-working path (S6-C3);
-        Redis + Celery join the same compose file in WS12. The former Railway selection
-        had zero artifacts and is void; the Docker Swarm deploy script is deleted.
-    -   *Cost:* ~$10–25/mo (VPS + domain + backup storage; see S6 cost table).
+-   **Platform:** **Vercel (SPA) + Render (FastAPI) + Neon (Postgres 17)** — owner
+    decision WS9.5, 2026-07-16, chosen for genuinely free tiers until rollout.
+    -   *Artifacts:* `render.yaml` blueprint (repo root), `cleardues/frontend/vercel.json`
+        (SPA rewrite + security headers), nightly Neon pg_dump via GitHub Actions
+        (`.github/workflows/db-backup.yml`), first-deploy guide `cleardues/deployment.md`.
+    -   *Cost:* $0 until rollout; upgrade triggers documented in deployment.md §8
+        (Render Starter $7/mo at first real users; Vercel Pro or Cloudflare Pages at
+        monetization; Neon Launch at >0.5 GB).
+    -   *Fallback:* the WS9 compose-on-VPS stack, verified end-to-end, in
+        `cleardues/deployment-vps.md`.
 -   **CI/CD:** GitHub Actions (root-level `ci.yml`, live since WS1) as the quality gate;
-    deploys are manual per the WS9 runbook (`cleardues/deployment.md`) until beta cadence
-    justifies automation.
+    Vercel/Render auto-deploy `main` on push (monorepo Root Directory + build filters).
 
 ### Decision Impact Analysis
 
 **Implementation Sequence:**
 1.  Init Project (FastAPI + Redux Starter).
-2.  Provision VPS + Traefik per the WS9 runbook (`cleardues/deployment.md`); Redis lands with WS12.
+2.  Wire Neon + Render + Vercel per the WS9.5 guide (`cleardues/deployment.md`); Redis lands with WS12 (Render Key Value).
 3.  Implement "Real-time" socket layer (Redis connection).
 4.  Build "Offline" Mutation Queue (TanStack).
 

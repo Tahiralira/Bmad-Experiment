@@ -4,7 +4,10 @@ from app import crud
 from app.core.config import settings
 from app.models import User, UserCreate
 
-engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
+# pool_pre_ping (WS9.5): managed Postgres with scale-to-zero (Neon) drops
+# idle connections when the compute suspends; without the ping, the first
+# request after a quiet period gets a dead connection and 500s.
+engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI), pool_pre_ping=True)
 
 
 # make sure all SQLModel models are imported (app.models) before initializing DB

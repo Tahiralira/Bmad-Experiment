@@ -1,0 +1,57 @@
+# Nightly Neon backup (WS9.5 — S6-C2 ported to the PaaS stack).
+# Neon's free plan keeps only a ~6-hour restore window and no daily backups,
+# so this workflow IS the real backup: pg_dump every night at 03:00 UTC,
+# stored as a private Actions artifact for 30 days.
+#
+# Setup (one-time, see cleardues/deployment.md §6):
+# 1. Repo Settings → Secrets and variables → Actions → new secret
+#    NEON_DIRECT_URL = the Neon DIRECT connection string (host WITHOUT
+#    "-pooler"), e.g. postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require
+# 2. NOTE: scheduled workflows only run from the repo's DEFAULT branch —
+#    this file must be on main for the cron to fire. Manual runs
+#    (workflow_dispatch) work from any branch.
+#
+# Restore (tested procedure in deployment.md §6): download the artifact, then
+#   pg_restore -d "<NEON_DIRECT_URL>" --clean --if-exists <file>.dump
+name: DB backup (Neon)
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      # Neon runs Postgres 17 (deployment.md tells you to pick 17 when
+      # creating the project); pg_dump must be >= the server version, and
+      # ubuntu-latest ships an older client — install 17 from PGDG.
+      - name: Install postgresql-client-17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          yes | sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+          sudo apt-get install -y -q postgresql-client-17
+
+      - name: Dump database
+        env:
+          NEON_DIRECT_URL: ${{ secrets.NEON_DIRECT_URL }}
+        run: |
+          if [ -z "$NEON_DIRECT_URL" ]; then
+            echo "::error::NEON_DIRECT_URL secret is not set (deployment.md §6)"
+            exit 1
+          fi
+          FILE="cleardues-$(date -u +%Y%m%d-%H%M%S).dump"
+          pg_dump -Fc "$NEON_DIRECT_URL" > "$FILE"
+          # An empty dump means something went silently wrong — fail loudly.
+          test "$(stat -c%s "$FILE")" -gt 1024
+          echo "wrote $FILE ($(du -h "$FILE" | cut -f1))"
+
+      - name: Store dump as private artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: "*.dump"
+          retention-days: 30
+          if-no-files-found: error

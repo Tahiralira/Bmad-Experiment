@@ -639,6 +639,53 @@ this file breaks that merge into runnable units.
       Status: DONE 2026-07-16 (branch ws9/deploy-ops; staging execution = owner
       runbook items above)
 
+- [x] **WS9.5 — Replatform to Vercel + Render + Neon** (unplanned session,
+      2026-07-16; owner decision same day supersedes WS9's compose-on-VPS)
+      Goal: free-tier PaaS deployment prepped so a first-time deployer can go
+      live in ~45 min. Owner chose Vercel (SPA) / Render (API) / Neon
+      (Postgres) / cleardues.site purely for free tiers; Neon picked over
+      Supabase (no 7-day pause, instant scale-to-zero resume, ~6h restore
+      window on free). Repo extraction DEFERRED by owner decision — WS1's
+      root CI + both platforms' monorepo Root Directory support make nesting
+      harmless for now; revisit at WS11/WS13 (extraction stays drilled).
+      Tasks:
+      - [x] `cleardues/frontend/vercel.json` — SPA rewrite + WS8 security
+            headers ported from nginx.conf + immutable /assets + no-cache HTML
+      - [x] `render.yaml` blueprint (repo root): python runtime + uv
+            (auto-detected via uv.lock in rootDir cleardues/backend), free
+            plan, startup migrations (free tier has no preDeployCommand),
+            health-check path, buildFilters, generateValue secrets
+            (SECRET_KEY/ENCRYPTION_KEY), sync:false prompts for the rest
+      - [x] Neon-ready backend: `pool_pre_ping` on the engine (scale-to-zero
+            drops idle conns) + `POSTGRES_SSLMODE` setting appended to the
+            DSN query (empty = local DSN byte-identical; 2 new tests)
+      - [x] `.github/workflows/db-backup.yml`: nightly 03:00 UTC pg_dump of
+            Neon (PGDG client 17), 30-day private artifacts, manual-run
+            testable; Neon free keeps only ~6h history so this IS the backup
+            (S6-C2 continuity). NOTE: cron fires only from the default
+            branch — deploy prerequisite is merging to main.
+      - [x] deployment.md rewritten as a first-time-deployer walkthrough
+            (Neon → Render blueprint → Vercel import → DNS for
+            cleardues.site → Google OAuth console → backup secret + restore
+            drill → verify checklist → paid-upgrade triggers →
+            troubleshooting); WS9 VPS runbook preserved as
+            deployment-vps.md (fallback, marked superseded)
+      - [x] Plan-of-record updated (architecture.md, CLAUDE.md, this file,
+            session-context, memory)
+      Verification: backend suite green incl. 2 new config tests (see WS9.5
+      notes in session-context); render.yaml/vercel.json/workflow validated;
+      Render start command exercised in the local 3.13 container. Live
+      Vercel/Render/Neon wiring is owner-executed by design (accounts are
+      theirs) — deployment.md §7 is the acceptance checklist.
+      Notes:
+      - Vercel Hobby is licensed non-commercial; monetization TESTING on it
+        is warn-first risk in practice (Vercel says it notifies before
+        acting but reserves no-notice takedown). Trigger table in
+        deployment.md §8: real charges → Vercel Pro or Cloudflare Pages.
+      - SMTP intentionally deferred: first login path is Google OAuth;
+        magic-link email needs an SMTP provider env-var drop later.
+      Status: DONE 2026-07-16 (branch ws9.5/replatform)
+
 - [ ] **WS10 — Growth Wiring & Analytics** (≈1 week)
       Goal: the beta can convert, retain, and be measured — globally.
       Depends on: WS5, WS6; WS9 for PostHog hosting.

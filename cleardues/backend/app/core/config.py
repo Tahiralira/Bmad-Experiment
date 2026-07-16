@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = ""
+    # TLS mode for managed Postgres (WS9.5): Neon requires TLS — set
+    # POSTGRES_SSLMODE=require there. Empty (local/compose Postgres) keeps
+    # the DSN exactly as before.
+    POSTGRES_SSLMODE: str = ""
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -84,6 +88,7 @@ class Settings(BaseSettings):
             host=self.POSTGRES_SERVER,
             port=self.POSTGRES_PORT,
             path=self.POSTGRES_DB,
+            query=f"sslmode={self.POSTGRES_SSLMODE}" if self.POSTGRES_SSLMODE else None,
         )
 
     SMTP_TLS: bool = True

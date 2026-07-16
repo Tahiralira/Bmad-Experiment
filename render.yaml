@@ -1,0 +1,74 @@
+# Render Blueprint for the ClearDues API (WS9.5 — Vercel/Render/Neon stack).
+# In the Render dashboard: New → Blueprint → pick this repo. Render reads this
+# file, creates the service, and prompts for every `sync: false` value below.
+# Full walkthrough: cleardues/deployment.md.
+#
+# Free-plan notes:
+# - No preDeployCommand on free instances, so migrations run at startup
+#   (single instance, so no migration race).
+# - Free services spin down after 15 idle minutes (~1 min cold start).
+#   First upgrade when real users arrive: plan: starter.
+services:
+  - type: web
+    name: cleardues-api
+    runtime: python
+    plan: free
+    # The repo is a monorepo (product lives under cleardues/) — rootDir makes
+    # Render treat the backend folder as the service root, and the uv.lock
+    # there switches Render's Python runtime to uv automatically.
+    rootDir: cleardues/backend
+    buildFilters:
+      paths:
+        - cleardues/backend/**
+    buildCommand: uv sync --locked --no-dev
+    # --no-sync: don't let `uv run` re-sync (it would pull dev deps back in).
+    startCommand: uv run --no-sync alembic upgrade head && uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/utils/health-check/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+      - key: PROJECT_NAME
+        value: ClearDues
+      - key: ENVIRONMENT
+        value: staging
+      # Render generates strong random values for these two on first deploy.
+      # IMMEDIATELY copy ENCRYPTION_KEY into a password manager: losing or
+      # changing it permanently bricks every stored user Gemini key (S5-C1).
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: FIRST_SUPERUSER_PASSWORD
+        generateValue: true
+      # ---- values you paste at blueprint-apply time (see deployment.md §2) --
+      - key: POSTGRES_SERVER
+        sync: false # Neon DIRECT host, e.g. ep-xxx-xxx.eu-central-1.aws.neon.tech (no "-pooler")
+      - key: POSTGRES_USER
+        sync: false # e.g. neondb_owner
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_DB
+        sync: false # e.g. neondb
+      - key: POSTGRES_SSLMODE
+        value: require # Neon requires TLS
+      - key: FIRST_SUPERUSER
+        sync: false # your email
+      - key: FRONTEND_HOST
+        sync: false # https://cleardues.site (or the Vercel URL until DNS is live)
+      - key: BACKEND_CORS_ORIGINS
+        sync: false # comma-separated, e.g. https://cleardues.site,https://www.cleardues.site
+      - key: OAUTH_REDIRECT_BASE_URL
+        sync: false # https://api.cleardues.site (or https://cleardues-api.onrender.com until DNS)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Optional — leave blank to start; add later without redeploying code.
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false

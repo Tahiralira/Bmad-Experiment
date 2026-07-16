@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-16 (WS9 done — deploy & ops; staging execution = owner runbook)
+**Last Updated:** 2026-07-16 (WS9.5 done — replatform to Vercel/Render/Neon prepped)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -217,12 +217,35 @@
 > cache control; (4) test restore commands by RUNNING them: psql wants
 > PGPASSWORD, not POSTGRES_PASSWORD (drill caught the runbook bug).
 >
-> **Next: WS10 (growth wiring & analytics). OWNER ACTIONS from WS9
-> (deployment.md §7): provision VPS/domain + run runbook (staging TLS +
-> uptime-alert verification pend on this), rotate the exposed PAT +
-> repoint remote, create the new GitHub repo + push the extraction,
-> create the uptime monitor. PostHog hosting (WS10) can target the same
-> VPS once provisioned.**
+> WS9.5 (Replatform to Vercel + Render + Neon) DONE 2026-07-16 on branch
+> `ws9.5/replatform`: **owner decision same day superseded WS9's
+> compose-on-VPS** — Vercel (SPA) + Render (API) + Neon (Postgres 17) +
+> cleardues.site, chosen for free tiers; Neon over Supabase (no 7-day
+> pause, sub-second scale-to-zero resume, ~6h free restore window); repo
+> extraction DEFERRED (monorepo Root Directory on both platforms + WS1
+> root CI make nesting harmless; revisit WS11/WS13). Prepped:
+> `render.yaml` blueprint (uv auto-detect, free plan, startup migrations
+> — no preDeployCommand on free/Docker), `frontend/vercel.json` (SPA
+> rewrite + WS8 headers + caching), `pool_pre_ping` + `POSTGRES_SSLMODE`
+> (Neon DSN; local DSN unchanged, 2 tests), nightly Neon pg_dump GH
+> Actions workflow (PGDG client 17, 30-day artifacts; cron only fires
+> from the DEFAULT branch), deployment.md rewritten as a first-deploy
+> walkthrough (VPS runbook → deployment-vps.md fallback).
+> Key learnings: (1) Render preDeployCommand is paid-AND-non-Docker only
+> — free tier puts `alembic upgrade head` in the start command; (2) Neon
+> free ≠ Supabase free in idle behavior (suspend/instant-resume vs
+> 7-day pause) and Neon direct host (no `-pooler`) must be used for
+> migrations/pg_dump; (3) container app/ code is IMAGE-BAKED — tests/
+> mount doesn't cover app edits, `docker compose cp` still required
+> (re-learned); (4) GitHub scheduled workflows run ONLY from the default
+> branch — deploy prerequisite is merging the ws-chain to main.
+>
+> **Next: WS10 (growth wiring & analytics). OWNER ACTIONS: follow
+> deployment.md end-to-end (merge to main → Neon → Render blueprint →
+> Vercel → DNS → Google OAuth → NEON_DIRECT_URL secret + backup test →
+> uptime monitor); rotate the exposed PAT + repoint remote (unchanged
+> from WS9). PostHog (WS10): pick hosted PostHog free tier or a Render
+> service when WS10 runs.**
 
 ---
 
@@ -365,6 +388,10 @@ cd cleardues/frontend && npm run build
   drilled; backend 249 passed / 0 skipped on 3.13, frontend 86 passed.
   Staging TLS + uptime-alert verification pend on owner-provisioned
   VPS/domain — see deployment.md §7 owner to-dos)
+- WS9.5 Replatform ← **DONE** ✓ (2026-07-16; branch ws9.5/replatform;
+  Vercel + Render + Neon free-tier stack prepped end-to-end: render.yaml,
+  vercel.json, Neon-ready engine/DSN, nightly backup workflow,
+  first-deploy walkthrough in deployment.md; VPS path → deployment-vps.md)
 - WS10 Growth Wiring & Analytics ← **NEXT** (invite public preview,
   per-group currency + Rs-hardcode purge, payment links registry, push
   permission flow, PostHog + activation funnel, monetization spec,
