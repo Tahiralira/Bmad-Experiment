@@ -11,7 +11,7 @@
 
 metadata:
   version: "1.0"
-  total_patterns: 25
+  total_patterns: 28
   categories:
     - docker
     - database
@@ -520,6 +520,65 @@ testing:
     prevention: "Streaming generators touch no session and no ORM instances — plain values only, captured before return"
     stories_encountered: ["WS7"]
     tokens_saved_estimate: "~800 per occurrence"
+
+  - id: "TEST-006"
+    title: "Mock 'assertions' that never asserted — exposed by Python 3.13"
+    symptoms:
+      - "AttributeError: 'called_once_with' is not a valid assertion (py3.13)"
+      - "A mock-based test that passed for years fails after a Python bump"
+    root_cause: |
+      `mock.called_once_with(...)` / `mock.assert_called()` typos return a
+      truthy Mock on old Pythons — the test asserts nothing. Python 3.13's
+      unittest.mock rejects misspelled assertion names, surfacing the fake.
+      Often paired with a second fake: patching "sqlmodel.Session" does not
+      intercept modules that did `from sqlmodel import Session` — patch the
+      NAME IN THE MODULE UNDER TEST ("app.x.Session"), then check the mock
+      was actually exercised (WS9 found call_count == 0 once patched right).
+    solution: |
+      Use real assertion methods (assert_called_once_with / assert_called_once)
+      and patch where the name is looked up, not where it is defined.
+    prevention: "Any `assert mock.<something>(...)` line is a bug; grep for `\\.called_once` on Python upgrades"
+    stories_encountered: ["WS9"]
+    tokens_saved_estimate: "~400 per occurrence"
+
+  - id: "DOCKER-005"
+    title: "Slim/new-Python image build fails compiling a locked package"
+    symptoms:
+      - "error: command 'gcc' failed: No such file or directory during uv sync"
+      - "Build worked on the fat base image, fails on -slim or a newer Python"
+    root_cause: |
+      The locked version of a native package predates the new Python's wheels
+      (WS9: httptools 0.6.1 had no cp313 wheel), so pip/uv falls back to an
+      sdist build needing a compiler that slim images don't ship.
+    solution: |
+      Do NOT apt-get install gcc. Upgrade just the affected family so wheels
+      exist, e.g.:
+        uv lock --upgrade-package httptools --upgrade-package uvloop \
+          --upgrade-package uvicorn --upgrade-package watchfiles \
+          --upgrade-package websockets
+      (`uv lock --check` still passes — pyproject is unchanged.) No host uv?
+      Run it in a container: python:3.13-slim + `pip install uv`.
+      NOTE: the ghcr.io/astral-sh/uv image is distroless (COPY --from only) —
+      it cannot be `docker run` directly.
+    prevention: "When bumping the base Python, expect the oldest locked native deps (uvloop/httptools family) to need a targeted relock"
+    stories_encountered: ["WS9"]
+    tokens_saved_estimate: "~600 per occurrence"
+
+  - id: "FE-007"
+    title: "nginx location-level add_header silently drops security headers"
+    symptoms:
+      - "Security headers present on / but missing on /assets/* (or vice versa)"
+    root_cause: |
+      nginx `add_header` inherits from the enclosing block ONLY if the
+      location has no add_header of its own — one add_header for caching
+      wipes every inherited security header in that location.
+    solution: |
+      Set cache headers with `expires` (not add_header) inside locations:
+      `expires 1y;` for hashed /assets/, `expires -1;` (Cache-Control:
+      no-cache) for index.html — server-level security headers keep flowing.
+    prevention: "Never use add_header inside a location that must inherit server-level headers; verify with curl -sI on BOTH / and an asset"
+    stories_encountered: ["WS9"]
+    tokens_saved_estimate: "~300 per occurrence"
 
 # =============================================================================
 # ARCHITECTURE PATTERNS

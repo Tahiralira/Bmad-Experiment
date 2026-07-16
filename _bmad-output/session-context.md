@@ -1,6 +1,6 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-15 (WS8 done — template purge + security hardening)
+**Last Updated:** 2026-07-16 (WS9 done — deploy & ops; staging execution = owner runbook)
 **Purpose:** Quick context load for new AI sessions. READ THIS FIRST.
 
 ---
@@ -184,9 +184,45 @@
 > (4) Never point pydantic EmailStr test data at `.test` TLDs —
 > email-validator rejects special-use domains (same trap as WS4's
 > anonymized emails).
+> WS9 (Deploy & Ops) DONE 2026-07-16 on branch `ws9/deploy-ops`:
+> **the stack is deployable, backed up, and documented** — compose-on-VPS
+> behind Traefik is the committed target (Railway claims purged from
+> architecture.md/epics.md/CLAUDE.md; Swarm + docker-compose-v1 scripts
+> deleted). (a) Backups (S6-C2/M5): custom postgres:17 sidecar
+> (`scripts/db-backup.sh`) — nightly daemon (03:00 UTC, 14-day retention)
+> + `pre-migrate-dump` one-shot GATING prestart (migrations never run
+> without a fresh dump; failed dump fails the deploy); **restore drill
+> executed** — pg_restore into a scratch DB matched live counts exactly
+> (12/15/28/97). (b) Hardening (S6-H4): backend python:3.10-full →
+> **3.13-slim** (1.98 GB → 464 MB), non-root USER, tests + dev deps out of
+> prod (INSTALL_DEV arg; override mounts tests so in-container pytest still
+> works); frontend npm ci + nginx:1.27-alpine (75 MB) + gzip + immutable
+> /assets caching via `expires` (add_header would drop the WS8 security
+> headers); memory limits + json-file 10m×3 log caps everywhere incl.
+> Traefik. (c) Adminer OUT of prod compose (override-only); db/playwright
+> no longer get the full .env (S5-H3/M1). (d) deployment.md replaced with
+> the real runbook (secrets checklist + ENCRYPTION_KEY bricking warning,
+> deploy, rollback-from-dump, restore drill, monitoring, owner to-dos).
+> (e) Repo extraction DRILLED (subtree split, 55 commits); copier/fastapi-org
+> template machinery deleted. Backend **249 passed / 0 skipped on 3.13**
+> (2 template pre-start tests were doubly fake — py3.13's mock exposed
+> them; rewritten); frontend 86 passed; main chunk 169.9 kB gz.
+> Key learnings: (1) locked native deps can predate a new Python's wheels —
+> relock the family (httptools/uvloop/uvicorn/watchfiles/websockets), never
+> apt-get gcc into a slim image; (2) py3.13 mock rejects misspelled
+> assertions (`.called_once_with`) — such tests never asserted anything,
+> and patching "sqlmodel.Session" doesn't intercept `from sqlmodel import
+> Session` (patch the name in the module under test); (3) nginx
+> location-level add_header WIPES inherited headers — use `expires` for
+> cache control; (4) test restore commands by RUNNING them: psql wants
+> PGPASSWORD, not POSTGRES_PASSWORD (drill caught the runbook bug).
 >
-> **Next: WS9 (deploy & ops) — unblocked (WS1 CI + WS8 hardening done).
-> Adminer removal + env_file scoping deliberately left for WS9.**
+> **Next: WS10 (growth wiring & analytics). OWNER ACTIONS from WS9
+> (deployment.md §7): provision VPS/domain + run runbook (staging TLS +
+> uptime-alert verification pend on this), rotate the exposed PAT +
+> repoint remote, create the new GitHub repo + push the extraction,
+> create the uptime monitor. PostHog hosting (WS10) can target the same
+> VPS once provisioned.**
 
 ---
 
@@ -235,7 +271,7 @@ Before starting ANY work, check these logs:
 ```
 Backend: FastAPI + SQLModel + PostgreSQL
 Frontend: React + TypeScript + Vite + TanStack (Router + Query)
-Infra: Docker Compose (dev), Railway (prod target)
+Infra: Docker Compose (dev + prod; VPS behind Traefik — decided WS9)
 
 Directory Pattern: Feature-based
 - backend/app/features/{name}/ → models.py, service.py, router.py
@@ -321,9 +357,18 @@ cd cleardues/frontend && npm run build
   revocation, starlette CVE cleared + sentry 2.x + --locked builds,
   mediator error mapper; backend 249 passed / 0 skipped, frontend 86
   passed, main chunk 169.2 kB gz)
-- WS9 Deploy & Ops ← **NEXT** (compose-on-VPS commitment, repo extraction,
-  backups + tested restore, image hardening, Adminer removal, monitoring,
-  staging deploy + runbook)
+- WS9 Deploy & Ops ← **DONE** ✓ (2026-07-16; branch ws9/deploy-ops;
+  compose-on-VPS committed + Railway/Swarm purged, backup sidecar +
+  pre-migration dump gate + EXECUTED restore drill, python:3.13-slim
+  non-root images (464 MB / 75 MB), Adminer out of prod, env_file scoped,
+  log caps + memory limits, real runbook in deployment.md, repo extraction
+  drilled; backend 249 passed / 0 skipped on 3.13, frontend 86 passed.
+  Staging TLS + uptime-alert verification pend on owner-provisioned
+  VPS/domain — see deployment.md §7 owner to-dos)
+- WS10 Growth Wiring & Analytics ← **NEXT** (invite public preview,
+  per-group currency + Rs-hardcode purge, payment links registry, push
+  permission flow, PostHog + activation funnel, monetization spec,
+  onboarding first-60-seconds)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

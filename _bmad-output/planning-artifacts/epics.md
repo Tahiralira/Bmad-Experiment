@@ -79,7 +79,7 @@ This document provides the complete epic and story breakdown for ClearDues, deco
 - **Frontend Stack:** React + TypeScript + Vite
 - **State Management:** Redux Toolkit (client state) + TanStack Query (server state)
 - **Real-Time Communication:** WebSockets with Redis Pub/Sub message broker
-- **Deployment Platform:** Railway (supports FastAPI + Celery + Redis + Postgres)
+- **Deployment Platform:** Docker Compose on a VPS behind Traefik (decided WS9, 2026-07-15; Redis/Celery join the compose stack in WS12 — the original Railway choice is void)
 - **Authentication:** OAuth2 + JWT with "Walled Garden" security (no public routes)
 - **Offline Strategy:** TanStack Query Persist + Mutation Queue pattern
 - **Background Processing:** Celery worker for notification scheduling and async tasks

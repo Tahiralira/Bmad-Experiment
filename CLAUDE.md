@@ -34,11 +34,13 @@ the execution plan (`10-execution-plan.md`) first.
 
 ## 🛠 Tech Stack (what actually exists in the code)
 
-- **Backend**: FastAPI (Python 3.10) + SQLModel (ORM) + Alembic
+- **Backend**: FastAPI (Python 3.13) + SQLModel (ORM) + Alembic
 - **Frontend**: React 19 + TypeScript + Vite + TanStack Router/Query
   (NO Redux — local state + TanStack Query is the pattern)
 - **Database**: PostgreSQL
-- **Infra**: Docker Compose (local dev); deployment target decided in WS9
+- **Infra**: Docker Compose everywhere — local dev via the compose override;
+  staging/production = the same stack on one VPS behind Traefik (decided WS9;
+  runbook: `cleardues/deployment.md`)
 
 **Planned but NOT yet present** (do not assume these exist): WebSockets, Redis
 Pub/Sub, Celery workers (all arrive with the nudge engine in WS12), PWA service

@@ -75,7 +75,7 @@ Project is classified as **Medium** complexity.
 This is the industry-standard reference architecture for the requested stack (FastAPI + React + Postgres).
 -   **Backend:** FastAPI with **SQLModel** (ideal for Postgres).
 -   **Frontend:** **React** with **Vite** and **TypeScript** (User's "best fit" request).
--   **Infrastructure:** Fully dockerized (Easy deployment to Render/Railway).
+-   **Infrastructure:** Fully dockerized (deployed via Docker Compose on a VPS — decided WS9, 2026-07-15).
 -   **PWA/Real-Time:** Vite support makes PWA additions easy; FastAPI native WebSockets ready.
 
 **Initialization Command:**
@@ -120,7 +120,9 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 **Critical Decisions (Block Implementation):**
 -   **State Management:** Redux Toolkit (Selected for scalability).
 -   **Offline Strategy:** TanStack Query + Persist (Selected for "Medium" complexity).
--   **Deployment Target:** Railway (Selected for Celery/Worker support).
+-   **Deployment Target:** Docker Compose on a single VPS behind Traefik (DECIDED WS9,
+    2026-07-15 — supersedes the original Railway selection; see S6-C3). Revisit a managed
+    platform only if the WS12 Redis/Celery tier outgrows one box.
 
 ### Data Architecture
 
@@ -151,16 +153,21 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 
 ### Infrastructure & Deployment
 
--   **Platform:** **Railway**.
-    -   *Rationale:* Native support for the **FastAPI (Web) + Celery (Worker) + Redis (Broker) + Postgres (DB)** stack.
-    -   *Cost:* Usage-based (Free tier available) vs Render's restriction on free workers.
--   **CI/CD:** GitHub Actions (Standard in starter) deploy to Railway.
+-   **Platform:** **Docker Compose on a single VPS behind Traefik** (DECIDED WS9, 2026-07-15).
+    -   *Rationale:* The repo's compose stack (Traefik TLS via Let's Encrypt, prestart
+        migrations, healthchecked Postgres) is the closest-to-working path (S6-C3);
+        Redis + Celery join the same compose file in WS12. The former Railway selection
+        had zero artifacts and is void; the Docker Swarm deploy script is deleted.
+    -   *Cost:* ~$10–25/mo (VPS + domain + backup storage; see S6 cost table).
+-   **CI/CD:** GitHub Actions (root-level `ci.yml`, live since WS1) as the quality gate;
+    deploys are manual per the WS9 runbook (`cleardues/deployment.md`) until beta cadence
+    justifies automation.
 
 ### Decision Impact Analysis
 
 **Implementation Sequence:**
 1.  Init Project (FastAPI + Redux Starter).
-2.  Setup Railway environment (DB + Redis).
+2.  Provision VPS + Traefik per the WS9 runbook (`cleardues/deployment.md`); Redis lands with WS12.
 3.  Implement "Real-time" socket layer (Redis connection).
 4.  Build "Offline" Mutation Queue (TanStack).
 
@@ -339,7 +346,7 @@ ClearDues/
 ### Coherence Validation ✅
 
 **Decision Compatibility:**
-FastAPI (Backend) + Redux (Frontend State) + Railway (Deployment) creates a coherent loop. The "Feature-based" folder structure aligns perfectly with the scalable nature of the chosen stack.
+FastAPI (Backend) + Redux (Frontend State) + compose-on-VPS (Deployment, per WS9) creates a coherent loop. The "Feature-based" folder structure aligns perfectly with the scalable nature of the chosen stack.
 
 **Pattern Consistency:**
 The agreed `snake_case` (API) vs `camelCase` (Frontend) pattern is supported by the standard behavior of the chosen frameworks, minimizing friction.
@@ -455,7 +462,7 @@ Initialize with `full-stack-fastapi-template`, then immediately strictly reorgan
 -   **19** functional requirements fully supported
 
 **📚 AI Agent Implementation Guide**
--   Technology stack with verified versions (FastAPI, React, Redux, Railway)
+-   Technology stack with verified versions (FastAPI, React, Redux, compose-on-VPS)
 -   Consistency rules that prevent implementation conflicts
 -   Project structure with clear boundaries
 -   Integration patterns and communication standards

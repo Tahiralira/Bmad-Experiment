@@ -553,29 +553,91 @@ this file breaks that merge into runnable units.
         owns the client decision (S7-M3).
       Status: DONE 2026-07-15 (branch ws8/template-purge)
 
-- [ ] **WS9 — Deploy & Ops (first deployment ever)** (≈1 week)
+- [x] **WS9 — Deploy & Ops** (≈1 week; done in 1 session — staging deploy itself
+      awaits user-provisioned VPS, see notes)
       Goal: a deployable, backed-up, monitored stack.
       Depends on: WS1 (CI), WS8 (image/deps hardening overlaps).
       Inputs: 06 (entire Recommended Path), 05 (H3).
       Tasks:
-      - [ ] Commit to compose-on-VPS for beta; delete the Swarm script and the
-            Railway claims from planning docs (S6-C3)
-      - [ ] Extract `cleardues/` to its own repository; rotate the PAT; credential
-            helper (S6-M4, M3)
-      - [ ] Nightly `pg_dump` → object storage + one **tested** restore; pre-migration
-            dump in prestart (S6-C2, M5)
-      - [ ] Image hardening: python:3.13-slim, non-root USER, drop tests COPY,
-            `npm ci`, pinned nginx, resource limits, gzip + cache headers (S6-H4)
-      - [ ] Remove Adminer from prod compose; scope env_file per service (S5-H3,
-            S6-M1)
-      - [ ] Uptime monitor on health-check; log rotation on all services + Traefik
-            (S6-H3)
-      - [ ] Deploy staging; write the 1–2 page ClearDues runbook (provision, secrets
-            checklist incl. encryption-key warning, deploy, rollback, restore)
-            (S6-M2)
-      Verification: app reachable on a real domain over TLS; restore drill executed
-      once; uptime alert fires on a test outage.
-      Status: pending
+      - [x] Commit to compose-on-VPS for beta; delete the Swarm script and the
+            Railway claims from planning docs (S6-C3) — deploy.sh (Swarm) +
+            build.sh/build-push.sh (docker-compose v1) deleted; Railway claims
+            replaced with the decision in architecture.md (6 sites), epics.md,
+            CLAUDE.md, session-context.md
+      - [x] Extract `cleardues/` to its own repository; rotate the PAT; credential
+            helper (S6-M4, M3) — extraction DRILLED (subtree split, 55 commits
+            preserved, verified, drill branch removed); copier machinery +
+            fastapi-org community files deleted (cleardues/.github FUNDING/
+            ISSUE_TEMPLATE/DISCUSSION_TEMPLATE/labeler, .copier/, hooks/,
+            copier.yml). Final push + PAT rotation + remote repoint are OWNER
+            ACTIONS (deployment.md §7): repointing the remote was blocked by the
+            session permission layer, and gh CLI is authenticated to a different
+            account — nothing I can rotate from here.
+      - [x] Nightly `pg_dump` + one **tested** restore; pre-migration dump gating
+            prestart (S6-C2, M5) — custom 80-line sidecar on postgres:17 (no
+            third-party image holding DB creds; pg_dump always matches server):
+            `db-backup` daemon (03:00 UTC, 14-day retention) + `pre-migrate-dump`
+            one-shot wired db→dump→prestart→backend so migrations NEVER run
+            without a fresh dump (a failed dump fails the deploy). Offsite = host
+            rclone cron documented in the runbook (object storage is per-VPS).
+      - [x] Image hardening (S6-H4): backend python:3.10-full → 3.13-slim
+            (1.98 GB → 464 MB), non-root USER app, tests/ + dev deps out of prod
+            (INSTALL_DEV build arg; override mounts tests + installs dev deps so
+            `docker compose exec backend pytest` still works), healthcheck
+            curl → python urllib (slim has no curl); frontend `npm ci`,
+            nginx:1 → 1.27-alpine (226 MB → 75 MB), gzip + immutable /assets
+            caching + no-cache index (via `expires` so WS8 security headers keep
+            inheriting); memory limits on every service; CI UV_PYTHON 3.10 → 3.13
+      - [x] Remove Adminer from prod compose (kept in override for local dev);
+            env_file scoped — db + playwright no longer receive the full .env
+            (S5-H3, S6-M1)
+      - [x] Log rotation json-file 10m×3 on all services + Traefik; uptime
+            monitor documented as a day-one runbook step (external account —
+            can't be created from here) (S6-H3)
+      - [x] ClearDues runbook written — deployment.md fully replaced (provision,
+            DNS, Traefik bootstrap, secrets checklist incl. ENCRYPTION_KEY
+            bricking warning, deploy, rollback incl. restore-from-pre-migrate-
+            dump, backups + offsite, quarterly restore drill, monitoring, owner
+            to-dos). Staging deploy NOT executed: no VPS/domain exists in this
+            environment — runbook §1–3 is the exact procedure (S6-M2)
+      Verification: DONE 2026-07-16 (except live-staging items, see notes) —
+      **Backend suite on the hardened 3.13 image: 249 passed / 0 failed /
+      0 skipped** (2 template pre-start tests were DOUBLY fake — misspelled
+      `.called_once_with` non-assertion + patching "sqlmodel.Session" which the
+      code never looks up; py3.13 exposed them, both rewritten to assert for
+      real). Frontend typecheck green, **86 passed**, build green — main chunk
+      **169.9 kB gz** (budget ≤250). `uv lock --check` passes after the 3.13
+      relock (httptools/uvloop/uvicorn/watchfiles/websockets — locked versions
+      predated cp313 wheels; gcc-on-slim build failure fixed the right way).
+      **Live local proof of the prod topology:** `docker compose up` ran
+      db → pre-migrate-dump (84 KB dump written) → prestart → backend healthy
+      under the new python-urllib healthcheck, as user `app` on Python 3.13.14;
+      nightly daemon scheduled ("nightly backups at 03:00 UTC, keeping 14
+      days"); **restore drill EXECUTED**: pg_restore of the pre-migrate dump
+      into restore_drill matched live counts exactly (12 users / 15 expenses /
+      28 splits / 97 audit rows), manual-dump command proven, scratch DB
+      dropped. Prod compose config validates; prod backend image: whoami=app,
+      no /app/tests, pytest absent, `import app.main` OK. Prod frontend
+      container curl-proven: `/` no-cache + all WS8 security headers,
+      `/assets/*.js` gzip + max-age=31536000, headers intact on both.
+      Notes / deviations:
+      - REMAINING FOR OWNER (all documented in deployment.md §7 + §1–3, §6):
+        (1) provision VPS + domain and run the runbook — "reachable over TLS"
+        and "uptime alert fires" are unverifiable without them; (2) rotate the
+        exposed PAT and re-point the remote (permission layer correctly blocked
+        me from changing where pushes go); (3) create the new GitHub repo and
+        push the drilled extraction; (4) create the uptime monitor.
+      - Restore-drill runbook snippet initially failed in the drill itself
+        (psql reads PGPASSWORD, not POSTGRES_PASSWORD) — fixed in the runbook;
+        this is exactly why the drill is a task and not a doc.
+      - pre-migrate-dump also runs on local `up` (~1s) — deliberate: the
+        backup path gets exercised on every developer boot.
+      - S6-L2 remainder (pre-commit `language: unsupported`, test-local.sh on
+        docker-compose v1) logged as WS9-L1 in technical-debt-log; WS11 owns.
+      - Sentry SDK 2.x was already done in WS8; S6-H3's Sentry item needed no
+        work here.
+      Status: DONE 2026-07-16 (branch ws9/deploy-ops; staging execution = owner
+      runbook items above)
 
 - [ ] **WS10 — Growth Wiring & Analytics** (≈1 week)
       Goal: the beta can convert, retain, and be measured — globally.

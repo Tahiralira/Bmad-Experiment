@@ -584,3 +584,17 @@ epic_5:
         description: "Hardcoded tailwind amber-* classes remain on 'Pending' badges and awaiting-confirmation text (v1 remnants outside the WS3 kit's find/replace scope). Should use --warning/--success tokens."
         suggested_fix: "Swap amber-100/800 etc. for warning/success token utilities when these cards are next touched (WS5/WS6 wire them to the group ledger)"
         effort: "small"
+
+  ws9_deploy_ops:
+    title: "WS9 - Deploy & Ops"
+    reviewed: true
+    review_date: "2026-07-15"
+    items:
+      - id: "WS9-L1"
+        type: "config-rot"
+        severity: "LOW"
+        status: "open"
+        file: "cleardues/.pre-commit-config.yaml"
+        description: "S6-L2 remainder: ruff hooks declare `language: unsupported` (invalid pre-commit language — the hook set errors if anyone installs it). The docker-compose-v1 scripts half of S6-L2 was fixed in WS9 (build/deploy/build-push deleted); test-local.sh still calls v1 docker-compose and `down -v`."
+        suggested_fix: "Fix or delete .pre-commit-config.yaml and test-local.sh with the WS11 docs/template cleanup"
+        effort: "small"
