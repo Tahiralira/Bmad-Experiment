@@ -16,7 +16,7 @@ services:
     # rootDir makes Render treat the backend folder as the service root, and
     # the uv.lock there switches Render's Python runtime to uv automatically.
     rootDir: backend
-    buildFilters:
+    buildFilter:
       paths:
         - backend/**
     buildCommand: uv sync --locked --no-dev
