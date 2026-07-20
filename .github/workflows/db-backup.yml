@@ -34,6 +34,12 @@ jobs:
           yes | sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
           sudo apt-get install -y -q postgresql-client-17
 
+      - name: Verify PostgreSQL client
+        run: |
+          which pg_dump
+          pg_dump --version
+          ls -l /usr/lib/postgresql/
+
       - name: Dump database
         env:
           NEON_DIRECT_URL: ${{ secrets.NEON_DIRECT_URL }}
@@ -42,11 +48,13 @@ jobs:
             echo "::error::NEON_DIRECT_URL secret is not set (deployment.md §6)"
             exit 1
           fi
+
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
           FILE="cleardues-$(date -u +%Y%m%d-%H%M%S).dump"
-          pg_dump -Fc "$NEON_DIRECT_URL" > "$FILE"
-          # An empty dump means something went silently wrong — fail loudly.
+          /usr/lib/postgresql/17/bin/pg_dump -Fc "$NEON_DIRECT_URL" > "$FILE"
+
           test "$(stat -c%s "$FILE")" -gt 1024
-          echo "wrote $FILE ($(du -h "$FILE" | cut -f1))"
 
       - name: Store dump as private artifact
         uses: actions/upload-artifact@v4
