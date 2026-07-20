@@ -10,7 +10,7 @@
 # 2. NOTE: scheduled workflows only run from the repo's DEFAULT branch —
 #    this file must be on main for the cron to fire. Manual runs
 #    (workflow_dispatch) work from any branch.
-#
+
 # Restore (tested procedure in deployment.md §6): download the artifact, then
 #   pg_restore -d "<NEON_DIRECT_URL>" --clean --if-exists <file>.dump
 name: DB backup (Neon)
