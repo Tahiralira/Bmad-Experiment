@@ -726,30 +726,93 @@ this file breaks that merge into runnable units.
       stack restarted from the new root and healthy.
       Status: DONE 2026-07-16 (branch ws9.6/repo-restructure)
 
-- [ ] **WS10 — Growth Wiring & Analytics** (≈1 week)
+- [ ] **WS10 — Growth Wiring & Analytics** (≈1 week — SPLIT into atomic
+      sub-sessions WS10.1–WS10.7, owner decision 2026-07-20: run one task per
+      conversation so none bloats; see per-sub-session status below)
       Goal: the beta can convert, retain, and be measured — globally.
       Depends on: WS5, WS6; WS9 for PostHog hosting.
       Inputs: 02 (F1, F7, §6, §9), 09 §6 (global-market requirements, monetization).
-      Tasks:
-      - [ ] Invite public preview page: "X invited you to 'Trip' — N members" →
-            one-tap OAuth → land inside the group (S2-F1)
-      - [ ] Currency: `formatCurrency` util + per-group currency setting
-            (locale-detected default, ISO-4217); purge all "Rs" hardcodes (8+ files,
-            backend error strings included)
-      - [ ] Payment deep links registry: user-configurable (Venmo, PayPal.Me, Cash
-            App, Revolut, UPI, IBAN copy, …) + universal "mark as paid" at settle time
-      - [ ] Push permission flow: ask after first confirmed expense, email fallback
-            path wired (email is first-class, not fallback-only)
-      - [ ] Analytics: self-hosted PostHog + event taxonomy (`domain.entity.action`)
-            + activation funnel (group ≥2 members + ≥1 confirmed expense within 48h)
-            + PRD metrics (settlement velocity, edit rate, mute rate)
-      - [ ] Write the monetization spec: tier matrix, quota numbers, paywall
-            placements, USD-first pricing, 2–4% conversion target
-      - [ ] Onboarding first-60-seconds: sandbox "try one expense" parse on the
-            organic path; group templates (Roommates/Trip/Dinner) presetting the
-            social contract; empty states name the next action (S2 §6)
-      Verification: cold invite→join→activation funnel visible in PostHog end-to-end.
-      Status: pending
+
+    - [x] **WS10.1 — Currency Foundation** (this is the market-global money layer
+          the settle UI / payments / onboarding all render through — done FIRST)
+          Depends on: WS5, WS6.
+          - [x] `formatCurrency(amount, currency, {signed, locale})` util +
+                `getCurrencySymbol` + `guessLocaleCurrency` (region→currency) in
+                `frontend/src/lib/currency.ts`; `Intl.NumberFormat` (per-currency
+                decimals — JPY 0, most 2); tolerates Decimal-string wire amounts and
+                falls back to USD/0 rather than throwing in render
+          - [x] `GroupSettings.currency` (ISO-4217, default USD, locale-guess seeded
+                at group create via `ExpenseGroupCreate.currency`) + migration
+                `c1d2e3f4a5b6`; GET/PATCH settings expose+validate it (422 on unknown,
+                case-insensitive). Backend `app/core/currency.py` curated ~46-code
+                supported set (global, mirrored to a frontend constant)
+          - [x] Purged all 16 "Rs" hardcodes + a stray `$` in inline-input; threaded
+                currency via a `CurrencyProvider`/`useCurrency` context for the
+                single-currency group subtree (GroupLedgerScreen + SmartInputModal),
+                explicit per-item currency for cross-group surfaces (dashboard rows,
+                /pending). Dashboard aggregate hero hides when groups span currencies
+                (`DashboardResponse.currency` null) — summing across currencies is
+                meaningless
+          - [x] Currency picker in group settings (owner-editable) + create-group
+                (locale-detected default)
+          Verification: DONE 2026-07-20 — **backend 258 passed / 0 failed / 0
+          skipped** (was 251; +7 currency tests: create default/with/unknown,
+          detail, settings case-insensitive update, 422 reject, dashboard
+          shared-vs-mixed); `alembic check` clean; frontend typecheck green,
+          **94 passed** (+8 formatCurrency unit tests), build green — main chunk
+          **170.16 kB gz** (budget ≤250). Live backend proof: `GET
+          /expense-groups/{id}` → 200 `"currency":"EUR"` after a settings PATCH.
+          Live frontend proof: create-group currency picker renders the full
+          ISO-4217 list with the locale-detected default (USD) selected (browser
+          read_page against the nginx build).
+          NOTE: full-app pixel screenshots not captured — the browser-pane
+          screenshot tool hangs against this project (documented WS3+ limitation)
+          and direct :5173→:8000 access is CORS-blocked; Playwright is the
+          established fallback (WS3/WS8) if pixel proof is required before merge.
+          Status: DONE 2026-07-20 (branch ws10.1/currency)
+
+    - [ ] **WS10.2 — Payment Links Registry + Universal Mark-as-Paid**
+          Depends on: WS6, WS10.1. Owner: per-user GLOBAL handles; cover major
+          providers (Venmo, PayPal.Me, Cash App, Revolut, UPI, IBAN-copy) + a
+          frictionless CUSTOM handle path (countries differ); deep-link where
+          supported else copy; surface counterparty handles + "mark as paid" at settle.
+          Status: pending
+
+    - [ ] **WS10.3 — Invite Public Preview + OAuth-return** (S2-F1)
+          Depends on: WS8. Current preview endpoint requires auth — add an UNAUTH
+          public preview + landing ("X invited you to 'Trip' — N members"),
+          one-tap OAuth carrying the token → auto-land inside the group.
+          Status: pending
+
+    - [ ] **WS10.4 — Onboarding First-60-Seconds** (S2 §6)
+          Depends on: WS7, WS10.1. Sandbox "try one expense" parse on the organic
+          path; group templates (Roommates/Trip/Dinner) presetting the social
+          contract; empty states name the next action.
+          Status: pending
+
+    - [ ] **WS10.5 — Monetization Spec** (DOC ONLY, no code)
+          Tier matrix, quota numbers (align w/ WS7 AI_FREE_MONTHLY_PARSES=20),
+          paywall placements, USD-first pricing, 2–4% conversion target.
+          Status: pending
+
+    - [ ] **WS10.6 — Observability: PostHog + Sentry** (owner's dedicated task)
+          Depends on: WS10.1–.4. ALL instrumentation code, env-gated
+          (VITE_POSTHOG_KEY / SENTRY_DSN, no-op unset): PostHog event taxonomy
+          (`domain.entity.action`) + activation funnel (group ≥2 members + ≥1
+          confirmed expense within 48h) + PRD metrics (settlement velocity, edit
+          rate, mute rate); Sentry frontend (@sentry/react) + confirm backend DSN
+          wiring (sentry-sdk already 2.65 from WS8). OWNER configures the instances
+          on Render + Vercel.
+          Verification: cold invite→join→activation funnel visible in PostHog
+          (owner-run once instances exist).
+          Status: pending
+
+    - [ ] **WS10.7 — Push Permission Flow + Email-first Notifications**
+          ⚠️ BLOCKED on WS11 (service worker) + WS12 (delivery backend); the
+          notifications feature is still a placeholder. If run standalone: only the
+          permission-prompt UX (after first confirmed expense) + subscription/
+          preference store; actual delivery folds into WS12.
+          Status: pending (blocked)
 
 - [ ] **WS11 — Docs Floor + Test Journeys + PWA Shell** (≈3 days)
       Goal: the repo survives its first external reader; real flows have automated

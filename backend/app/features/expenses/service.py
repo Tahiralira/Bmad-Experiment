@@ -330,8 +330,8 @@ def calculate_unequal_split(
     # Validate sum matches total (within 0.01 tolerance for floating point)
     if abs(provided_total - total_amount) > Decimal("0.01"):
         raise ValueError(
-            f"Split amounts (Rs {provided_total}) must equal "
-            f"total expense amount (Rs {total_amount})"
+            f"Split amounts ({provided_total}) must equal "
+            f"total expense amount ({total_amount})"
         )
 
     # Return validated splits with safe UUID conversion

@@ -1,11 +1,18 @@
+import { DEFAULT_CURRENCY, formatCurrency } from "@/lib/currency"
+
 import type { AuditActionType, AuditLog } from "../types"
 
-export function formatActivityEntry(log: AuditLog): string {
+// WS10.1: `currency` is the group's ISO-4217 code (the feed is group-scoped);
+// defaulted so existing callers/tests that omit it still render.
+export function formatActivityEntry(
+  log: AuditLog,
+  currency: string = DEFAULT_CURRENCY,
+): string {
   const user = log.user_name || "Someone"
 
   switch (log.action_type) {
     case "created":
-      return formatCreatedEntry(user, log)
+      return formatCreatedEntry(user, log, currency)
     case "edited":
       return formatEditedEntry(user, log)
     case "confirmed":
@@ -13,7 +20,7 @@ export function formatActivityEntry(log: AuditLog): string {
     case "rejected":
       return formatRejectedEntry(user, log)
     case "settled":
-      return formatSettledEntry(user, log)
+      return formatSettledEntry(user, log, currency)
     case "split_updated":
       return formatSplitUpdatedEntry(user, log)
     default:
@@ -21,19 +28,23 @@ export function formatActivityEntry(log: AuditLog): string {
   }
 }
 
-function formatCreatedEntry(user: string, log: AuditLog): string {
+function formatCreatedEntry(
+  user: string,
+  log: AuditLog,
+  currency: string,
+): string {
   const after = log.changes_json?.after
   const description = after?.description as string | undefined
   const amount = after?.amount as number | undefined
 
   if (description && amount != null) {
-    return `${user} created expense "${description}" for Rs ${amount}`
+    return `${user} created expense "${description}" for ${formatCurrency(amount, currency)}`
   }
   if (description) {
     return `${user} created expense "${description}"`
   }
   if (amount != null) {
-    return `${user} created an expense for Rs ${amount}`
+    return `${user} created an expense for ${formatCurrency(amount, currency)}`
   }
   return `${user} created an expense`
 }
@@ -83,7 +94,11 @@ function formatRejectedEntry(user: string, log: AuditLog): string {
   return `${user} rejected an expense`
 }
 
-function formatSettledEntry(user: string, log: AuditLog): string {
+function formatSettledEntry(
+  user: string,
+  log: AuditLog,
+  currency: string,
+): string {
   const before = log.changes_json?.before
   const after = log.changes_json?.after
 
@@ -91,7 +106,7 @@ function formatSettledEntry(user: string, log: AuditLog): string {
   if (before?.status === "pending" && after?.status === "confirmed") {
     const amount = before?.amount as number | undefined
     if (amount != null) {
-      return `${user} confirmed settlement of Rs ${amount}`
+      return `${user} confirmed settlement of ${formatCurrency(amount, currency)}`
     }
     return `${user} confirmed a settlement`
   }
@@ -100,7 +115,7 @@ function formatSettledEntry(user: string, log: AuditLog): string {
   if (after?.status === "pending") {
     const amount = after?.amount as number | undefined
     if (amount != null) {
-      return `${user} marked Rs ${amount} as settled`
+      return `${user} marked ${formatCurrency(amount, currency)} as settled`
     }
     return `${user} marked an expense as settled`
   }
@@ -108,7 +123,7 @@ function formatSettledEntry(user: string, log: AuditLog): string {
   // Fallback
   const amount = after?.amount as number | undefined
   if (amount != null) {
-    return `${user} marked Rs ${amount} as settled`
+    return `${user} marked ${formatCurrency(amount, currency)} as settled`
   }
   return `${user} marked an expense as settled`
 }

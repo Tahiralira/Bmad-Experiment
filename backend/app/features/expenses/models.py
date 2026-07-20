@@ -217,6 +217,9 @@ class PendingConfirmationPublic(SQLModel):
 
     expense: ExpensePublic
     split: "ExpenseSplitPublic"
+    # WS10.1: the expense's group currency — /pending spans groups, so each
+    # card must render in its own currency.
+    currency: str = "USD"
 
 
 class ExpenseRejectResponse(SQLModel):

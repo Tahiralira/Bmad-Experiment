@@ -2,6 +2,8 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { useSettleUp } from "@/features/expenses/api/expenses"
+import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/currency-context"
 
 import { usePairwiseBalances } from "../api/groups"
 
@@ -22,7 +24,8 @@ interface Props {
  */
 export function PairwiseBalances({ groupId, pendingCounterpartyIds }: Props) {
   const { data, isLoading, error } = usePairwiseBalances(groupId)
-  const settleUp = useSettleUp()
+  const currency = useCurrency()
+  const settleUp = useSettleUp(currency)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   if (isLoading) {
@@ -81,14 +84,14 @@ export function PairwiseBalances({ groupId, pendingCounterpartyIds }: Props) {
                 {net === 0
                   ? "You're even — settle up to clear the ledger"
                   : userOwes
-                    ? `You owe Rs ${item.you_owe_them}${
+                    ? `You owe ${formatCurrency(item.you_owe_them, currency)}${
                         Number(item.they_owe_you) > 0
-                          ? ` · they owe Rs ${item.they_owe_you}`
+                          ? ` · they owe ${formatCurrency(item.they_owe_you, currency)}`
                           : ""
                       }`
-                    : `Owes you Rs ${item.they_owe_you}${
+                    : `Owes you ${formatCurrency(item.they_owe_you, currency)}${
                         Number(item.you_owe_them) > 0
-                          ? ` · you owe Rs ${item.you_owe_them}`
+                          ? ` · you owe ${formatCurrency(item.you_owe_them, currency)}`
                           : ""
                       }`}
               </p>
@@ -96,7 +99,7 @@ export function PairwiseBalances({ groupId, pendingCounterpartyIds }: Props) {
 
             {net > 0 ? (
               <span className="text-body font-semibold tabular-nums text-text-primary">
-                Rs {item.net}
+                {formatCurrency(item.net, currency)}
               </span>
             ) : hasPendingSettleUp ? (
               <span className="text-body-small text-text-secondary">
@@ -105,7 +108,7 @@ export function PairwiseBalances({ groupId, pendingCounterpartyIds }: Props) {
             ) : isConfirming ? (
               <div className="flex items-center gap-2">
                 <span className="text-body-small text-text-secondary">
-                  Paid {name} Rs {Math.abs(net).toFixed(2)}?
+                  Paid {name} {formatCurrency(Math.abs(net), currency)}?
                 </span>
                 <Button
                   size="sm"

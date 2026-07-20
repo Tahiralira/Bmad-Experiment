@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BalanceDisplay } from "@/components/ui/balance-display"
+import { formatCurrency } from "@/lib/currency"
 import {
   usePendingConfirmations,
   useConfirmExpense,
@@ -98,7 +99,7 @@ function PendingConfirmationCard({
   isConfirming,
   isRejecting,
 }: PendingConfirmationCardProps) {
-  const { expense, split } = item
+  const { expense, split, currency } = item
   const isProcessing = isConfirming || isRejecting
 
   return (
@@ -107,18 +108,22 @@ function PendingConfirmationCard({
         <CardTitle className="text-base">{expense.description}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Amount owed and total */}
+        {/* Amount owed and total — /pending spans groups, so pass each item's
+            own currency explicitly (no CurrencyProvider here). */}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Your share</p>
             <BalanceDisplay
               amount={Number(split.amount_owed)}
               variant="title"
+              currency={currency}
             />
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Total expense</p>
-            <p className="text-lg font-semibold">Rs {expense.amount}</p>
+            <p className="text-lg font-semibold">
+              {formatCurrency(expense.amount, currency)}
+            </p>
           </div>
         </div>
 

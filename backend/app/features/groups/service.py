@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from app.core.currency import normalize_currency
 from app.features.auth.models import utc_now
 from app.features.auth.models import User
 from app.features.groups.models import (
@@ -50,11 +51,33 @@ def create_expense_group(
         role=GROUP_ROLE_OWNER,
     )
     session.add(member)
-    session.flush()  # Flush member to DB within transaction
+
+    # WS10.1: seed the settings row with the client's locale-detected currency
+    # (normalize_currency falls back to the default on empty/unknown codes) so
+    # the group starts denominated correctly instead of always in USD.
+    settings = GroupSettings(
+        group_id=group.id,
+        currency=normalize_currency(group_in.currency),
+    )
+    session.add(settings)
+
+    session.flush()  # Flush member + settings to DB within transaction
     session.refresh(group)
     # Note: Caller is responsible for commit (handled by FastAPI session dependency)
 
     return group
+
+
+def get_group_currency(session: Session, group_id: uuid.UUID) -> str:
+    """The group's ISO-4217 currency (WS10.1), or the default if unset.
+
+    Read-only — does NOT create a settings row (unlike
+    get_or_create_group_settings), so it's safe on hot read paths.
+    """
+    currency = session.exec(
+        select(GroupSettings.currency).where(GroupSettings.group_id == group_id)
+    ).first()
+    return normalize_currency(currency)
 
 
 def get_group_by_id(session: Session, group_id: uuid.UUID) -> ExpenseGroup | None:

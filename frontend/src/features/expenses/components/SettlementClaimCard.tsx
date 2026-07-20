@@ -3,6 +3,8 @@ import { Check, X, Clock } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { BalanceDisplay } from "@/components/ui/balance-display"
+import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/currency-context"
 import { cn } from "@/lib/utils"
 import { useConfirmSettlement, useRejectSettlement } from "../api/expenses"
 import type { Expense, SettlementClaimPublic } from "../types"
@@ -48,6 +50,7 @@ export function SettlementClaimCard({
 }: SettlementClaimCardProps) {
   const confirmMutation = useConfirmSettlement()
   const rejectMutation = useRejectSettlement()
+  const currency = useCurrency()
 
   const [optimisticState, setOptimisticState] = useState<
     "pending" | "confirmed" | "rejected"
@@ -129,7 +132,7 @@ export function SettlementClaimCard({
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Total expense</p>
             <p className="text-lg font-semibold">
-              Rs {expense.amount}
+              {formatCurrency(expense.amount, currency)}
             </p>
           </div>
         </div>

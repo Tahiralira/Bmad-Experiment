@@ -1,5 +1,7 @@
 import { useState } from "react"
 
+import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/currency-context"
 import type { AuditLog, AuditActionType } from "../types"
 import { formatRelativeTime } from "../utils/timeFormat"
 
@@ -26,6 +28,7 @@ export function AuditLogList({
   isLoadingMore,
 }: AuditLogListProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const currency = useCurrency()
 
   if (!logs.length) {
     return (
@@ -59,7 +62,7 @@ export function AuditLogList({
                 {log.changes_json?.after?.description
                   ? ` "${log.changes_json.after.description as string}"`
                   : log.changes_json?.after?.amount
-                    ? ` for Rs ${log.changes_json.after.amount as string}`
+                    ? ` for ${formatCurrency(log.changes_json.after.amount as string, currency)}`
                     : ""}
               </span>
             </p>

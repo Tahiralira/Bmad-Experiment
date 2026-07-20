@@ -15,10 +15,14 @@ export interface ExpenseGroup {
 export interface ExpenseGroupDetail extends ExpenseGroup {
   member_count: number
   net_balance: string
+  /** WS10.1: the group's ISO-4217 currency; the whole ledger renders in it */
+  currency: string
 }
 
 export interface ExpenseGroupCreate {
   name: string
+  /** WS10.1: locale-detected ISO-4217 currency for the new group (optional) */
+  currency?: string
 }
 
 export interface GroupMember {
@@ -91,12 +95,15 @@ export interface GroupSettings {
   group_id: string
   strict_mode: boolean
   ai_personality: AIPersonality
+  /** WS10.1: the group's ISO-4217 currency */
+  currency: string
 }
 
 /** PATCH body — send only the fields that change */
 export interface GroupSettingsUpdate {
   strict_mode?: boolean
   ai_personality?: AIPersonality
+  currency?: string
 }
 
 // === Member Types ===

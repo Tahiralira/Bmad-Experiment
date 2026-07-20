@@ -4,6 +4,8 @@ import { useRef, useState } from "react"
 
 import { BalanceDisplay } from "@/components/ui/balance-display"
 import { Button } from "@/components/ui/button"
+import { formatCurrency } from "@/lib/currency"
+import { CurrencyProvider, useCurrency } from "@/lib/currency-context"
 import {
   useAggregateClaims,
   useExpenseAuditLog,
@@ -134,6 +136,7 @@ export function GroupLedgerScreen({ groupId }: Props) {
   const netBalance = Number(group.net_balance)
 
   return (
+    <CurrencyProvider currency={group.currency}>
     <div className="space-y-8">
       {/* Header */}
       <header className="space-y-4">
@@ -300,6 +303,7 @@ export function GroupLedgerScreen({ groupId }: Props) {
         triggerRef={addExpenseRef}
       />
     </div>
+    </CurrencyProvider>
   )
 }
 
@@ -330,6 +334,7 @@ interface ExpenseRowProps {
 
 function ExpenseRow({ item, payerName }: ExpenseRowProps) {
   const { expense, my_split } = item
+  const currency = useCurrency()
   const [expanded, setExpanded] = useState(false)
 
   // Fetched lazily on expand: who owes what + the expense's audit trail
@@ -363,11 +368,11 @@ function ExpenseRow({ item, payerName }: ExpenseRowProps) {
           </span>
           <div className="text-right">
             <p className="text-body font-semibold tabular-nums text-text-primary">
-              Rs {expense.amount}
+              {formatCurrency(expense.amount, currency)}
             </p>
             {my_split && (
               <p className="text-body-small tabular-nums text-text-secondary">
-                Your share: Rs {my_split.amount_owed}
+                Your share: {formatCurrency(my_split.amount_owed, currency)}
               </p>
             )}
           </div>
@@ -405,7 +410,8 @@ function ExpenseRow({ item, payerName }: ExpenseRowProps) {
                       {split.user_name}
                     </span>
                     <span className="text-body-small tabular-nums text-text-secondary">
-                      Rs {split.amount_owed} &bull; {split.status}
+                      {formatCurrency(split.amount_owed, currency)} &bull;{" "}
+                      {split.status}
                     </span>
                   </li>
                 ))}

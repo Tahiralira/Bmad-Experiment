@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react"
+import { DEFAULT_CURRENCY, formatCurrency } from "@/lib/currency"
 import { SplitType } from "../types"
 import type { GroupMember } from "../types"
 
@@ -11,6 +12,8 @@ interface UseSplitStateProps {
   initialType?: SplitType
   /** Payer ID (for rounding difference absorption) */
   payerId?: string
+  /** ISO-4217 currency for the validation message (WS10.1) */
+  currency?: string
 }
 
 interface UseSplitStateReturn {
@@ -84,6 +87,7 @@ export function useSplitState({
   members,
   initialType = "equal",
   payerId,
+  currency = DEFAULT_CURRENCY,
 }: UseSplitStateProps): UseSplitStateReturn {
   const [splitType, setSplitType] = useState<SplitType>(initialType)
   const [excludedMembers, setExcludedMembers] = useState<Set<string>>(new Set())
@@ -287,7 +291,7 @@ export function useSplitState({
         const currentTotal = totalAmount - remainingAmount
         return {
           isValid: false,
-          validationError: `Split amounts (Rs ${currentTotal.toFixed(2)}) must equal total expense amount (Rs ${totalAmount.toFixed(2)})`,
+          validationError: `Split amounts (${formatCurrency(currentTotal, currency)}) must equal total expense amount (${formatCurrency(totalAmount, currency)})`,
         }
       }
     }
@@ -327,7 +331,7 @@ export function useSplitState({
     }
     // Map/Set identities (not .size) — the S4-M2 check depends on WHICH
     // members have amounts, and state setters always produce new instances
-  }, [members, excludedMembers, splitType, customAmounts, remainingAmount, totalAmount, percentages, totalPercentage])
+  }, [members, excludedMembers, splitType, customAmounts, remainingAmount, totalAmount, percentages, totalPercentage, currency])
 
   return {
     splitType,

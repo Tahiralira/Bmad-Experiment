@@ -219,6 +219,8 @@ export interface ExpenseRejectResponse {
 export interface PendingConfirmation {
   expense: Expense
   split: ExpenseSplit
+  /** WS10.1: the expense's group currency (/pending spans groups) */
+  currency: string
 }
 
 // =============================================================================

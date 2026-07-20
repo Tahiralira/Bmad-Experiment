@@ -59,9 +59,11 @@ describe("PairwiseBalances", () => {
       <PairwiseBalances groupId={GROUP_ID} pendingCounterpartyIds={new Set()} />,
     )
 
+    // No CurrencyProvider wraps the render → formatCurrency uses the USD
+    // default (WS10.1). Group-scoped screens supply the real currency.
     expect(screen.getByText("Alex")).toBeInTheDocument()
-    expect(screen.getByText("Rs 600.00")).toBeInTheDocument()
-    expect(screen.getByText(/owes you rs 600\.00/i)).toBeInTheDocument()
+    expect(screen.getByText("$600.00")).toBeInTheDocument()
+    expect(screen.getByText(/owes you \$600\.00/i)).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /settle up/i })).toBeNull()
   })
 
@@ -72,7 +74,7 @@ describe("PairwiseBalances", () => {
     )
 
     expect(
-      screen.getByText(/you owe rs 50\.00 · they owe rs 20\.00/i),
+      screen.getByText(/you owe \$50\.00 · they owe \$20\.00/i),
     ).toBeInTheDocument()
   })
 
@@ -86,7 +88,7 @@ describe("PairwiseBalances", () => {
     fireEvent.click(screen.getByRole("button", { name: /settle up with sam/i }))
     // Nothing sent yet — manual confirm only (product constitution)
     expect(mockSettleUpMutate).not.toHaveBeenCalled()
-    expect(screen.getByText(/paid sam rs 30\.00\?/i)).toBeInTheDocument()
+    expect(screen.getByText(/paid sam \$30\.00\?/i)).toBeInTheDocument()
 
     // Step 2: the confirmation
     fireEvent.click(screen.getByRole("button", { name: /yes, i paid/i }))

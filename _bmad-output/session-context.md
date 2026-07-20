@@ -1,6 +1,7 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-16 (WS9.6 done — repo flattened: app now at repo root)
+**Last Updated:** 2026-07-20 (WS10.1 done — per-group currency; WS10 split into
+atomic sub-sessions WS10.1–WS10.7)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -250,12 +251,51 @@
 > (re-learned); (4) GitHub scheduled workflows run ONLY from the default
 > branch — deploy prerequisite is merging the ws-chain to main.
 >
-> **Next: WS10 (growth wiring & analytics). OWNER ACTIONS: follow
-> deployment.md end-to-end (merge to main → Neon → Render blueprint →
-> Vercel → DNS → Google OAuth → NEON_DIRECT_URL secret + backup test →
-> uptime monitor); rotate the exposed PAT + repoint remote (unchanged
-> from WS9). PostHog (WS10): pick hosted PostHog free tier or a Render
-> service when WS10 runs.**
+> WS10 SPLIT (owner decision 2026-07-20): WS10 (Growth Wiring & Analytics,
+> ~1 week / 7 tasks) is broken into ATOMIC sub-sessions WS10.1–WS10.7 — one
+> per conversation, none bloated. Full breakdown in
+> `10-execution-plan.md` WS10 section. Analytics = PostHog + Sentry as ONE
+> dedicated task (WS10.6) where the code lands here and the OWNER configures
+> the instances on Render + Vercel. Payments (WS10.2) = per-user GLOBAL
+> handles + a frictionless custom-handle path.
+>
+> WS10.1 (Currency Foundation) DONE 2026-07-20 on branch `ws10.1/currency`:
+> **ClearDues is now global-market — no hardcoded "Rs".** Currency is a
+> per-group setting (`GroupSettings.currency`, ISO-4217, default USD,
+> locale-guessed at group create; migration c1d2e3f4a5b6). (a) Frontend
+> `lib/currency.ts`: `formatCurrency` (Intl.NumberFormat, per-currency
+> decimals, tolerates Decimal-string wire amounts, USD/0 fallback — never
+> throws in render), `getCurrencySymbol`, `guessLocaleCurrency`
+> (region→currency). (b) Threading: a `CurrencyProvider`/`useCurrency`
+> context wraps the single-currency group subtree (GroupLedgerScreen +
+> SmartInputModal) so deep money components format without prop-drilling;
+> the two genuinely cross-group surfaces pass explicit per-item currency —
+> dashboard rows (`GroupBalanceSummary.currency`) and /pending
+> (`PendingConfirmationPublic.currency`). (c) Dashboard aggregate hero hides
+> when groups span currencies (`DashboardResponse.currency` null) — summing
+> across currencies is meaningless; per-group rows carry their own. (d)
+> Backend `app/core/currency.py` curated ~46-code supported set + validation
+> (422 on unknown, case-insensitive); mirrored to a frontend constant for the
+> pickers (group settings owner-editable + create-group). Backend **258
+> passed / 0 skipped**, `alembic check` clean; frontend typecheck green,
+> **94 passed**, main chunk 170.16 kB gz.
+> Key learnings: (1) `import app` in the backend container resolves to
+> `/app/app` (the baked package) — `docker cp <abs-src> cleardues-backend-1:/app/`
+> is required to sync app edits (and the PowerShell tool's cwd PERSISTS across
+> calls, so a stray `cd frontend` silently breaks relative docker-cp sources);
+> (2) dashboard-aggregating tests must mint a FRESH user — the shared
+> normal_user accumulates committed groups from sibling tests and pollutes the
+> cross-group total; (3) currency threading via React context is far less
+> churn than prop-drilling ~14 components, and isolated component tests just
+> get the USD default; (4) browser-pane screenshots still hang on this project
+> and direct :5173→:8000 access is CORS-blocked — Playwright remains the
+> pixel-proof fallback.
+>
+> **Next: WS10.2 (Payment Links + Universal Mark-as-Paid) — per-user global
+> handles + custom path. OWNER ACTIONS (unchanged): follow deployment.md
+> (merge to main → Neon → Render → Vercel → DNS → Google OAuth →
+> NEON_DIRECT_URL + backup test → uptime monitor); rotate the exposed PAT +
+> repoint remote. PostHog+Sentry land in WS10.6 (owner configures instances).**
 
 ---
 
@@ -402,10 +442,16 @@ cd frontend && npm run build
   Vercel + Render + Neon free-tier stack prepped end-to-end: render.yaml,
   vercel.json, Neon-ready engine/DSN, nightly backup workflow,
   first-deploy walkthrough in deployment.md; VPS path → deployment-vps.md)
-- WS10 Growth Wiring & Analytics ← **NEXT** (invite public preview,
-  per-group currency + Rs-hardcode purge, payment links registry, push
-  permission flow, PostHog + activation funnel, monetization spec,
-  onboarding first-60-seconds)
+- WS10 Growth Wiring & Analytics ← **SPLIT into WS10.1–WS10.7** (atomic
+  sub-sessions, run one per conversation; see 10-execution-plan.md)
+  - WS10.1 Currency Foundation ← **DONE** ✓ (2026-07-20; branch
+    ws10.1/currency; per-group ISO-4217 currency, formatCurrency util +
+    context, all "Rs" purged, currency pickers; backend 258, frontend 94)
+  - WS10.2 Payment Links + Mark-as-Paid ← **NEXT** (per-user global handles
+    + custom path)
+  - WS10.3 Invite public preview + OAuth-return · WS10.4 Onboarding
+    first-60s · WS10.5 Monetization spec (doc) · WS10.6 Observability
+    (PostHog + Sentry, owner-configured) · WS10.7 Push (blocked on WS11/WS12)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

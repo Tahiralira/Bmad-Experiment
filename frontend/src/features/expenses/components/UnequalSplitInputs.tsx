@@ -1,6 +1,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { BalanceDisplay } from "@/components/ui/balance-display"
 import { Check } from "lucide-react"
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency"
+import { useCurrency } from "@/lib/currency-context"
 import { cn } from "@/lib/utils"
 import type { GroupMember } from "../types"
 
@@ -25,8 +27,8 @@ interface UnequalSplitInputsProps {
  *
  * Features:
  * - Member chips with inline amount input fields
- * - BalanceDisplay component for currency prefix
- * - "Rs" prefix with comma separators
+ * - BalanceDisplay component for currency formatting
+ * - Group-currency symbol prefix (WS10.1) with locale grouping
  * - Numeric input for each member
  * - Teal checkmark when amount entered
  * - Real-time remaining amount calculation
@@ -49,6 +51,9 @@ export function UnequalSplitInputs({
   totalAmount,
   onAmountChange,
 }: UnequalSplitInputsProps) {
+  const currency = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
+
   // Filter out excluded members (Story 3.8)
   const includedMembers = members.filter((m) => !excludedMembers.has(m.user_id))
 
@@ -117,7 +122,7 @@ export function UnequalSplitInputs({
 
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-sm text-text-secondary">
-                  Rs
+                  {currencySymbol}
                 </span>
                 <input
                   type="number"
@@ -154,8 +159,8 @@ export function UnequalSplitInputs({
       {!isExactMatch && (
         <p className="text-xs text-text-secondary mt-3">
           {isOverAllocated
-            ? `Over-allocated by Rs ${Math.abs(remaining).toFixed(2)}`
-            : `Allocate Rs ${remaining.toFixed(2)} more`}
+            ? `Over-allocated by ${formatCurrency(Math.abs(remaining), currency)}`
+            : `Allocate ${formatCurrency(remaining, currency)} more`}
         </p>
       )}
     </div>

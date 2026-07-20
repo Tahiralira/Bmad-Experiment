@@ -4,6 +4,14 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { SUPPORTED_CURRENCIES, guessLocaleCurrency } from "@/lib/currency"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
 
 import { useCreateGroup } from "../api/groups"
@@ -14,6 +22,9 @@ interface Props {
 
 export function CreateGroupForm({ onSuccess }: Props) {
   const [name, setName] = useState("")
+  // Locale-detected default (WS10.1) — editable before creating, and later in
+  // group settings.
+  const [currency, setCurrency] = useState<string>(() => guessLocaleCurrency())
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   const createGroup = useCreateGroup()
@@ -35,7 +46,7 @@ export function CreateGroupForm({ onSuccess }: Props) {
     }
 
     try {
-      await createGroup.mutateAsync({ name: trimmedName })
+      await createGroup.mutateAsync({ name: trimmedName, currency })
       showSuccessToast("Group created successfully!")
       if (onSuccess) {
         onSuccess()
@@ -66,6 +77,29 @@ export function CreateGroupForm({ onSuccess }: Props) {
         />
         <p className="text-sm text-muted-foreground">
           Give your group a descriptive name
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="create-group-currency">Currency</Label>
+        <Select
+          value={currency}
+          onValueChange={setCurrency}
+          disabled={createGroup.isPending}
+        >
+          <SelectTrigger id="create-group-currency" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SUPPORTED_CURRENCIES.map((c) => (
+              <SelectItem key={c.code} value={c.code}>
+                {c.code} — {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground">
+          All expenses in this group use this currency. You can change it later.
         </p>
       </div>
 
