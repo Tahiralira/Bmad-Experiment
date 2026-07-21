@@ -4,6 +4,7 @@ import { BalanceDisplay } from "@/components/ui/balance-display"
 import { Button } from "@/components/ui/button"
 import { useDashboard } from "../api/dashboard"
 import type { GroupBalanceSummary } from "../types"
+import { OnboardingSandbox } from "./OnboardingSandbox"
 
 export function Dashboard() {
   const { data, isLoading, error, refetch } = useDashboard()
@@ -44,19 +45,10 @@ export function Dashboard() {
   }
 
   if (!data?.groups.length) {
-    return (
-      <div className="space-y-4 py-12 text-center">
-        <h2 className="text-title font-semibold text-text-primary">
-          Nothing to keep score of yet
-        </h2>
-        <p className="text-body text-text-secondary">
-          Start a group and add one expense — ClearDues takes it from there.
-        </p>
-        <Button asChild>
-          <Link to="/groups">Start a group</Link>
-        </Button>
-      </div>
-    )
+    // Organic path (no invite, no groups): the first-60-seconds sandbox
+    // (WS10.4) lets the Aha happen before any setup, and always names the
+    // next action (create a group).
+    return <OnboardingSandbox />
   }
 
   return (

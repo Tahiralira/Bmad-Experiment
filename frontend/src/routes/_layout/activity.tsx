@@ -1,6 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { Activity } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
+
+import { Button } from "@/components/ui/button"
 
 import { useUserGroups } from "@/features/groups/api/groups"
 import { useGroupAuditLog } from "@/features/expenses/api/expenses"
@@ -195,6 +197,12 @@ function EmptyState({ type }: { type: "no-groups" | "no-activity" }) {
           ? "Join or create a group to see activity here"
           : "Actions will appear here as they happen in your groups"}
       </p>
+      {/* Empty state names the next action (WS10.4) */}
+      {type === "no-groups" && (
+        <Button asChild variant="outline" className="mt-4">
+          <Link to="/groups">Create a group</Link>
+        </Button>
+      )}
     </div>
   )
 }

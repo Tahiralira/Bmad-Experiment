@@ -1,7 +1,8 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-21 (WS10.3 done — public invite preview + OAuth-return
-auto-join; WS10 split into atomic sub-sessions WS10.1–WS10.7)
+**Last Updated:** 2026-07-21 (WS10.4 done — onboarding first-60-seconds: organic
+sandbox parse + group templates + next-action empty states; WS10 split into atomic
+sub-sessions WS10.1–WS10.7)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -353,13 +354,49 @@ auto-join; WS10 split into atomic sub-sessions WS10.1–WS10.7)
 > then read sessionStorage. `window.location.assign` can't be redefined on the
 > instance ("Cannot redefine property").
 >
-> **Next: WS10.4 (Onboarding first-60-seconds, S2 §6) — sandbox "try one
-> expense" parse on the organic path, group templates (Roommates/Trip/Dinner)
-> presetting the social contract, empty states that name the next action.
-> Depends on WS7 + WS10.1. OWNER ACTIONS (unchanged): follow deployment.md (merge
-> to main → Neon → Render → Vercel → DNS → Google OAuth → NEON_DIRECT_URL +
-> backup test → uptime monitor); rotate the exposed PAT + repoint remote.
-> PostHog+Sentry land in WS10.6 (owner configures instances).**
+> WS10.4 (Onboarding first-60-seconds) DONE 2026-07-21 on branch
+> `ws10.4/onboarding`: **the organic path now has an aha before any setup, and
+> no empty screen is a dead end.** (a) Sandbox parse: `ExpenseParseRequest.
+> group_id` is now OPTIONAL — the parse endpoint skips the membership gate and
+> defaults to friendly when no group_id is sent (grouped parses unchanged). It
+> never persists (parse only ever returns data) and is metered like any hosted
+> parse (a model call costs money; 429 on exhausted quota; no separate quota
+> bucket). Frontend `parseExpense` groupId optional; new `OnboardingSandbox`
+> renders on the empty dashboard: type an expense → real streamed commentary →
+> read-only "here's what I read" preview (formatCurrency in the locale currency)
+> → always-present "Create your first group" CTA. NO migration (request-field
+> plumbing only). (b) Group templates: `ExpenseGroupCreate.strict_mode`
+> (optional) threaded into `create_expense_group` → seeds GroupSettings;
+> `features/groups/templates.ts` defines Roommates/Trip/Dinner (name + strictMode
+> + social-contract blurb); CreateGroupForm chips prefill the name (only while
+> it's still a template default — never clobbers a typed name) + send strict_mode.
+> All three ship strict_mode OFF per S2 §6; the per-template field + optional
+> payload keep nudge-cadence / settlement-cycle presets ready for WS12. (c) Empty
+> states name the next action: groups page gains a "Create your first group"
+> button (was text-only), activity "no groups" gains a CTA, dashboard empty state
+> IS the sandbox. Backend **298 passed / 0 skipped** (+4), `alembic check` clean;
+> frontend typecheck green, **111 passed** (+8), main chunk 170.40 kB gz.
+> Screenshots → `_bmad-output/implementation-artifacts/ws10.4-screenshots/` (16,
+> Playwright + API interception — no live Gemini needed).
+> Key learnings: (1) a public/optional surface over an otherwise strict endpoint
+> is cleanest as an OPTIONAL field guarded at the top (skip membership when
+> group_id is None) — the strict path stays byte-identical, mirroring WS10.3's
+> optional-auth dep. (2) The generated `GroupsService.createGroup` body type is
+> loose (`{name}`) and `data` is passed as a variable, so extra optional fields
+> (currency in WS10.1, strict_mode now) flow through at runtime with no client
+> regeneration. (3) For pixel proof that needs a live backend + AI, Playwright
+> `page.route` interception (canned dashboard JSON + a hand-rolled SSE parse
+> response) beats wiring the real stack — it sidesteps the nginx CSP /
+> cross-origin :8000 wall AND the absent GEMINI_API_KEY. Register the catch-all
+> route FIRST (Playwright matches routes in reverse registration order).
+>
+> **Next: WS10.5 (Monetization Spec — DOC ONLY, no code): tier matrix, quota
+> numbers aligned with WS7 AI_FREE_MONTHLY_PARSES=20, paywall placements,
+> USD-first pricing, 2–4% conversion target. Then WS10.6 (Observability: PostHog
+> + Sentry, owner configures instances), WS10.7 (Push — blocked on WS11/WS12).
+> OWNER ACTIONS (unchanged): follow deployment.md (merge to main → Neon → Render
+> → Vercel → DNS → Google OAuth → NEON_DIRECT_URL + backup test → uptime
+> monitor); rotate the exposed PAT + repoint remote.**
 
 ---
 
@@ -519,9 +556,11 @@ cd frontend && npm run build
     branch ws10.3/invite-public; public unauth preview + inviter_name, one-tap
     Google join carrying the token → auto-land in group; backend 294, frontend
     103)
-  - WS10.4 Onboarding first-60s ← **NEXT** (S2 §6) · WS10.5 Monetization spec
-    (doc) · WS10.6 Observability (PostHog + Sentry, owner-configured) · WS10.7
-    Push (blocked on WS11/WS12)
+  - WS10.4 Onboarding first-60s ← **DONE** ✓ (2026-07-21; branch
+    ws10.4/onboarding; organic sandbox parse [group_id optional], group templates
+    Roommates/Trip/Dinner, next-action empty states; backend 298, frontend 111)
+  - WS10.5 Monetization spec (doc) ← **NEXT** · WS10.6 Observability (PostHog +
+    Sentry, owner-configured) · WS10.7 Push (blocked on WS11/WS12)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

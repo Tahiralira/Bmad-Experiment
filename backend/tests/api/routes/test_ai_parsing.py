@@ -345,6 +345,51 @@ class TestParserRouter:
         assert complete["confidence_score"] == 0.95
         assert complete["commentary"] == COMMENTARY
 
+    def test_parse_sandbox_no_group_succeeds(self, client, db, monkeypatch):
+        """WS10.4: an organic-path sandbox parse omits group_id — it skips the
+        membership gate, defaults to friendly, is metered like any hosted
+        parse, and creates no group state."""
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        headers, user_id, _ = _make_authed_user(client, db)
+
+        with patch(
+            "app.features.ai.parser_service.get_gemini_client",
+            return_value=_mock_gemini_client(),
+        ):
+            r = client.post(
+                f"{settings.API_V1_STR}/expenses/parse",
+                json={"text": "Paid 40 for pizza with the team"},
+                headers=headers,
+            )
+
+        assert r.status_code == 200
+        events = _sse_events(r.text)
+        assert events[-1]["type"] == "complete"
+        assert all(e["type"] != "error" for e in events)
+        complete = events[-1]["data"]
+        assert complete["amount"] == "60.0"  # from the mock parse JSON
+        assert complete["payer_id"] == str(user_id)
+
+        # Metered like any hosted parse — a sandbox call still costs money.
+        usage = db.exec(select(AIUsage).where(AIUsage.user_id == user_id)).first()
+        assert usage is not None and usage.parse_count == 1
+
+    def test_parse_sandbox_is_metered_429_when_exhausted(
+        self, client, db, monkeypatch
+    ):
+        """The sandbox is a real model call — an exhausted quota 429s it too."""
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
+        monkeypatch.setattr(settings, "AI_FREE_MONTHLY_PARSES", 0)
+        headers, _, _ = _make_authed_user(client, db)
+
+        r = client.post(
+            f"{settings.API_V1_STR}/expenses/parse",
+            json={"text": "Paid 40 for pizza"},
+            headers=headers,
+        )
+        assert r.status_code == 429
+        assert "free AI parses" in r.json()["detail"]
+
     def test_parse_non_member_is_403(self, client, db, monkeypatch):
         monkeypatch.setattr(settings, "GEMINI_API_KEY", "server-key")
         owner_headers, _, _ = _make_authed_user(client, db)

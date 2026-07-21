@@ -11,10 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import { SUPPORTED_CURRENCIES, guessLocaleCurrency } from "@/lib/currency"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
 
 import { useCreateGroup } from "../api/groups"
+import {
+  GROUP_TEMPLATES,
+  TEMPLATE_SUGGESTED_NAMES,
+  type GroupTemplateId,
+} from "../templates"
 
 interface Props {
   onSuccess?: () => void
@@ -25,10 +31,34 @@ export function CreateGroupForm({ onSuccess }: Props) {
   // Locale-detected default (WS10.1) — editable before creating, and later in
   // group settings.
   const [currency, setCurrency] = useState<string>(() => guessLocaleCurrency())
+  // WS10.4: onboarding template. Presets the name + the social contract
+  // (strict_mode). null = no template chosen; the backend then uses its
+  // default. Selecting a chip fills the name only while it's still a template
+  // default, so a user's own typed name is never clobbered.
+  const [templateId, setTemplateId] = useState<GroupTemplateId | null>(null)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   const createGroup = useCreateGroup()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+
+  const selectedTemplate =
+    GROUP_TEMPLATES.find((t) => t.id === templateId) ?? null
+
+  const handleSelectTemplate = (id: GroupTemplateId) => {
+    // Toggle off if the same chip is tapped again.
+    if (id === templateId) {
+      setTemplateId(null)
+      return
+    }
+    const template = GROUP_TEMPLATES.find((t) => t.id === id)
+    if (!template) return
+    setTemplateId(id)
+    // Only auto-fill the name if the user hasn't typed one of their own.
+    const trimmed = name.trim()
+    if (!trimmed || TEMPLATE_SUGGESTED_NAMES.has(trimmed)) {
+      setName(template.suggestedName)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,7 +76,15 @@ export function CreateGroupForm({ onSuccess }: Props) {
     }
 
     try {
-      await createGroup.mutateAsync({ name: trimmedName, currency })
+      await createGroup.mutateAsync({
+        name: trimmedName,
+        currency,
+        // Only send the preset when a template is chosen; otherwise let the
+        // backend default stand (WS10.4).
+        ...(selectedTemplate
+          ? { strict_mode: selectedTemplate.strictMode }
+          : {}),
+      })
       showSuccessToast("Group created successfully!")
       if (onSuccess) {
         onSuccess()
@@ -64,6 +102,48 @@ export function CreateGroupForm({ onSuccess }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* WS10.4: onboarding templates — one tap presets the name + the social
+          contract instead of asking configuration questions. */}
+      <div className="space-y-2">
+        <Label asChild>
+          <span id="group-template-label">Start from a template</span>
+        </Label>
+        <div
+          role="group"
+          aria-labelledby="group-template-label"
+          className="flex flex-wrap gap-2"
+        >
+          {GROUP_TEMPLATES.map((template) => {
+            const selected = template.id === templateId
+            return (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => handleSelectTemplate(template.id)}
+                aria-pressed={selected}
+                disabled={createGroup.isPending}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  selected
+                    ? "border-primary bg-primary/10 text-primary font-medium"
+                    : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <span aria-hidden="true">{template.emoji}</span>
+                {template.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-sm text-muted-foreground min-h-[1.25rem]">
+          {selectedTemplate
+            ? selectedTemplate.blurb
+            : "Optional — pick one to prefill, or just name your group below."}
+        </p>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="name">Group Name</Label>
         <Input

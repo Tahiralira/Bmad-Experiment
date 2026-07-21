@@ -21,7 +21,12 @@ from starlette.requests import Request
 from app.api.deps import CurrentUser, SessionDep
 from app.core.limiter import AI_PARSE_LIMIT, limiter
 from app.features.ai import parser_service
-from app.features.ai.models import ExpenseParseRequest, ExpenseParseResponse, ParseStreamEvent
+from app.features.ai.models import (
+    AIPersonality,
+    ExpenseParseRequest,
+    ExpenseParseResponse,
+    ParseStreamEvent,
+)
 from app.features.groups.service import is_group_member
 
 router = APIRouter()
@@ -69,7 +74,10 @@ async def parse_expense(
     **Personality modes**: `professional`, `friendly` (default), `funny`.
     """
     # --- Pre-flight: real HTTP errors while we still can (before streaming) ---
-    if not is_group_member(
+    # WS10.4: a sandbox onboarding parse carries no group_id and skips the
+    # membership gate — it never persists an expense, so there is nothing to
+    # authorize against a group. Every OTHER parse still proves membership.
+    if expense_in.group_id is not None and not is_group_member(
         session, group_id=expense_in.group_id, user_id=current_user.id
     ):
         raise HTTPException(
@@ -99,9 +107,16 @@ async def parse_expense(
             ),
         )
 
-    personality = expense_in.personality or parser_service.get_group_personality(
-        session, expense_in.group_id
-    )
+    # A sandbox parse has no group to read a personality from — default to
+    # friendly (WS10.4). Grouped parses read the group's configured tone.
+    if expense_in.personality is not None:
+        personality = expense_in.personality
+    elif expense_in.group_id is not None:
+        personality = parser_service.get_group_personality(
+            session, expense_in.group_id
+        )
+    else:
+        personality = AIPersonality.FRIENDLY
 
     # Snapshot before commit: the generator below runs AFTER this function
     # returns, when the session dependency has torn down — touching the

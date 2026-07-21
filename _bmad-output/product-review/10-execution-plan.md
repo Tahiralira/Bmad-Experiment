@@ -865,11 +865,52 @@ this file breaks that merge into runnable units.
             proven via Playwright, matching WS3/WS8/WS10.2.
           Status: DONE 2026-07-21 (branch ws10.3/invite-public)
 
-    - [ ] **WS10.4 — Onboarding First-60-Seconds** (S2 §6)
+    - [x] **WS10.4 — Onboarding First-60-Seconds** (S2 §6)
           Depends on: WS7, WS10.1. Sandbox "try one expense" parse on the organic
           path; group templates (Roommates/Trip/Dinner) presetting the social
           contract; empty states name the next action.
-          Status: pending
+          - [x] Sandbox parse: `ExpenseParseRequest.group_id` made OPTIONAL; the
+                parse endpoint skips the membership gate + defaults to friendly
+                when no group_id is sent (grouped parses unchanged). It never
+                persists — only returns parsed data — and is metered like any
+                hosted parse (a model call costs money; 429 on exhausted quota).
+                Frontend `parseExpense` groupId optional (omits group_id from the
+                body). New `OnboardingSandbox` renders on the empty dashboard
+                (organic path): type an expense → real streamed commentary →
+                read-only "here's what I read" preview (formatCurrency in the
+                locale currency) → always-present "Create your first group" CTA.
+                No migration (request-field plumbing only).
+          - [x] Group templates: `ExpenseGroupCreate.strict_mode` (optional)
+                threaded into `create_expense_group` → seeds GroupSettings.
+                `frontend/src/features/groups/templates.ts` defines Roommates/
+                Trip/Dinner (name + strictMode + a social-contract blurb); chips
+                in CreateGroupForm prefill the name (only while it's still a
+                template default — never clobbers a typed name) + send strict_mode.
+                All three ship strict_mode OFF per S2 §6 ("strict-mode off"); the
+                per-template field + optional payload keep nudge-cadence /
+                settlement-cycle presets ready to attach at WS12 without reshaping
+                call sites.
+          - [x] Empty states name the next action: groups page gains a "Create
+                your first group" button (was text-only); activity "no groups"
+                gains a "Create a group" CTA; dashboard empty state IS the sandbox.
+          Verification: DONE 2026-07-21 — **backend 298 passed / 0 skipped** (was
+          294; +2 sandbox parse [no-group success + metered 429], +2 group-template
+          [default strict off, template presets strict]); `alembic check` clean (no
+          schema change). Frontend typecheck green, **111 passed** (was 103; +3
+          OnboardingSandbox, +4 CreateGroupForm templates, +1 parse omits group_id),
+          build green — main chunk **170.40 kB gz** (budget ≤250).
+          **Screenshots (Playwright, API-intercepted — no live Gemini needed):** 16
+          — sandbox idle + sandbox aha (parsed preview) + groups-empty + create-group
+          templates, each × 375px/1280px × light/dark →
+          `_bmad-output/implementation-artifacts/ws10.4-screenshots/`.
+          Notes / deviations:
+          - Sandbox is auth-gated (user is signed in on the organic path; "before
+            any setup" means before a GROUP, not before auth) and consumes the
+            normal monthly free quota — no separate quota bucket invented.
+          - Screenshot proof used Playwright request interception (canned dashboard
+            + SSE parse) rather than a live backend, sidestepping the nginx CSP /
+            cross-origin :8000 wall and the absent GEMINI_API_KEY entirely.
+          Status: DONE 2026-07-21 (branch ws10.4/onboarding)
 
     - [ ] **WS10.5 — Monetization Spec** (DOC ONLY, no code)
           Tier matrix, quota numbers (align w/ WS7 AI_FREE_MONTHLY_PARSES=20),

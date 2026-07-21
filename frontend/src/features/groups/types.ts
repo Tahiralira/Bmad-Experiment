@@ -23,6 +23,9 @@ export interface ExpenseGroupCreate {
   name: string
   /** WS10.1: locale-detected ISO-4217 currency for the new group (optional) */
   currency?: string
+  /** WS10.4: onboarding template preset for the group's social contract.
+   * Omitted when no template is chosen (backend falls back to the default). */
+  strict_mode?: boolean
 }
 
 export interface GroupMember {
