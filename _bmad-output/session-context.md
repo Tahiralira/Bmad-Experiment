@@ -1,7 +1,7 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-21 (WS10.2 done — payment links registry + universal
-mark-as-paid; WS10 split into atomic sub-sessions WS10.1–WS10.7)
+**Last Updated:** 2026-07-21 (WS10.3 done — public invite preview + OAuth-return
+auto-join; WS10 split into atomic sub-sessions WS10.1–WS10.7)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -325,12 +325,41 @@ mark-as-paid; WS10 split into atomic sub-sessions WS10.1–WS10.7)
 > frontend only display metadata — one source of truth, and the XSS-scheme guard
 > lives in one place.
 >
-> **Next: WS10.3 (Invite public preview + OAuth-return, S2-F1) — add an UNAUTH
-> public invite preview + one-tap OAuth carrying the token → auto-land in the
-> group. OWNER ACTIONS (unchanged): follow deployment.md (merge to main → Neon →
-> Render → Vercel → DNS → Google OAuth → NEON_DIRECT_URL + backup test → uptime
-> monitor); rotate the exposed PAT + repoint remote. PostHog+Sentry land in
-> WS10.6 (owner configures instances).**
+> WS10.3 (Invite public preview + OAuth-return) DONE 2026-07-21 on branch
+> `ws10.3/invite-public`: **an invited person now sees the group before signing
+> in and joins in one tap.** (a) New optional-auth dependency
+> `OptionalCurrentUser` (deps.py, `OAuth2PasswordBearer(auto_error=False)`) that
+> NEVER raises — no token, bad token, revoked, or inactive user all resolve to
+> None. (b) `GET /expense-groups/invite/{token}` is now PUBLIC: `already_member`
+> is only computed when authed (False for anonymous), `inviter_name` added,
+> per-IP `PREVIEW_LIMIT` (30/min) as defense-in-depth. No migration (reuses
+> GroupInvite). (c) Frontend `invite.$token.tsx` dropped the force-redirect to
+> /login — logged-out visitors see "<inviter> invited you to <group> — N members"
+> + one-tap "Continue with Google to join" (OAuthButtons gained `beforeRedirect`
+> to stash the token + `showDivider`/`label` props) and an email fallback;
+> signed-in visitors get the explicit Join button. (d) `auth.callback.tsx`
+> auto-accepts the pending invite after the code exchange and lands the user in
+> the group; magic-link carry (login.verify) unchanged. Backend **294 passed / 0
+> skipped** (+6); frontend typecheck green, **103 passed**, build green.
+> Screenshots → `_bmad-output/implementation-artifacts/ws10.3-screenshots/`.
+> Key learnings: (1) for a public endpoint that personalizes when signed in, use
+> a SEPARATE optional-auth dep (`auto_error=False`) — never loosen the strict
+> `CurrentUser` (it stays a hard gate everywhere else). (2) The invite carry is
+> pure frontend: sessionStorage survives the same-tab OAuth round trip, so
+> `beforeRedirect` stashes the token and the callback replays it — no backend
+> OAuth-state threading needed. (3) Playwright can't leave the page and still
+> read sessionStorage; to assert the OAuth-carry, fulfill the OAuth-login
+> navigation with **HTTP 204** (browsers stay on the current document for a 204),
+> then read sessionStorage. `window.location.assign` can't be redefined on the
+> instance ("Cannot redefine property").
+>
+> **Next: WS10.4 (Onboarding first-60-seconds, S2 §6) — sandbox "try one
+> expense" parse on the organic path, group templates (Roommates/Trip/Dinner)
+> presetting the social contract, empty states that name the next action.
+> Depends on WS7 + WS10.1. OWNER ACTIONS (unchanged): follow deployment.md (merge
+> to main → Neon → Render → Vercel → DNS → Google OAuth → NEON_DIRECT_URL +
+> backup test → uptime monitor); rotate the exposed PAT + repoint remote.
+> PostHog+Sentry land in WS10.6 (owner configures instances).**
 
 ---
 
@@ -486,9 +515,13 @@ cd frontend && npm run build
     ws10.2/payment-links; per-user global handle registry, provider deep-links
     + copy, counterparty surface at both settle paths, Settings manager;
     backend 288, frontend 103)
-  - WS10.3 Invite public preview + OAuth-return ← **NEXT** (S2-F1) · WS10.4
-    Onboarding first-60s · WS10.5 Monetization spec (doc) · WS10.6 Observability
-    (PostHog + Sentry, owner-configured) · WS10.7 Push (blocked on WS11/WS12)
+  - WS10.3 Invite public preview + OAuth-return ← **DONE** ✓ (2026-07-21;
+    branch ws10.3/invite-public; public unauth preview + inviter_name, one-tap
+    Google join carrying the token → auto-land in group; backend 294, frontend
+    103)
+  - WS10.4 Onboarding first-60s ← **NEXT** (S2 §6) · WS10.5 Monetization spec
+    (doc) · WS10.6 Observability (PostHog + Sentry, owner-configured) · WS10.7
+    Push (blocked on WS11/WS12)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

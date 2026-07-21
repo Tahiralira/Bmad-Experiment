@@ -19,6 +19,10 @@ from app.core.config import settings
 # real money per call.
 AUTH_LIMIT = "10/minute"
 AI_PARSE_LIMIT = "20/minute"
+# Public invite preview (WS10.3): unauthenticated, so a modest per-IP cap on
+# top of the global default. The token is unguessable (token_urlsafe(32)), so
+# this is defense-in-depth against scraping, not the primary guard.
+PREVIEW_LIMIT = "30/minute"
 
 limiter = Limiter(
     key_func=get_remote_address,

@@ -822,11 +822,48 @@ this file breaks that merge into runnable units.
             same lean-UI call as BYOK's keyed endpoints.
           Status: DONE 2026-07-21 (branch ws10.2/payment-links)
 
-    - [ ] **WS10.3 — Invite Public Preview + OAuth-return** (S2-F1)
+    - [x] **WS10.3 — Invite Public Preview + OAuth-return** (S2-F1)
           Depends on: WS8. Current preview endpoint requires auth — add an UNAUTH
           public preview + landing ("X invited you to 'Trip' — N members"),
           one-tap OAuth carrying the token → auto-land inside the group.
-          Status: pending
+          - [x] Optional-auth dependency `OptionalCurrentUser` (deps.py,
+                `auto_error=False` bearer) — never raises, so an anonymous
+                visitor and a broken token both get the public view.
+          - [x] `GET /expense-groups/invite/{token}` is now PUBLIC: no auth
+                required, `already_member` only computed when authed (False for
+                anonymous), `inviter_name` added to the preview, per-IP
+                `PREVIEW_LIMIT` (30/min) defense-in-depth on the unauth endpoint.
+                No new table/migration (reuses GroupInvite).
+          - [x] Public landing (`invite.$token.tsx`): dropped the force-redirect
+                to /login. Logged-out visitors see "<inviter> invited you to
+                <group> — N members" with one-tap "Continue with Google to join"
+                (stashes the token via OAuthButtons `beforeRedirect`) + an email
+                fallback; signed-in visitors get the explicit Join button.
+          - [x] OAuth-return auto-join (`auth.callback.tsx`): after the code
+                exchange, `processPendingInvite()` → POST accept → land inside the
+                group; invalid/expired invite falls through to the dashboard.
+                Magic-link carry (login.verify) unchanged.
+          Verification: DONE 2026-07-21 — **backend 294 passed / 0 skipped** (was
+          288; +6 public-preview tests: unauth 200 + inviter_name, authed
+          member/non-member already_member, invalid 404, revoked 410, garbage
+          bearer → public view). Frontend typecheck green, **103 passed**, build
+          green — main chunk unchanged (~170 kB gz). The existing WS8
+          preview-does-not-join test stays green (auth still personalizes).
+          **Screenshots (Playwright, real seeded invite):** 6 — public landing
+          (Jordan Lee → "Roommates", Google CTA + email fallback) × 375px/1280px ×
+          light/dark, plus the logged-in Join view × light/dark →
+          `_bmad-output/implementation-artifacts/ws10.3-screenshots/`. **OAuth-carry
+          proven:** clicking "Continue with Google to join" fires the OAuth login
+          request AND stashes `pending_invite_token` (204-nav trick keeps the doc
+          alive to read sessionStorage).
+          Notes / deviations:
+          - Full live-Google round trip still needs real client creds (WS8's
+            standing gap) — the carry glue + accept path are proven with a minted
+            JWT + the real accept endpoint; only Google's redirect is stubbed.
+          - Route components aren't unit-tested in this repo (thin, and
+            OAuthButtons reads `import.meta.env` at module load) — the flow is
+            proven via Playwright, matching WS3/WS8/WS10.2.
+          Status: DONE 2026-07-21 (branch ws10.3/invite-public)
 
     - [ ] **WS10.4 — Onboarding First-60-Seconds** (S2 §6)
           Depends on: WS7, WS10.1. Sandbox "try one expense" parse on the organic

@@ -13,26 +13,42 @@ const API_URL = import.meta.env.VITE_API_URL.replace(/\/$/, "")
 
 interface OAuthButtonsProps {
   disabled?: boolean
+  /** Run just before leaving for the provider — e.g. stash a pending invite
+   * token so the OAuth return can auto-join (WS10.3). */
+  beforeRedirect?: () => void
+  /** The "Or continue with" divider only reads right under a login form.
+   * Hide it when OAuth is the primary CTA (WS10.3 invite landing). */
+  showDivider?: boolean
+  /** Override the Google button label (e.g. "Continue with Google to join"). */
+  label?: string
 }
 
-export function OAuthButtons({ disabled }: OAuthButtonsProps) {
+export function OAuthButtons({
+  disabled,
+  beforeRedirect,
+  showDivider = true,
+  label = "Google",
+}: OAuthButtonsProps) {
   const handleOAuthLogin = (provider: "google") => {
+    beforeRedirect?.()
     // Redirect to backend OAuth endpoint
     window.location.assign(`${API_URL}/api/v1/auth/oauth/${provider}/login`)
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
+      {showDivider && (
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              Or continue with
+            </span>
+          </div>
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">
-            Or continue with
-          </span>
-        </div>
-      </div>
+      )}
 
       <Button
         variant="outline"
@@ -42,7 +58,7 @@ export function OAuthButtons({ disabled }: OAuthButtonsProps) {
         className="w-full"
       >
         <GoogleIcon className="mr-2 h-4 w-4" />
-        Google
+        {label}
       </Button>
     </div>
   )

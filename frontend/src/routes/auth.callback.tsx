@@ -14,6 +14,8 @@ import { AuthLayout } from "@/components/Common/AuthLayout"
 import { OpenAPI } from "@/shared/api"
 import { getApiErrorMessage } from "@/utils"
 
+import { processPendingInvite } from "./invite.$token"
+
 export const Route = createFileRoute("/auth/callback")({
   component: OAuthCallbackPage,
   validateSearch: (search: Record<string, unknown>) => ({
@@ -61,8 +63,32 @@ function OAuthCallbackPage() {
         body: { code },
         mediaType: "application/json",
       })
-        .then((response) => {
+        .then(async (response) => {
           localStorage.setItem("access_token", response.access_token)
+          // WS10.3: if the user arrived via an invite, auto-accept it and
+          // land them inside the group (one-tap OAuth join).
+          const inviteToken = processPendingInvite()
+          if (inviteToken) {
+            try {
+              const result = await __request<{ group?: { id?: string } }>(
+                OpenAPI,
+                {
+                  method: "POST",
+                  url: `/api/v1/expense-groups/invite/${inviteToken}/accept`,
+                },
+              )
+              if (result?.group?.id) {
+                navigate({
+                  to: "/groups/$groupId",
+                  params: { groupId: result.group.id },
+                })
+                return
+              }
+            } catch {
+              // Invite expired/invalid/already-joined — don't trap the user on
+              // the callback page; fall through to the dashboard.
+            }
+          }
           navigate({ to: "/" })
         })
         .catch((err: unknown) => {
