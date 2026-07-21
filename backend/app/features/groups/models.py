@@ -27,6 +27,12 @@ class ExpenseGroupCreate(SQLModel):
     # group starts in a sensible currency (editable in settings). Optional —
     # omitted/invalid falls back to the default via the service.
     currency: str | None = Field(default=None, max_length=3)
+    # WS10.4: onboarding templates (Roommates/Trip/Dinner) preset the group's
+    # "social contract" at creation. Today that contract is strict_mode; the
+    # low-friction templates all start it OFF (quiet auto-confirm). Optional —
+    # omitted falls back to the GroupSettings default (False). Nudge cadence /
+    # settlement-cycle presets slot in here once those features exist (WS12).
+    strict_mode: bool | None = Field(default=None)
 
 
 class ExpenseGroupPublic(SQLModel):

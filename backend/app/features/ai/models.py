@@ -85,10 +85,18 @@ class ExpenseParseRequest(BaseModel):
     """
     Request body for AI expense parsing.
 
-    User provides natural language expense description along with
+    User provides natural language expense description along with optional
     group context (for personality settings and member validation).
 
-    If personality is not provided, the group's default personality will be used.
+    group_id is optional (WS10.4): omit it for a SANDBOX parse on the organic
+    onboarding path — the "try one expense" aha moment that happens before the
+    user has created any group. A sandbox parse skips group membership, uses
+    the default personality, and (like every hosted parse) still counts against
+    the user's monthly free quota because it costs a real model call. It never
+    persists anything — the endpoint only ever returns parsed data.
+
+    If personality is not provided, the group's default personality will be
+    used (or the friendly default for a sandbox parse).
     """
 
     text: str = PydanticField(
@@ -97,8 +105,12 @@ class ExpenseParseRequest(BaseModel):
         max_length=500,
         description="Natural language expense description",
     )
-    group_id: uuid.UUID = PydanticField(
-        ..., description="Group ID for context and personality settings"
+    group_id: uuid.UUID | None = PydanticField(
+        default=None,
+        description=(
+            "Group ID for context and personality settings. Omit for a "
+            "sandbox onboarding parse (no group required)."
+        ),
     )
     personality: AIPersonality | None = PydanticField(
         default=None,

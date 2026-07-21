@@ -55,10 +55,14 @@ def create_expense_group(
     # WS10.1: seed the settings row with the client's locale-detected currency
     # (normalize_currency falls back to the default on empty/unknown codes) so
     # the group starts denominated correctly instead of always in USD.
+    # WS10.4: an onboarding template may also preset strict_mode; when omitted,
+    # fall back to the GroupSettings default (False) rather than forcing a value.
     settings = GroupSettings(
         group_id=group.id,
         currency=normalize_currency(group_in.currency),
     )
+    if group_in.strict_mode is not None:
+        settings.strict_mode = group_in.strict_mode
     session.add(settings)
 
     session.flush()  # Flush member + settings to DB within transaction

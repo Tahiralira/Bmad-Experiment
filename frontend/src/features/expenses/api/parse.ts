@@ -24,7 +24,12 @@ type ParseStreamEvent =
 
 export interface ParseExpenseOptions {
   text: string
-  groupId: string
+  /**
+   * Group to parse within. Omit for a SANDBOX onboarding parse (WS10.4) — the
+   * "try one expense" aha moment before the user has any group. The backend
+   * skips the membership check when no group_id is sent.
+   */
+  groupId?: string
   /** Called for each commentary chunk (word-level) as it streams in */
   onCommentary?: (chunk: string) => void
   /** Abort when the modal closes / a new parse supersedes this one */
@@ -47,7 +52,8 @@ export async function parseExpense({
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ text, group_id: groupId }),
+    // Send group_id only when parsing within a group; a sandbox parse omits it.
+    body: JSON.stringify(groupId ? { text, group_id: groupId } : { text }),
     signal,
   })
 

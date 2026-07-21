@@ -7,11 +7,11 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-07-16 (WS9.6: GIT-002 gitignore-hidden source files, DOCKER-006 stale image vs mounted tests)
+# Last Updated: 2026-07-21 (WS10.4: FE-009 Playwright API interception for pixel proof)
 
 metadata:
   version: "1.0"
-  total_patterns: 30
+  total_patterns: 31
   categories:
     - docker
     - database
@@ -621,6 +621,33 @@ testing:
     prevention: "For frontend pixel proof on this project use Playwright + bypassCSP + docker-cp'd dist; the browser-pane/preview screenshot tools hang here (WS3+)"
     stories_encountered: ["WS10.2"]
     tokens_saved_estimate: "~800 per occurrence"
+
+  - id: "FE-009"
+    title: "Pixel proof for UI that needs a live backend/AI — intercept, don't wire"
+    symptoms:
+      - "A screenshot needs a logged-in user, seeded data, or an AI response"
+      - "The nginx build blocks the :8000 API (CSP) and there's no GEMINI_API_KEY"
+    root_cause: |
+      Driving the real stack for a screenshot means fighting the CSP wall
+      (FE-008), CORS from :5173→:8000, auth seeding, AND any external service
+      (Gemini) that isn't configured locally.
+    solution: |
+      Decouple the screenshot from the backend with Playwright request
+      interception (WS10.4). In a launched-chromium script:
+      1. context({ bypassCSP: true, colorScheme, viewport }); addInitScript sets
+         localStorage access_token (any value — isLoggedIn() only checks
+         presence) + vite-ui-theme (light/dark).
+      2. page.route the API with canned responses: JSON for reads, and a
+         hand-rolled SSE body ("data: {...}\n\n" frames ending in a `complete`
+         event) for the streaming parse endpoint.
+      CRITICAL: register the CATCH-ALL route (**/api/v1/**) FIRST — Playwright
+      matches routes in REVERSE registration order, so specific routes must be
+      registered AFTER the catch-all to win.
+      docker-cp the fresh dist into the frontend container first (FE-008); the
+      script hits http://localhost:5173 and every /api call is intercepted.
+    prevention: "When a screenshot's only blocker is live data/AI, intercept the API in Playwright rather than provisioning the backend; catch-all route registered first"
+    stories_encountered: ["WS10.4"]
+    tokens_saved_estimate: "~700 per occurrence"
 
 # =============================================================================
 # ARCHITECTURE PATTERNS

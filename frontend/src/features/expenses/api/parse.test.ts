@@ -129,4 +129,14 @@ describe("parseExpense", () => {
       ParseError
     )
   })
+
+  it("omits group_id for a sandbox parse (no groupId — WS10.4)", async () => {
+    fetchMock.mockResolvedValue(sseResponse([COMPLETE_EVENT]))
+
+    await parseExpense({ text: "Paid 40 for pizza" })
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(JSON.parse(init.body)).toEqual({ text: "Paid 40 for pizza" })
+    expect(JSON.parse(init.body)).not.toHaveProperty("group_id")
+  })
 })

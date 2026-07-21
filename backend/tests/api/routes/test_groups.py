@@ -697,6 +697,33 @@ def test_update_currency_rejects_unknown_code(
     assert r.status_code == 422
 
 
+# === Onboarding template presets (WS10.4 / S2 §6) ===
+
+
+def test_create_group_defaults_strict_mode_off(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """No template preset → GroupSettings.strict_mode keeps its default (off)."""
+    group = _create_group(client, normal_user_token_headers, name="Plain")
+    body = _get_settings(client, normal_user_token_headers, group["id"])
+    assert body["strict_mode"] is False
+
+
+def test_create_group_template_can_preset_strict_mode(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """A template may seed strict_mode at creation (the social-contract preset).
+
+    All shipped templates start it OFF, but the plumbing must honor whatever
+    value the client sends so a future template can diverge.
+    """
+    group = _create_group(
+        client, normal_user_token_headers, name="Formal", strict_mode=True
+    )
+    body = _get_settings(client, normal_user_token_headers, group["id"])
+    assert body["strict_mode"] is True
+
+
 def test_dashboard_currency_shared_vs_mixed(
     client: TestClient, db: Session
 ) -> None:

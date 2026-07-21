@@ -75,9 +75,14 @@ function Groups() {
             <Users className="h-8 w-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-semibold">No groups yet</h3>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-4">
             Create a group to start tracking shared expenses
           </p>
+          {/* Empty state names the next action (WS10.4) */}
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create your first group
+          </Button>
         </div>
       ) : (
         /* Each group is a real URL now (WS5/S4-H3): deep-linkable,
