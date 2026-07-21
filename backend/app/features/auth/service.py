@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlmodel import Session, delete, func, select
 
+from app.core.payment_providers import build_pay_url, provider_name
 from app.core.security import get_password_hash
 from app.features.auth.models import (
     User,
@@ -15,6 +16,10 @@ from app.features.auth.models import (
     UserUpdate,
     LoginCode,
     MagicLinkToken,
+    PaymentMethod,
+    PaymentMethodCreate,
+    PaymentMethodPublic,
+    PaymentMethodUpdate,
     RevokedToken,
     AUTH_METHOD_OAUTH,
     GroupBalanceSummary,
@@ -139,6 +144,109 @@ def soft_delete_user(session: Session, user: User) -> None:
     session.exec(
         delete(MagicLinkToken).where(MagicLinkToken.email == original_email)
     )
+    # Payment handles are PII (a Venmo/UPI/IBAN identifies the person) — scrub
+    # them with the rest (WS10.2). Financial rows stay; contact handles don't.
+    session.exec(
+        delete(PaymentMethod).where(PaymentMethod.user_id == user.id)
+    )
+    session.flush()
+
+
+# ============================================================================
+# PAYMENT METHODS (WS10.2)
+# ============================================================================
+
+
+def build_payment_method_public(pm: PaymentMethod) -> PaymentMethodPublic:
+    """Shape a stored handle for the wire: adds the display name and the
+    server-computed deep link (None = copy-only)."""
+    return PaymentMethodPublic(
+        id=pm.id,
+        provider=pm.provider,
+        provider_name=provider_name(pm.provider),
+        handle=pm.handle,
+        label=pm.label,
+        pay_url=build_pay_url(pm.provider, pm.handle),
+    )
+
+
+def list_payment_methods(
+    session: Session, user_id: uuid.UUID
+) -> list[PaymentMethod]:
+    """All of a user's payment handles, oldest first (stable order)."""
+    return list(
+        session.exec(
+            select(PaymentMethod)
+            .where(PaymentMethod.user_id == user_id)
+            .order_by(PaymentMethod.created_at)
+        ).all()
+    )
+
+
+def count_payment_methods(session: Session, user_id: uuid.UUID) -> int:
+    """How many handles a user has registered (for the per-user cap)."""
+    return session.exec(
+        select(func.count())
+        .select_from(PaymentMethod)
+        .where(PaymentMethod.user_id == user_id)
+    ).one()
+
+
+def find_payment_method(
+    session: Session, user_id: uuid.UUID, provider: str, handle: str
+) -> PaymentMethod | None:
+    """Look up an exact (provider, handle) the user already has — the friendly
+    pre-check behind the unique constraint (router → 409 on a duplicate)."""
+    return session.exec(
+        select(PaymentMethod).where(
+            PaymentMethod.user_id == user_id,
+            PaymentMethod.provider == provider,
+            PaymentMethod.handle == handle,
+        )
+    ).first()
+
+
+def get_payment_method(
+    session: Session, method_id: uuid.UUID, user_id: uuid.UUID
+) -> PaymentMethod | None:
+    """Fetch one handle, scoped to its owner (returns None if not theirs)."""
+    pm = session.get(PaymentMethod, method_id)
+    if pm is None or pm.user_id != user_id:
+        return None
+    return pm
+
+
+def create_payment_method(
+    session: Session, *, user_id: uuid.UUID, data: PaymentMethodCreate
+) -> PaymentMethod:
+    """Persist one handle. Caller validates the cap + duplicates first; the
+    unique constraint is the backstop. Flushes; the router commits (ARCH-001)."""
+    pm = PaymentMethod(
+        user_id=user_id,
+        provider=data.provider,
+        handle=data.handle,
+        label=data.label,
+    )
+    session.add(pm)
+    session.flush()
+    return pm
+
+
+def update_payment_method(
+    session: Session, pm: PaymentMethod, data: PaymentMethodUpdate
+) -> PaymentMethod:
+    """Apply a partial update (handle/label). Flushes; the router commits."""
+    updates = data.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(pm, field, value)
+    session.add(pm)
+    session.flush()
+    return pm
+
+
+def delete_payment_method(session: Session, pm: PaymentMethod) -> None:
+    """Remove a handle. Flushes; the router commits."""
+    session.delete(pm)
     session.flush()
 
 

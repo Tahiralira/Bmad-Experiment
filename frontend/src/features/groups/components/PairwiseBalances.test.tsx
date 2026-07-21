@@ -22,6 +22,14 @@ vi.mock("@/features/expenses/api/expenses", () => ({
   useSettleUp: () => ({ mutate: mockSettleUpMutate, isPending: false }),
 }))
 
+// Stub the counterparty payment surface (WS10.2) — it has its own tests and
+// uses react-query, which this suite deliberately doesn't wire up.
+vi.mock("@/features/payments/components/PaymentHandles", () => ({
+  PaymentHandles: ({ counterpartyName }: { counterpartyName: string }) => (
+    <div data-testid="payment-handles">pay {counterpartyName}</div>
+  ),
+}))
+
 const GROUP_ID = "11111111-1111-1111-1111-111111111111"
 
 function setBalances(items: PairwiseBalanceItem[]) {
@@ -89,6 +97,8 @@ describe("PairwiseBalances", () => {
     // Nothing sent yet — manual confirm only (product constitution)
     expect(mockSettleUpMutate).not.toHaveBeenCalled()
     expect(screen.getByText(/paid sam \$30\.00\?/i)).toBeInTheDocument()
+    // The counterparty's payment handles surface at this step (WS10.2)
+    expect(screen.getByTestId("payment-handles")).toBeInTheDocument()
 
     // Step 2: the confirmation
     fireEvent.click(screen.getByRole("button", { name: /yes, i paid/i }))

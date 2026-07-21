@@ -24,6 +24,8 @@ from app.features.auth.models import (
     # Session security models (WS8)
     LoginCode,
     RevokedToken,
+    # Payment methods (WS10.2)
+    PaymentMethod,
     # Auth method constants
     AUTH_METHOD_PASSWORD,
     AUTH_METHOD_MAGIC_LINK,
@@ -52,6 +54,8 @@ __all__ = [
     # Session security models (WS8)
     "LoginCode",
     "RevokedToken",
+    # Payment methods (WS10.2)
+    "PaymentMethod",
     # Auth method constants
     "AUTH_METHOD_PASSWORD",
     "AUTH_METHOD_MAGIC_LINK",

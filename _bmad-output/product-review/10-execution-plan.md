@@ -771,12 +771,56 @@ this file breaks that merge into runnable units.
           established fallback (WS3/WS8) if pixel proof is required before merge.
           Status: DONE 2026-07-20 (branch ws10.1/currency)
 
-    - [ ] **WS10.2 — Payment Links Registry + Universal Mark-as-Paid**
+    - [x] **WS10.2 — Payment Links Registry + Universal Mark-as-Paid**
           Depends on: WS6, WS10.1. Owner: per-user GLOBAL handles; cover major
           providers (Venmo, PayPal.Me, Cash App, Revolut, UPI, IBAN-copy) + a
           frictionless CUSTOM handle path (countries differ); deep-link where
           supported else copy; surface counterparty handles + "mark as paid" at settle.
-          Status: pending
+          - [x] `payment_method` table (per-user, GLOBAL — not per-group; a
+                person's Venmo/UPI/IBAN is the same wherever they settle) +
+                migration `c2d3e4f5a6b7`; unique per (user, provider, handle),
+                per-user cap (12), CASCADE on hard-delete + PII-scrub on
+                soft-delete. Self-service CRUD under `/users/me/payment-methods`
+                (provider validated against registry → 422; duplicate/cap → 409).
+          - [x] `app/core/payment_providers.py` registry (single source of truth
+                for valid codes + `build_pay_url`): venmo/paypal/cashapp/revolut
+                deep-link to profile pages, upi → `upi://pay?pa=`, iban → copy-only,
+                custom → pasted https link becomes a button else copy-only. Handles
+                URL-encoded; custom URLs restricted to http(s) (stored-XSS guard on
+                the rendered href). Frontend `lib/payment-providers.ts` mirror holds
+                ONLY presentation metadata (names/placeholders) — pay_url is
+                server-computed, never duplicated.
+          - [x] Counterparty lookup `GET /expense-groups/{id}/members/{uid}/
+                payment-methods`, authorized by SHARED group membership (caller a
+                member → 403 else; target a member → 404 else). Handles are meant
+                to be seen by the people who owe you — public within that boundary.
+          - [x] Universal mark-as-paid: `PaymentHandles` (Pay deep-link where one
+                exists + always Copy) surfaced at BOTH settle surfaces — the
+                pairwise "Between you and…" settle-up confirm AND the per-expense
+                "Ready to settle" card, before the pay action. Manager
+                (`PaymentMethodsManager`) added as a Settings tab.
+          Verification: DONE 2026-07-21 — **backend 288 passed / 0 skipped** (was
+          258; +30: 13 provider-URL unit tests incl. XSS-scheme rejection + 17 API
+          tests incl. CRUD/validation/cap/dup/counterparty-authz/soft-delete scrub);
+          `alembic check` clean, downgrade exercised. Frontend typecheck green,
+          **103 passed** (+9: registry + PaymentHandles), build green — main chunk
+          **170.20 kB gz** (budget ≤250), payments split to its own 1.37 kB chunk.
+          **Screenshots (Playwright, real seeded scenario — You owe Alex $50):** 8
+          shots (group settle-up with Alex's Venmo/PayPal Pay-links + IBAN copy-only,
+          and Settings manager × 375px/1280px × light/dark) →
+          `_bmad-output/implementation-artifacts/ws10.2-screenshots/`.
+          Notes / deviations:
+          - The nginx build serves an image-baked bundle + a strict CSP
+            (`connect-src 'self' https:`) that blocks the http://localhost:8000 API
+            locally — this is the "CORS-blocked" wall WS10.1 hit (it's CSP). Pixel
+            proof path: `docker compose cp frontend/dist/. frontend:/usr/share/
+            nginx/html/` to serve the fresh build, then Playwright with
+            `bypassCSP:true` + a minted JWT in localStorage. The CSP itself stays
+            verified by WS8's tests, not bypassed in production.
+          - Edit endpoint (`PUT /users/me/payment-methods/{id}`) exists + tested but
+            the manager UI does add + remove only (change = remove & re-add) — the
+            same lean-UI call as BYOK's keyed endpoints.
+          Status: DONE 2026-07-21 (branch ws10.2/payment-links)
 
     - [ ] **WS10.3 — Invite Public Preview + OAuth-return** (S2-F1)
           Depends on: WS8. Current preview endpoint requires auth — add an UNAUTH

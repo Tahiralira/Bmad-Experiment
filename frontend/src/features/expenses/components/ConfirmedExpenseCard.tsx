@@ -3,6 +3,7 @@ import { CheckCircle, Clock, Banknote } from "lucide-react"
 import { toast } from "sonner"
 
 import { BalanceDisplay } from "@/components/ui/balance-display"
+import { PaymentHandles } from "@/features/payments/components/PaymentHandles"
 import { formatCurrency } from "@/lib/currency"
 import { useCurrency } from "@/lib/currency-context"
 import { cn } from "@/lib/utils"
@@ -149,6 +150,17 @@ export function ConfirmedExpenseCard({
               Awaiting confirmation from{" "}
               {ownerName || "expense owner"}
             </span>
+          </div>
+        )}
+
+        {/* Counterparty payment handles (WS10.2) — pay before you mark paid */}
+        {!isSettled && (
+          <div className="mt-3 border-t border-border pt-3">
+            <PaymentHandles
+              groupId={expense.group_id}
+              counterpartyUserId={expense.payer_id}
+              counterpartyName={ownerName ?? "the payer"}
+            />
           </div>
         )}
 

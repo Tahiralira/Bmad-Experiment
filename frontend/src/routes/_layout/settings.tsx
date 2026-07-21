@@ -3,11 +3,17 @@ import { createFileRoute } from "@tanstack/react-router"
 import DeleteAccount from "@/components/UserSettings/DeleteAccount"
 import UserInformation from "@/components/UserSettings/UserInformation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PaymentMethodsManager } from "@/features/payments"
 import useAuth from "@/hooks/useAuth"
 
 // ClearDues is passwordless — the template's Password tab died in WS8
 const tabsConfig = [
   { value: "my-profile", title: "My profile", component: UserInformation },
+  {
+    value: "payment-methods",
+    title: "Payment methods",
+    component: PaymentMethodsManager,
+  },
   { value: "danger-zone", title: "Danger zone", component: DeleteAccount },
 ]
 

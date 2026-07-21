@@ -599,6 +599,29 @@ testing:
     stories_encountered: ["WS9"]
     tokens_saved_estimate: "~300 per occurrence"
 
+  - id: "FE-008"
+    title: "Playwright pixel proof against the local nginx build (stale bundle + CSP wall)"
+    symptoms:
+      - "New frontend UI doesn't appear at localhost:5173 even after npm run build"
+      - "Console: 'Connecting to http://localhost:8000 violates CSP directive connect-src self https:' — all API calls blocked (WS10.1 mislabeled this 'CORS-blocked')"
+    root_cause: |
+      Two independent walls. (1) The frontend container serves an IMAGE-BAKED
+      bundle from /usr/share/nginx/html — a host `npm run build` writes to
+      frontend/dist, which nginx never sees. (2) WS8's nginx.conf ships a strict
+      CSP (connect-src 'self' https:) that blocks the plain-http
+      localhost:8000 API in local dev.
+    solution: |
+      1. Serve the fresh build: `docker compose cp frontend/dist/. frontend:/usr/share/nginx/html/`
+      2. Mint a JWT in-container (security.create_access_token) and drive Playwright:
+         context({ bypassCSP: true }); addInitScript sets localStorage
+         access_token + vite-ui-theme (dark/light); goto the route; fullPage
+         screenshot. bypassCSP only affects the test browser — prod CSP is
+         verified by WS8's suite, never weakened.
+      Seed demo users with @*.example.com (email-validator rejects .local/.test).
+    prevention: "For frontend pixel proof on this project use Playwright + bypassCSP + docker-cp'd dist; the browser-pane/preview screenshot tools hang here (WS3+)"
+    stories_encountered: ["WS10.2"]
+    tokens_saved_estimate: "~800 per occurrence"
+
 # =============================================================================
 # ARCHITECTURE PATTERNS
 # =============================================================================

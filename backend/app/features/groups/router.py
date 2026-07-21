@@ -14,7 +14,8 @@ from app.features.expenses.models import (
     PairwiseBalancesPublic,
 )
 from app.features.groups import service
-from app.features.auth.models import Message
+from app.features.auth import service as auth_service
+from app.features.auth.models import Message, PaymentMethodsPublic
 from app.features.groups.models import (
     ExpenseGroup,
     ExpenseGroupCreate,
@@ -309,6 +310,42 @@ def list_group_members(
     return GroupMembersListResponse(
         members=members,
         count=len(members),
+    )
+
+
+@router.get(
+    "/{group_id}/members/{member_user_id}/payment-methods",
+    response_model=PaymentMethodsPublic,
+)
+def get_member_payment_methods(
+    group_id: uuid.UUID,
+    member_user_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> PaymentMethodsPublic:
+    """
+    A group member's payment handles, so you can pay someone you owe at settle
+    time (WS10.2 — "universal mark-as-paid").
+
+    Authorized by SHARED group membership: the caller must be a member of the
+    group AND the target must be a member of the SAME group (404 otherwise —
+    handles aren't a directory to probe across the app). Handles are meant to
+    be seen by the people who owe you, so within that boundary they are public.
+    """
+    _get_group_for_member(session, group_id, current_user)
+
+    if not service.is_group_member(
+        session, group_id=group_id, user_id=member_user_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="That person isn't a member of this group",
+        )
+
+    methods = auth_service.list_payment_methods(session, member_user_id)
+    return PaymentMethodsPublic(
+        data=[auth_service.build_payment_method_public(m) for m in methods],
+        count=len(methods),
     )
 
 
