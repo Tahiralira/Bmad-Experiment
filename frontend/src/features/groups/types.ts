@@ -58,13 +58,15 @@ export interface GroupInvitesResponse {
   count: number
 }
 
-/** What an invited person sees BEFORE joining (WS8/S5-M4). */
+/** What an invited person sees BEFORE joining (WS8/S5-M4; public in WS10.3). */
 export interface InvitePreview {
   group_id: string
   group_name: string
   member_count: number
   expires_at: string
   already_member: boolean
+  /** WS10.3: "<inviter> invited you to <group>" on the public landing. */
+  inviter_name: string | null
 }
 
 // === Pairwise Balances (WS6/S2-F9) ===

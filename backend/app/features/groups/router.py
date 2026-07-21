@@ -2,9 +2,11 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, status
+from starlette.requests import Request
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, OptionalCurrentUser, SessionDep
 from app.core.config import settings
+from app.core.limiter import PREVIEW_LIMIT, limiter
 from app.features.expenses.models import (
     AuditLogsPublic,
     ExpensePublic,
@@ -15,7 +17,7 @@ from app.features.expenses.models import (
 )
 from app.features.groups import service
 from app.features.auth import service as auth_service
-from app.features.auth.models import Message, PaymentMethodsPublic
+from app.features.auth.models import Message, PaymentMethodsPublic, User
 from app.features.groups.models import (
     ExpenseGroup,
     ExpenseGroupCreate,
@@ -474,16 +476,21 @@ def _get_valid_invite(session: SessionDep, token: str) -> GroupInvite:
 
 
 @router.get("/invite/{token}", response_model=InvitePreview)
+@limiter.limit(PREVIEW_LIMIT)
 def preview_invite(
+    request: Request,
     token: str,
     session: SessionDep,
-    current_user: CurrentUser,
+    current_user: OptionalCurrentUser,
 ) -> InvitePreview:
     """
-    Preview an invite WITHOUT joining: group name, member count, expiry.
+    Preview an invite WITHOUT joining: inviter, group name, member count, expiry.
 
-    Read-only — the landing page renders this and joining happens via the
-    explicit POST below. (WS10 extends this into the public preview page.)
+    PUBLIC (WS10.3): no auth required, so a logged-out invitee sees the group
+    before deciding to sign in. `already_member` is only meaningful for an
+    authenticated caller (False for anonymous visitors). Read-only — joining is
+    the explicit POST below. Rate-limited per IP (defense-in-depth on an
+    unauthenticated endpoint).
     """
     invite = _get_valid_invite(session, token)
 
@@ -494,14 +501,18 @@ def preview_invite(
             detail="The group no longer exists",
         )
 
+    inviter = session.get(User, invite.created_by)
+    already_member = current_user is not None and service.is_group_member(
+        session, group_id=group.id, user_id=current_user.id
+    )
+
     return InvitePreview(
         group_id=group.id,
         group_name=group.name,
         member_count=service.get_group_member_count(session, group.id),
         expires_at=invite.expires_at,
-        already_member=service.is_group_member(
-            session, group_id=group.id, user_id=current_user.id
-        ),
+        already_member=already_member,
+        inviter_name=(inviter.full_name if inviter else None),
     )
 
 

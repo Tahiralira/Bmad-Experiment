@@ -118,11 +118,14 @@ class GroupInvitesPublic(SQLModel):
 
 
 class InvitePreview(SQLModel):
-    """What an invited person sees BEFORE joining (WS8/S5-M4).
+    """What an invited person sees BEFORE joining (WS8/S5-M4; public in WS10.3).
 
     Accepting used to be a state-changing GET — any link prefetcher could
     join a group. Now GET shows this preview and joining is an explicit POST
-    from the landing page.
+    from the landing page. WS10.3 makes this preview PUBLIC (no auth): a
+    logged-out invitee sees the group before deciding to sign in, so
+    `already_member` is only meaningful when a caller is authenticated
+    (False for anonymous visitors).
     """
 
     group_id: uuid.UUID
@@ -130,6 +133,8 @@ class InvitePreview(SQLModel):
     member_count: int
     expires_at: datetime
     already_member: bool
+    # WS10.3: "<inviter> invited you to <group>" on the public landing page.
+    inviter_name: str | None = None
 
 
 # === Database Models ===
