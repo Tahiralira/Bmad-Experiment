@@ -3,6 +3,8 @@ import { Clock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BalanceDisplay } from "@/components/ui/balance-display"
+import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/currency-context"
 import { usePendingSettlements } from "../api/expenses"
 import type { PendingSettlement } from "../types"
 import { formatRelativeTime } from "../utils/timeFormat"
@@ -82,6 +84,7 @@ interface PendingSettlementCardProps {
 
 function PendingSettlementCard({ item }: PendingSettlementCardProps) {
   const { expense, claim } = item
+  const currency = useCurrency()
 
   return (
     <Card>
@@ -104,7 +107,7 @@ function PendingSettlementCard({ item }: PendingSettlementCardProps) {
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Total expense</p>
             <p className="text-lg font-semibold">
-              Rs {expense.amount}
+              {formatCurrency(expense.amount, currency)}
             </p>
           </div>
         </div>

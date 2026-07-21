@@ -600,3 +600,141 @@ def test_list_group_members_owner_first(
     # Owner should be first (descending sort: owner > member)
     assert members[0]["role"] == GROUP_ROLE_OWNER
     assert members[1]["role"] == GROUP_ROLE_MEMBER
+
+
+# ---------------------------------------------------------------------------
+# WS10.1 — per-group currency (global market)
+# ---------------------------------------------------------------------------
+
+
+def _create_group(client: TestClient, headers: dict[str, str], **body) -> dict:
+    body.setdefault("name", "Currency Group")
+    r = client.post(
+        f"{settings.API_V1_STR}/expense-groups/", headers=headers, json=body
+    )
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _get_settings(client: TestClient, headers: dict[str, str], group_id: str) -> dict:
+    r = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{group_id}/settings", headers=headers
+    )
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_create_group_defaults_currency_to_usd(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """A group created without a currency defaults to USD."""
+    group = _create_group(client, normal_user_token_headers, name="No Currency")
+    body = _get_settings(client, normal_user_token_headers, group["id"])
+    assert body["currency"] == "USD"
+
+
+def test_create_group_with_currency(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """The client's locale-detected currency is seeded at creation."""
+    group = _create_group(
+        client, normal_user_token_headers, name="Euro Trip", currency="EUR"
+    )
+    body = _get_settings(client, normal_user_token_headers, group["id"])
+    assert body["currency"] == "EUR"
+
+
+def test_create_group_with_unknown_currency_falls_back_to_usd(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """An unknown currency at creation is tolerated (normalized to default),
+    not a hard 422 — creation should never fail on a bad client guess."""
+    group = _create_group(
+        client, normal_user_token_headers, name="Bad Guess", currency="ZZZ"
+    )
+    body = _get_settings(client, normal_user_token_headers, group["id"])
+    assert body["currency"] == "USD"
+
+
+def test_group_detail_includes_currency(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    group = _create_group(
+        client, normal_user_token_headers, name="Detail", currency="INR"
+    )
+    r = client.get(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}",
+        headers=normal_user_token_headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["currency"] == "INR"
+
+
+def test_owner_updates_currency_case_insensitive(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """PATCH accepts a lowercase code and uppercases it."""
+    group = _create_group(client, normal_user_token_headers, name="Patch me")
+    r = client.patch(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/settings",
+        headers=normal_user_token_headers,
+        json={"currency": "gbp"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["currency"] == "GBP"
+
+
+def test_update_currency_rejects_unknown_code(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """An unknown ISO-4217 code is a 422 on the explicit settings update."""
+    group = _create_group(client, normal_user_token_headers, name="Reject")
+    r = client.patch(
+        f"{settings.API_V1_STR}/expense-groups/{group['id']}/settings",
+        headers=normal_user_token_headers,
+        json={"currency": "XYZ"},
+    )
+    assert r.status_code == 422
+
+
+def test_dashboard_currency_shared_vs_mixed(
+    client: TestClient, db: Session
+) -> None:
+    """The dashboard reports a shared currency only when all groups agree;
+    otherwise it is null so the frontend hides the cross-currency total.
+
+    Uses a FRESH user — the dashboard aggregates ALL of a user's groups, and
+    the shared normal_user accumulates committed groups from other tests.
+    """
+    from app import crud
+    from app.models import UserCreate
+    from tests.utils.utils import (
+        random_email,
+        random_lower_string,
+        token_headers_for_user,
+    )
+
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+    )
+    headers = token_headers_for_user(user)
+
+    _create_group(client, headers, name="A", currency="EUR")
+    b = _create_group(client, headers, name="B", currency="EUR")
+
+    r = client.get(f"{settings.API_V1_STR}/users/me/dashboard", headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["currency"] == "EUR"
+    # Every group row carries its own currency
+    assert all(g["currency"] == "EUR" for g in data["groups"])
+
+    # Add a group in a different currency → shared currency collapses to null
+    client.patch(
+        f"{settings.API_V1_STR}/expense-groups/{b['id']}/settings",
+        headers=headers,
+        json={"currency": "JPY"},
+    )
+    r = client.get(f"{settings.API_V1_STR}/users/me/dashboard", headers=headers)
+    assert r.json()["currency"] is None

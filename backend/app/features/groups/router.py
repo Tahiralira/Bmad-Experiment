@@ -129,6 +129,7 @@ def get_group_detail(
         net_balance=expense_service.get_group_net_balance(
             session, group_id, current_user.id
         ),
+        currency=service.get_group_currency(session, group_id),
     )
 
 
@@ -225,6 +226,7 @@ def get_group_settings(
         group_id=settings_row.group_id,
         strict_mode=settings_row.strict_mode,
         ai_personality=settings_row.ai_personality,
+        currency=settings_row.currency,
     )
     session.commit()  # persists the lazily-created defaults row
     return response
@@ -268,6 +270,7 @@ def update_group_settings(
         group_id=settings_row.group_id,
         strict_mode=settings_row.strict_mode,
         ai_personality=settings_row.ai_personality,
+        currency=settings_row.currency,
     )
 
 

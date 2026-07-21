@@ -144,6 +144,9 @@ export function useUpdateGroupSettings(groupId: string) {
       if (variables.ai_personality !== undefined) {
         toast.success(PERSONALITY_TOAST[settings.ai_personality])
       }
+      if (variables.currency !== undefined) {
+        toast.success(`Group currency set to ${settings.currency}`)
+      }
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error))

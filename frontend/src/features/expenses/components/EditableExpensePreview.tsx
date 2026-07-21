@@ -5,6 +5,7 @@ import { Check, ChevronDown, ChevronUp, Settings, Lock } from "lucide-react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
+import { useCurrency } from "@/lib/currency-context"
 import { InlineEditableField } from "@/components/ui/inline-input"
 import { useExpenseEdit } from "../hooks/useExpenseEdit"
 import { useSplitState } from "../hooks/useSplitState"
@@ -72,6 +73,9 @@ export function EditableExpensePreview({
   const { data: membersData, isLoading: isLoadingMembers } = useGroupMembers(groupId)
   const members: GroupMemberType[] = membersData?.members || []
 
+  // The group's currency (WS10.1) — from CurrencyProvider in SmartInputModal
+  const currency = useCurrency()
+
   // Story 4.1: Creator check for editing existing expenses
   // If expense is provided, check if current user is the creator
   const isCreator = expense && currentUserId ? expense.created_by === currentUserId : true
@@ -117,6 +121,7 @@ export function EditableExpensePreview({
     totalAmount: Number(editedData.amount),
     members,
     payerId: editedData.payer_id,
+    currency,
   })
 
   // Pre-populate custom amounts when switching from equal to unequal split (Story 3.6)

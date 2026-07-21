@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { type ElementType, useState } from "react"
 
+import { useCurrency } from "@/lib/currency-context"
 import type { AuditActionType, AuditLog } from "../types"
 import {
   formatActivityEntry,
@@ -35,10 +36,11 @@ export function ActivityFeedItem({
   showGroupName,
 }: ActivityFeedItemProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const currency = useCurrency()
   const Icon = ACTION_ICONS[log.action_type] || Plus
   const colorClass = getActionColor(log.action_type)
   const initials = getUserInitials(log.user_name)
-  const description = formatActivityEntry(log)
+  const description = formatActivityEntry(log, currency)
 
   return (
     <div

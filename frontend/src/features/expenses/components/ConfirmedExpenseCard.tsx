@@ -3,6 +3,8 @@ import { CheckCircle, Clock, Banknote } from "lucide-react"
 import { toast } from "sonner"
 
 import { BalanceDisplay } from "@/components/ui/balance-display"
+import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/currency-context"
 import { cn } from "@/lib/utils"
 import { useSettleExpense } from "../api/expenses"
 import type { Expense, ExpenseSplit } from "../types"
@@ -51,6 +53,7 @@ export function ConfirmedExpenseCard({
   className,
 }: ConfirmedExpenseCardProps) {
   const settleMutation = useSettleExpense()
+  const currency = useCurrency()
   const [isOptimisticSettled, setIsOptimisticSettled] = useState(false)
 
   // Revert optimistic state if the actual mutation fails
@@ -113,7 +116,7 @@ export function ConfirmedExpenseCard({
               {expense.description}
             </h3>
             <p className="text-sm text-muted-foreground">
-              Total: Rs {expense.amount}
+              Total: {formatCurrency(expense.amount, currency)}
             </p>
           </div>
 

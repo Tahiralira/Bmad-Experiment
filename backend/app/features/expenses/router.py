@@ -2,9 +2,10 @@
 import uuid
 
 from fastapi import APIRouter, Body, HTTPException, Query
-from sqlmodel import select
+from sqlmodel import Session, select
 
 from app.api.deps import CurrentUser, SessionDep
+from app.core.currency import DEFAULT_CURRENCY, normalize_currency
 from app.features.expenses import service as expense_service
 from app.features.expenses.models import (
     AggregateSettleUpRequest,
@@ -39,6 +40,26 @@ router = APIRouter(prefix="/expenses", tags=["expenses"])
 # mutating endpoint here commits exactly once, after all writes (including
 # audit entries) have joined the same transaction. See solution-patterns.yaml
 # ARCH-001.
+
+
+def _group_currency_map(
+    session: Session, group_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """Map group_id -> ISO-4217 currency for a set of groups in ONE query
+    (WS10.1). Used by cross-group lists so each row renders in its own
+    currency without an N+1 lookup. Groups without a settings row are absent
+    from the map; callers fall back to the default.
+    """
+    if not group_ids:
+        return {}
+    from app.features.groups.models import GroupSettings
+
+    rows = session.exec(
+        select(GroupSettings.group_id, GroupSettings.currency).where(
+            GroupSettings.group_id.in_(group_ids)  # type: ignore[attr-defined]
+        )
+    ).all()
+    return {group_id: normalize_currency(currency) for group_id, currency in rows}
 
 
 @router.post("/", response_model=ExpensePublic)
@@ -319,11 +340,19 @@ def get_pending_confirmations(
         session, current_user.id
     )
 
+    # WS10.1: resolve each expense's group currency in ONE query (no N+1) so
+    # the cross-group list renders each card in its own currency.
+    currency_by_group = _group_currency_map(
+        session, {item["expense"].group_id for item in pending_data}
+    )
+
     result = []
     for item in pending_data:
+        expense = item["expense"]
         result.append(PendingConfirmationPublic(
-            expense=ExpensePublic.model_validate(item["expense"]),
-            split=ExpenseSplitPublic.model_validate(item["split"])
+            expense=ExpensePublic.model_validate(expense),
+            split=ExpenseSplitPublic.model_validate(item["split"]),
+            currency=currency_by_group.get(expense.group_id, DEFAULT_CURRENCY),
         ))
 
     return result

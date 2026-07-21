@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useUserGroups } from "@/features/groups/api/groups"
+import { useGroupSettings, useUserGroups } from "@/features/groups/api/groups"
+import { CurrencyProvider } from "@/lib/currency-context"
 import { useAuth } from "@/hooks/useAuth"
 import { AICommentaryBubble } from "./AICommentaryBubble"
 import { ExpensePreviewCard } from "./ExpensePreviewCard"
@@ -91,6 +92,9 @@ export function SmartInputModal({
   )
   const effectiveGroupId = groupId ?? selectedGroupId
   const { data: groups } = useUserGroups()
+  // The selected group's currency drives every amount rendered in the split
+  // flow (WS10.1); enabled only once a group is chosen.
+  const { data: groupSettings } = useGroupSettings(effectiveGroupId ?? "")
 
   // Query client for cache invalidation
   const queryClient = useQueryClient()
@@ -267,6 +271,7 @@ export function SmartInputModal({
   useEffect(() => () => abortParse(), [abortParse])
 
   return (
+    <CurrencyProvider currency={groupSettings?.currency}>
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         {/* Backdrop overlay */}
@@ -473,5 +478,6 @@ export function SmartInputModal({
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
+    </CurrencyProvider>
   )
 }

@@ -1,5 +1,7 @@
 import { useMemo } from "react"
 
+import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/currency-context"
 import { cn } from "@/lib/utils"
 
 /**
@@ -39,36 +41,16 @@ export interface BalanceDisplayProps {
   contextDescription?: string
 
   /**
+   * ISO-4217 currency code (WS10.1). Defaults to the active group's currency
+   * from CurrencyContext; pass explicitly on cross-group surfaces (dashboard
+   * rows) where each item has its own currency.
+   */
+  currency?: string
+
+  /**
    * Custom className for additional styling
    */
   className?: string
-}
-
-/**
- * Currency formatter with "Rs" prefix.
- * NOTE: hardcoded currency is a known WS10 item (per-group currency + formatCurrency
- * util). Do not fix here — WS3 is visual only.
- */
-function formatCurrency(amount: number, signed: boolean): string {
-  const absAmount = amount === 0 ? 0 : Math.abs(amount)
-
-  const hasDecimals = absAmount % 1 !== 0
-  const fractionDigits = hasDecimals ? 2 : 0
-
-  const formatter = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  })
-
-  let formatted = formatter.format(absAmount).replace("₹", "Rs ")
-
-  if (signed && amount < 0) {
-    formatted = `-${formatted}`
-  }
-
-  return formatted
 }
 
 /**
@@ -91,18 +73,22 @@ export function BalanceDisplay({
   variant = "body",
   contextLabel,
   contextDescription,
+  currency,
   className,
 }: BalanceDisplayProps) {
+  const contextCurrency = useCurrency()
+  const activeCurrency = currency ?? contextCurrency
+
   // With a direction label, the amount is an unsigned neutral fact.
   const formattedAmount = useMemo(
-    () => formatCurrency(amount, !contextLabel),
-    [amount, contextLabel],
+    () => formatCurrency(amount, activeCurrency, { signed: !contextLabel }),
+    [amount, activeCurrency, contextLabel],
   )
 
   // Full sentence for screen readers; the visual spans are hidden from AT so
   // nothing is announced twice (v1 UX-L3).
   const srText = useMemo(() => {
-    const amountText = `${Math.abs(amount)} rupees`
+    const amountText = formatCurrency(amount, activeCurrency)
     const direction = amount < 0 ? "owe" : "are owed"
 
     if (contextDescription) {
@@ -112,7 +98,7 @@ export function BalanceDisplay({
       return `${contextLabel} ${amountText}`
     }
     return amountText
-  }, [amount, contextLabel, contextDescription])
+  }, [amount, activeCurrency, contextLabel, contextDescription])
 
   const showLabelAbove = variant === "display" || variant === "title"
 

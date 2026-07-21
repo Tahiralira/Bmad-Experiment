@@ -61,19 +61,38 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Balance hero */}
+      {/* Balance hero — a single total only makes sense in one currency
+          (WS10.1). When groups span currencies, the backend sends currency:
+          null; we drop the aggregate and let the per-group rows carry it. */}
       <header className="pt-2">
-        <p className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted mb-1">
-          Total balance
-        </p>
-        <BalanceDisplay
-          amount={Number(data.total_balance)}
-          variant="display"
-          contextDescription="across all groups"
-        />
-        <p className="text-body-small text-text-secondary mt-1">
-          Across {data.count} group{data.count !== 1 ? "s" : ""}
-        </p>
+        {data.currency ? (
+          <>
+            <p className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted mb-1">
+              Total balance
+            </p>
+            <BalanceDisplay
+              amount={Number(data.total_balance)}
+              variant="display"
+              currency={data.currency}
+              contextDescription="across all groups"
+            />
+            <p className="text-body-small text-text-secondary mt-1">
+              Across {data.count} group{data.count !== 1 ? "s" : ""}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-caption font-medium uppercase tracking-[0.06em] text-text-muted mb-1">
+              Your balances
+            </p>
+            <p className="text-body text-text-primary">
+              Your groups use different currencies — see each below.
+            </p>
+            <p className="text-body-small text-text-secondary mt-1">
+              Across {data.count} group{data.count !== 1 ? "s" : ""}
+            </p>
+          </>
+        )}
       </header>
 
       {/* Groups ledger */}
@@ -117,6 +136,7 @@ function GroupRow({ group }: GroupRowProps) {
           <BalanceDisplay
             amount={Number(group.net_balance)}
             variant="title"
+            currency={group.currency}
             contextLabel={Number(group.net_balance) < 0 ? "You owe" : "You're owed"}
             contextDescription={`in ${group.group_name}`}
           />

@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { SUPPORTED_CURRENCIES } from "@/lib/currency"
 
 import { useGroupSettings, useUpdateGroupSettings } from "../api/groups"
 import type { AIPersonality } from "../types"
@@ -71,6 +72,42 @@ export function GroupSettingsPanel({ groupId, isOwner }: Props) {
             {!isOwner && " Only the group owner can change this."}
           </p>
         </div>
+      </div>
+
+      <div className="py-2">
+        <Label
+          htmlFor={`currency-${groupId}`}
+          className="text-body font-medium text-text-primary"
+        >
+          Currency
+        </Label>
+        <p
+          id={`currency-desc-${groupId}`}
+          className="mt-0.5 mb-2 text-body-small text-text-secondary"
+        >
+          Every amount in this group is shown in this currency.
+          {!isOwner && " Only the group owner can change this."}
+        </p>
+        <Select
+          value={settings.currency}
+          disabled={!isOwner || updateSettings.isPending}
+          onValueChange={(value) => updateSettings.mutate({ currency: value })}
+        >
+          <SelectTrigger
+            id={`currency-${groupId}`}
+            className="w-full"
+            aria-describedby={`currency-desc-${groupId}`}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SUPPORTED_CURRENCIES.map((c) => (
+              <SelectItem key={c.code} value={c.code}>
+                {c.code} — {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="py-2">

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
+import { DEFAULT_CURRENCY, formatCurrency } from "@/lib/currency"
 import { OpenAPI } from "@/shared/api"
 import type {
   AggregateSettleUpRequest,
@@ -545,7 +546,7 @@ async function createAggregateSettlement(
  * "Settle with X" (WS6): nets every confirmed expense between the caller
  * and the counterparty into ONE claim awaiting ONE confirmation.
  */
-export function useSettleUp() {
+export function useSettleUp(currency: string = DEFAULT_CURRENCY) {
   const queryClient = useQueryClient()
 
   return useMutation<SettlementClaimPublic, Error, AggregateSettleUpRequest>({
@@ -559,7 +560,7 @@ export function useSettleUp() {
       queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
       const who = claim.counterparty_name ?? "them"
       toast.success(
-        `Settle-up recorded — Rs ${claim.amount} to ${who}, awaiting their confirmation`,
+        `Settle-up recorded — ${formatCurrency(claim.amount, currency)} to ${who}, awaiting their confirmation`,
       )
     },
     onError: (error) => {

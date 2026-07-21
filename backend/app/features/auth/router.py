@@ -133,10 +133,17 @@ def get_dashboard(
     groups = auth_service.get_user_dashboard(session, current_user.id)
     total_balance = sum((g.net_balance for g in groups), Decimal("0.00"))
 
+    # WS10.1: total_balance only makes sense in a single currency. Expose the
+    # shared currency when every group agrees; None signals the frontend to
+    # hide the aggregate hero and render per-group rows instead.
+    currencies = {g.currency for g in groups}
+    shared_currency = currencies.pop() if len(currencies) == 1 else None
+
     return DashboardResponse(
         groups=groups,
         total_balance=total_balance,
         count=len(groups),
+        currency=shared_currency,
     )
 
 

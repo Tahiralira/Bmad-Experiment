@@ -400,7 +400,8 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
     """
     # NOTE: Import inside function to avoid circular dependency between
     # auth.service -> groups.models -> auth.models. This is intentional.
-    from app.features.groups.models import ExpenseGroup, GroupMember
+    from app.core.currency import normalize_currency
+    from app.features.groups.models import ExpenseGroup, GroupMember, GroupSettings
     from app.features.expenses.models import Expense, ExpenseSplit, ExpenseStatus, SplitStatus
 
     # Subquery to count members per group
@@ -422,7 +423,9 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
         .subquery()
     )
 
-    # Main query to get user's groups with member counts
+    # Main query to get user's groups with member counts + currency (WS10.1).
+    # GroupSettings is LEFT-joined: groups predating the settings row (or with
+    # none yet) still appear, currency normalized to the default below.
     statement = (
         select(
             ExpenseGroup.id,
@@ -430,6 +433,7 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
             ExpenseGroup.updated_at,
             member_count_subq.c.member_count,
             expense_activity_subq.c.last_expense_at,
+            GroupSettings.currency,
         )
         .join(GroupMember, GroupMember.group_id == ExpenseGroup.id)
         .join(member_count_subq, member_count_subq.c.group_id == ExpenseGroup.id)
@@ -437,6 +441,11 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
             expense_activity_subq,
             expense_activity_subq.c.group_id == ExpenseGroup.id,
             isouter=True,  # groups without expenses still appear
+        )
+        .join(
+            GroupSettings,
+            GroupSettings.group_id == ExpenseGroup.id,
+            isouter=True,
         )
         .where(GroupMember.user_id == user_id)
     )
@@ -505,6 +514,7 @@ def get_user_dashboard(session: Session, user_id: uuid.UUID) -> list[GroupBalanc
                 else row.updated_at
             ),
             member_count=row.member_count,
+            currency=normalize_currency(row.currency),
         )
         for row in results
     ]

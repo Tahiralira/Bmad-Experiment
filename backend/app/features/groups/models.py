@@ -6,8 +6,10 @@ from decimal import Decimal
 from typing import Literal, Optional
 
 import sqlalchemy as sa
+from pydantic import field_validator
 from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
 
+from app.core.currency import DEFAULT_CURRENCY, is_supported_currency
 from app.features.auth.models import User, utc_now
 
 # Timezone-aware timestamps to match the migrations (WS5/B-H9 reconcile)
@@ -21,6 +23,10 @@ class ExpenseGroupCreate(SQLModel):
     """Request schema for creating a group."""
 
     name: str = Field(min_length=1, max_length=100)
+    # WS10.1: the client passes a locale-detected ISO-4217 currency so a new
+    # group starts in a sensible currency (editable in settings). Optional —
+    # omitted/invalid falls back to the default via the service.
+    currency: str | None = Field(default=None, max_length=3)
 
 
 class ExpenseGroupPublic(SQLModel):
@@ -47,6 +53,9 @@ class ExpenseGroupDetail(ExpenseGroupWithMembers):
     owes. Decimal to the wire (serialized as a string, e.g. "12.50")."""
 
     net_balance: Decimal = Decimal("0.00")
+    # WS10.1: the group's ISO-4217 currency — every amount in this group is in
+    # it, so the whole ledger screen renders through one code.
+    currency: str = DEFAULT_CURRENCY
 
 
 # === Member Schemas ===
@@ -198,11 +207,13 @@ ALLOWED_AI_PERSONALITIES = ("professional", "friendly", "funny")
 
 
 class GroupSettingsPublic(SQLModel):
-    """Response schema for group settings (WS6 strict mode + WS7 personality)."""
+    """Response schema for group settings (WS6 strict mode + WS7 personality
+    + WS10.1 currency)."""
 
     group_id: uuid.UUID
     strict_mode: bool
     ai_personality: str
+    currency: str
 
 
 class GroupSettingsUpdate(SQLModel):
@@ -213,6 +224,19 @@ class GroupSettingsUpdate(SQLModel):
 
     strict_mode: bool | None = None
     ai_personality: Literal["professional", "friendly", "funny"] | None = None
+    # WS10.1: ISO-4217 currency. Validated against the supported set (422 on an
+    # unknown code) and uppercased so "usd" and "USD" both work.
+    currency: str | None = None
+
+    @field_validator("currency")
+    @classmethod
+    def _validate_currency(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        upper = v.upper()
+        if not is_supported_currency(upper):
+            raise ValueError(f"Unsupported currency code: {v}")
+        return upper
 
 
 class GroupSettings(SQLModel, table=True):
@@ -236,6 +260,9 @@ class GroupSettings(SQLModel, table=True):
     )
     ai_personality: str = Field(default="friendly", index=True)
     strict_mode: bool = Field(default=False)
+    # WS10.1: per-group ISO-4217 currency (global market). Every amount in the
+    # group is denominated in it.
+    currency: str = Field(default=DEFAULT_CURRENCY, max_length=3)
     created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
     updated_at: datetime = Field(
         default_factory=utc_now,

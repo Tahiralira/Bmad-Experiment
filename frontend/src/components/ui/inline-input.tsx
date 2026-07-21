@@ -2,6 +2,8 @@ import { useState } from "react"
 import { RotateCcw } from "lucide-react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
+import { getCurrencySymbol } from "@/lib/currency"
+import { useCurrency } from "@/lib/currency-context"
 import { cn } from "@/lib/utils"
 import { BalanceDisplay } from "./balance-display"
 
@@ -65,6 +67,7 @@ export function InlineEditableField({
   name,
 }: InlineEditableFieldProps) {
   const [isFocused, setIsFocused] = useState(false)
+  const currency = useCurrency()
 
   return (
     <div
@@ -92,7 +95,9 @@ export function InlineEditableField({
         {type === "currency" ? (
           // Currency input with BalanceDisplay formatting
           <div className="flex-1 flex items-center">
-            <span className="text-text-muted mr-1">$</span>
+            <span className="text-text-muted mr-1">
+              {getCurrencySymbol(currency)}
+            </span>
             <input
               id={name}
               name={name}

@@ -16,8 +16,8 @@ interface SplitAmountsDisplayProps {
  * Split Amounts Display Component
  *
  * Shows how much each member owes for the expense.
- * Uses BalanceDisplay component for currency formatting (Rs prefix, comma separators).
- * Only shows amounts for included members.
+ * Uses BalanceDisplay, which formats in the group's currency via CurrencyContext
+ * (WS10.1). Only shows amounts for included members.
  *
  * @example
  * ```tsx

@@ -217,6 +217,9 @@ class GroupBalanceSummary(SQLModel):
     net_balance: Decimal  # Positive = owed to user, negative = user owes
     last_activity: datetime
     member_count: int
+    # WS10.1: the group's ISO-4217 currency — the dashboard spans groups, so
+    # each row renders in its own currency.
+    currency: str = "USD"
 
 
 class DashboardResponse(SQLModel):
@@ -225,3 +228,8 @@ class DashboardResponse(SQLModel):
     groups: list[GroupBalanceSummary]
     total_balance: Decimal  # Sum of all net_balances
     count: int  # Number of groups
+    # WS10.1: the shared currency when every group uses the same one, else None.
+    # total_balance is only meaningful when this is set — the frontend hides the
+    # aggregate hero and relies on per-group rows when groups span currencies
+    # (summing across currencies has no meaning).
+    currency: str | None = None
