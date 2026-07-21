@@ -6,8 +6,14 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from pydantic import EmailStr
+from pydantic import EmailStr, field_validator
 from sqlmodel import Field, Relationship, SQLModel
+
+from app.core.payment_providers import (
+    MAX_HANDLE_LENGTH,
+    MAX_LABEL_LENGTH,
+    is_supported_provider,
+)
 
 # Timezone-aware timestamps to match the migrations (WS5/B-H9 reconcile)
 _AWARE_DATETIME = sa.DateTime(timezone=True)
@@ -47,6 +53,95 @@ class ApiKeyUpdate(SQLModel):
     """BYOK (WS7): the user's own Gemini API key. Never returned by any API."""
 
     api_key: str = Field(min_length=20, max_length=200)
+
+
+# === Payment Method Schemas (WS10.2) ===
+
+
+def _clean_handle(v: str) -> str:
+    stripped = v.strip()
+    if not stripped:
+        raise ValueError("Handle cannot be empty")
+    return stripped
+
+
+def _clean_label(v: str | None) -> str | None:
+    if v is None:
+        return None
+    stripped = v.strip()
+    return stripped or None
+
+
+class PaymentMethodCreate(SQLModel):
+    """Register one payment handle (WS10.2).
+
+    `provider` is validated against the supported registry (422 on unknown)
+    and lower-cased; `handle` is trimmed and must be non-empty. Validation is
+    deliberately permissive on the handle's shape — handle formats differ by
+    country, and the settle UI's whole point is frictionless capture.
+    """
+
+    provider: str = Field(max_length=20)
+    handle: str = Field(min_length=1, max_length=MAX_HANDLE_LENGTH)
+    label: str | None = Field(default=None, max_length=MAX_LABEL_LENGTH)
+
+    @field_validator("provider")
+    @classmethod
+    def _validate_provider(cls, v: str) -> str:
+        code = v.lower().strip()
+        if not is_supported_provider(code):
+            raise ValueError(f"Unsupported payment provider: {v}")
+        return code
+
+    @field_validator("handle")
+    @classmethod
+    def _validate_handle(cls, v: str) -> str:
+        return _clean_handle(v)
+
+    @field_validator("label")
+    @classmethod
+    def _validate_label(cls, v: str | None) -> str | None:
+        return _clean_label(v)
+
+
+class PaymentMethodUpdate(SQLModel):
+    """Update a handle's value or label (provider is fixed — delete + re-add
+    to change it). Fields optional; send only what changes."""
+
+    handle: str | None = Field(default=None, min_length=1, max_length=MAX_HANDLE_LENGTH)
+    label: str | None = Field(default=None, max_length=MAX_LABEL_LENGTH)
+
+    @field_validator("handle")
+    @classmethod
+    def _validate_handle(cls, v: str | None) -> str | None:
+        return None if v is None else _clean_handle(v)
+
+    @field_validator("label")
+    @classmethod
+    def _validate_label(cls, v: str | None) -> str | None:
+        return _clean_label(v)
+
+
+class PaymentMethodPublic(SQLModel):
+    """A payment handle as shown in the UI.
+
+    Used for BOTH the owner's own list and a counterparty's handles surfaced at
+    settle time — payment handles are shared with the people who owe you by
+    design. `pay_url` is the server-computed deep link (None = copy-only);
+    `provider_name` is the display name.
+    """
+
+    id: uuid.UUID
+    provider: str
+    provider_name: str
+    handle: str
+    label: str | None = None
+    pay_url: str | None = None
+
+
+class PaymentMethodsPublic(SQLModel):
+    data: list["PaymentMethodPublic"]
+    count: int
 
 
 # Helper function for UTC timestamp
@@ -98,6 +193,36 @@ class User(UserBase, table=True):
             "oauth_provider_id",
             unique=True,
         ),
+    )
+
+
+# Per-user payment handles (WS10.2). GLOBAL, not per-group: a person's Venmo /
+# UPI / IBAN is the same wherever they settle. Surfaced to a counterparty at the
+# moment they owe money (authorized by shared group membership), so it is NOT
+# encrypted — unlike the Gemini key, the whole point is for others to see it.
+class PaymentMethod(SQLModel, table=True):
+    __tablename__ = "payment_method"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "user_id",
+            "provider",
+            "handle",
+            name="uq_payment_method_user_provider_handle",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, index=True, ondelete="CASCADE"
+    )
+    provider: str = Field(max_length=20)
+    handle: str = Field(max_length=MAX_HANDLE_LENGTH)
+    label: str | None = Field(default=None, max_length=MAX_LABEL_LENGTH)
+    created_at: datetime = Field(default_factory=utc_now, sa_type=_AWARE_DATETIME)
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_type=_AWARE_DATETIME,
+        sa_column_kwargs={"onupdate": utc_now},
     )
 
 

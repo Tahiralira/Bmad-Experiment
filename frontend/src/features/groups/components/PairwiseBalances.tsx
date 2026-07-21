@@ -2,6 +2,7 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { useSettleUp } from "@/features/expenses/api/expenses"
+import { PaymentHandles } from "@/features/payments/components/PaymentHandles"
 import { formatCurrency } from "@/lib/currency"
 import { useCurrency } from "@/lib/currency-context"
 
@@ -106,25 +107,35 @@ export function PairwiseBalances({ groupId, pendingCounterpartyIds }: Props) {
                 Settle-up pending
               </span>
             ) : isConfirming ? (
-              <div className="flex items-center gap-2">
-                <span className="text-body-small text-text-secondary">
-                  Paid {name} {formatCurrency(Math.abs(net), currency)}?
-                </span>
-                <Button
-                  size="sm"
-                  onClick={() => handleSettleUp(item.user_id)}
-                  disabled={settleUp.isPending}
-                >
-                  Yes, I paid
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmingId(null)}
-                  disabled={settleUp.isPending}
-                >
-                  Cancel
-                </Button>
+              <div className="w-full space-y-3 rounded-md border border-border bg-surface-elevated p-3">
+                {/* Universal mark-as-paid (WS10.2): pay them, then confirm */}
+                <PaymentHandles
+                  groupId={groupId}
+                  counterpartyUserId={item.user_id}
+                  counterpartyName={name}
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+                  <span className="text-body-small text-text-secondary">
+                    Paid {name} {formatCurrency(Math.abs(net), currency)}?
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleSettleUp(item.user_id)}
+                      disabled={settleUp.isPending}
+                    >
+                      Yes, I paid
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmingId(null)}
+                      disabled={settleUp.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
               <Button

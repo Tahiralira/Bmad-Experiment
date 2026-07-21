@@ -26,11 +26,16 @@ from app.core import security
 from app.core.config import settings
 from app.core.limiter import AUTH_LIMIT, limiter
 from app.core.oauth import oauth, SUPPORTED_PROVIDERS, is_provider_configured
+from app.core.payment_providers import MAX_METHODS_PER_USER
 from app.core.security import get_password_hash
 from app.features.auth.models import (
     ApiKeyUpdate,
     LoginCodeExchange,
     Message,
+    PaymentMethodCreate,
+    PaymentMethodPublic,
+    PaymentMethodUpdate,
+    PaymentMethodsPublic,
     TokenWithUser,
     User,
     UserPublic,
@@ -116,6 +121,109 @@ def delete_my_api_key(
     session.add(current_user)
     session.commit()
     return Message(message="API key removed. Your parses now use the free tier.")
+
+
+# ============================================================================
+# PAYMENT METHODS (WS10.2) — per-user GLOBAL handles, surfaced at settle time.
+# ============================================================================
+
+
+@users_router.get("/me/payment-methods", response_model=PaymentMethodsPublic)
+def list_my_payment_methods(
+    session: SessionDep, current_user: CurrentUser
+) -> PaymentMethodsPublic:
+    """
+    List the current user's payment handles (Venmo, PayPal.Me, UPI, IBAN, …).
+
+    Each carries a server-computed `pay_url` deep link where one exists, else
+    it is copy-only (IBAN, plain-text custom handles).
+    """
+    methods = auth_service.list_payment_methods(session, current_user.id)
+    return PaymentMethodsPublic(
+        data=[auth_service.build_payment_method_public(m) for m in methods],
+        count=len(methods),
+    )
+
+
+@users_router.post(
+    "/me/payment-methods", response_model=PaymentMethodPublic, status_code=201
+)
+def add_my_payment_method(
+    *, session: SessionDep, body: PaymentMethodCreate, current_user: CurrentUser
+) -> PaymentMethodPublic:
+    """
+    Register a payment handle. Provider is validated against the supported
+    registry (422 on unknown); a per-user cap keeps the list sane, and exact
+    duplicates are rejected (409).
+    """
+    if auth_service.count_payment_methods(session, current_user.id) >= MAX_METHODS_PER_USER:
+        raise HTTPException(
+            status_code=409,
+            detail=f"You can save up to {MAX_METHODS_PER_USER} payment methods. "
+            "Remove one to add another.",
+        )
+    if auth_service.find_payment_method(
+        session, current_user.id, body.provider, body.handle
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="You've already saved that payment handle.",
+        )
+    pm = auth_service.create_payment_method(
+        session, user_id=current_user.id, data=body
+    )
+    session.commit()
+    session.refresh(pm)
+    return auth_service.build_payment_method_public(pm)
+
+
+@users_router.put(
+    "/me/payment-methods/{method_id}", response_model=PaymentMethodPublic
+)
+def update_my_payment_method(
+    *,
+    method_id: uuid.UUID,
+    session: SessionDep,
+    body: PaymentMethodUpdate,
+    current_user: CurrentUser,
+) -> PaymentMethodPublic:
+    """
+    Update one of the current user's payment handles (value or label). Editing
+    to exactly duplicate another saved handle is rejected (409).
+    """
+    pm = auth_service.get_payment_method(session, method_id, current_user.id)
+    if pm is None:
+        raise HTTPException(status_code=404, detail="Payment method not found")
+
+    new_handle = body.handle if body.handle is not None else pm.handle
+    dup = auth_service.find_payment_method(
+        session, current_user.id, pm.provider, new_handle
+    )
+    if dup is not None and dup.id != pm.id:
+        raise HTTPException(
+            status_code=409,
+            detail="You've already saved that payment handle.",
+        )
+
+    pm = auth_service.update_payment_method(session, pm, body)
+    session.commit()
+    session.refresh(pm)
+    return auth_service.build_payment_method_public(pm)
+
+
+@users_router.delete("/me/payment-methods/{method_id}", response_model=Message)
+def delete_my_payment_method(
+    *, method_id: uuid.UUID, session: SessionDep, current_user: CurrentUser
+) -> Message:
+    """
+    Remove one of the current user's payment handles.
+    """
+    pm = auth_service.get_payment_method(session, method_id, current_user.id)
+    if pm is None:
+        raise HTTPException(status_code=404, detail="Payment method not found")
+    auth_service.delete_payment_method(session, pm)
+    session.commit()
+    return Message(message="Payment method removed.")
 
 
 @users_router.get("/me/dashboard", response_model=DashboardResponse)

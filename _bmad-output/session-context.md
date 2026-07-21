@@ -1,7 +1,7 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-20 (WS10.1 done — per-group currency; WS10 split into
-atomic sub-sessions WS10.1–WS10.7)
+**Last Updated:** 2026-07-21 (WS10.2 done — payment links registry + universal
+mark-as-paid; WS10 split into atomic sub-sessions WS10.1–WS10.7)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -291,11 +291,46 @@ atomic sub-sessions WS10.1–WS10.7)
 > and direct :5173→:8000 access is CORS-blocked — Playwright remains the
 > pixel-proof fallback.
 >
-> **Next: WS10.2 (Payment Links + Universal Mark-as-Paid) — per-user global
-> handles + custom path. OWNER ACTIONS (unchanged): follow deployment.md
-> (merge to main → Neon → Render → Vercel → DNS → Google OAuth →
-> NEON_DIRECT_URL + backup test → uptime monitor); rotate the exposed PAT +
-> repoint remote. PostHog+Sentry land in WS10.6 (owner configures instances).**
+> WS10.2 (Payment Links + Universal Mark-as-Paid) DONE 2026-07-21 on branch
+> `ws10.2/payment-links`: **you can now pay who you owe from the settle screen.**
+> Per-user GLOBAL payment handles (`payment_method` table, migration
+> c2d3e4f5a6b7; unique per user+provider+handle, cap 12, CASCADE + PII-scrub on
+> account soft-delete). (a) `app/core/payment_providers.py` is the single source
+> of truth for valid provider codes AND `build_pay_url` — venmo/paypal/cashapp/
+> revolut deep-link to profile pages, upi → `upi://pay?pa=`, iban → copy-only,
+> custom → a pasted https link becomes a button else copy-only. Handles are
+> URL-encoded and custom URLs are restricted to http(s) (the custom handle
+> renders as an <a href>, so a javascript:/data: payload would be stored XSS —
+> rejected). The frontend `lib/payment-providers.ts` mirror holds ONLY
+> presentation metadata; pay_url is server-computed and never duplicated. (b)
+> Self-service CRUD `/users/me/payment-methods` (422 unknown provider,
+> 409 duplicate/cap). (c) Counterparty lookup
+> `GET /expense-groups/{id}/members/{uid}/payment-methods` gated by SHARED group
+> membership (403 non-member caller, 404 target-not-in-group) — handles are
+> public only to people in a group with you. (d) `PaymentHandles` (Pay deep-link
+> + always Copy) surfaced at BOTH settle surfaces: the pairwise "Between you
+> and…" settle-up confirm and the per-expense "Ready to settle" card;
+> `PaymentMethodsManager` is a new Settings tab. Backend **288 passed / 0
+> skipped** (+30), `alembic check` clean; frontend typecheck green, **103
+> passed** (+9), main chunk 170.20 kB gz (payments in its own 1.37 kB chunk).
+> Screenshots → `_bmad-output/implementation-artifacts/ws10.2-screenshots/`.
+> Key learnings: (1) the nginx build is IMAGE-BAKED and ships a strict CSP
+> (`connect-src 'self' https:`) that blocks the local http://localhost:8000 API —
+> THIS is WS10.1's "CORS-blocked" wall (it's CSP). Pixel proof: `docker compose
+> cp frontend/dist/. frontend:/usr/share/nginx/html/` to serve the fresh build,
+> then Playwright with `bypassCSP:true` + a JWT in localStorage; the CSP stays
+> verified by WS8's tests, never bypassed in prod. (2) `.local` and `.test`/
+> `.invalid` TLDs fail email-validator — seed demo users with `@*.example.com`
+> (same trap as WS4/WS8). (3) keep URL-construction server-side and give the
+> frontend only display metadata — one source of truth, and the XSS-scheme guard
+> lives in one place.
+>
+> **Next: WS10.3 (Invite public preview + OAuth-return, S2-F1) — add an UNAUTH
+> public invite preview + one-tap OAuth carrying the token → auto-land in the
+> group. OWNER ACTIONS (unchanged): follow deployment.md (merge to main → Neon →
+> Render → Vercel → DNS → Google OAuth → NEON_DIRECT_URL + backup test → uptime
+> monitor); rotate the exposed PAT + repoint remote. PostHog+Sentry land in
+> WS10.6 (owner configures instances).**
 
 ---
 
@@ -447,10 +482,12 @@ cd frontend && npm run build
   - WS10.1 Currency Foundation ← **DONE** ✓ (2026-07-20; branch
     ws10.1/currency; per-group ISO-4217 currency, formatCurrency util +
     context, all "Rs" purged, currency pickers; backend 258, frontend 94)
-  - WS10.2 Payment Links + Mark-as-Paid ← **NEXT** (per-user global handles
-    + custom path)
-  - WS10.3 Invite public preview + OAuth-return · WS10.4 Onboarding
-    first-60s · WS10.5 Monetization spec (doc) · WS10.6 Observability
+  - WS10.2 Payment Links + Mark-as-Paid ← **DONE** ✓ (2026-07-21; branch
+    ws10.2/payment-links; per-user global handle registry, provider deep-links
+    + copy, counterparty surface at both settle paths, Settings manager;
+    backend 288, frontend 103)
+  - WS10.3 Invite public preview + OAuth-return ← **NEXT** (S2-F1) · WS10.4
+    Onboarding first-60s · WS10.5 Monetization spec (doc) · WS10.6 Observability
     (PostHog + Sentry, owner-configured) · WS10.7 Push (blocked on WS11/WS12)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
