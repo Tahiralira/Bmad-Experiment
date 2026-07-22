@@ -1,8 +1,8 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-21 (WS10.4 done — onboarding first-60-seconds: organic
-sandbox parse + group templates + next-action empty states; WS10 split into atomic
-sub-sessions WS10.1–WS10.7)
+**Last Updated:** 2026-07-21 (WS10.5 done — Monetization Spec, doc only:
+tier matrix + quota numbers pinned to code + paywall placements + USD-first pricing
++ 2–4% conversion target; WS10 split into atomic sub-sessions WS10.1–WS10.7)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -390,13 +390,42 @@ sub-sessions WS10.1–WS10.7)
 > cross-origin :8000 wall AND the absent GEMINI_API_KEY. Register the catch-all
 > route FIRST (Playwright matches routes in reverse registration order).
 >
-> **Next: WS10.5 (Monetization Spec — DOC ONLY, no code): tier matrix, quota
-> numbers aligned with WS7 AI_FREE_MONTHLY_PARSES=20, paywall placements,
-> USD-first pricing, 2–4% conversion target. Then WS10.6 (Observability: PostHog
-> + Sentry, owner configures instances), WS10.7 (Push — blocked on WS11/WS12).
-> OWNER ACTIONS (unchanged): follow deployment.md (merge to main → Neon → Render
-> → Vercel → DNS → Google OAuth → NEON_DIRECT_URL + backup test → uptime
-> monitor); rotate the exposed PAT + repoint remote.**
+> WS10.5 (Monetization Spec — DOC ONLY) DONE 2026-07-21 on branch
+> `ws10.5/monetization`: **the one-page spec S1 §5 / S9 §6.4 demanded before
+> Epic 6 now exists** — `_bmad-output/planning-artifacts/monetization-spec.md`.
+> Consolidates S1 §5/§6, S2 §7/§9, S9 §6.4 into the accountable decision
+> framework that makes "is feature X free or Pro?" answerable. Model: freemium ·
+> organizer-pays · annual-first · USD-first, with a **non-negotiable free floor**
+> (everything a Borrower does + unlimited groups/manual expenses — protects the
+> network effect). Pricing USD-first (owner set 2026-07-22, undercutting S1 §5's
+> $4.99/$39.99): **Pro $1.99/mo, $19.99/yr** (~16% off; thin gap — "set-and-forget"
+> carries annual, not the discount), **Trip Pass $4.99 one-time / one group / 90
+> days** (now positioned as pay-once-cover-everyone, NOT a cheaper Pro), **Group
+> Pro** (one seat upgrades the group). Tier matrix carries an honest
+> **Enforcement-today** column — the ONLY live code-enforced gate is the AI quota
+> (`AI_FREE_MONTHLY_PARSES = 20`, config.py:131; spec number matches the code, not
+> "e.g."); every Pro feature marked *planned* is free-because-absent until both it
+> and the billing layer exist. Payment deep links stay FREE (WS10.2 — highest-intent
+> moment). 7-row paywall-placement table (surface / trigger / soft-vs-hard gate /
+> mediator-voice copy / status; AI-quota gate is SOFT — manual entry is always the
+> fallback). Target **2–4% free→paid** + guardrail metrics (invite→join,
+> mute-rate kill switch) handed to WS10.6 to instrument. Explicit out-of-scope:
+> **NO billing/Stripe/entitlement built — beta ships free-only + instrumented; the
+> paywall+billing build-out is Phase 4/post-beta.** No gates run (doc only, no code).
+> Key learnings: (1) a monetization spec has to be pinned to the code it claims to
+> price — the review said "~20 parses/mo (e.g.)", the spec says 20 *because
+> config.py:131 says 20*, with a "don't drift them apart" note; (2) mark
+> not-yet-built Pro features free-because-absent, not free-by-policy, so the doc
+> stays honest under DoD and no one thinks the gate already ships; (3) keep the
+> free floor a hard constraint the doc can veto scope against — that's the whole
+> point of writing it.
+>
+> **Next: WS10.6 (Observability: PostHog + Sentry) — env-gated instrumentation
+> code lands here (event taxonomy, activation funnel, the guardrail metrics
+> WS10.5 §8 named), OWNER configures the instances on Render + Vercel. Then WS10.7
+> (Push — blocked on WS11/WS12). OWNER ACTIONS (unchanged): follow deployment.md
+> (merge to main → Neon → Render → Vercel → DNS → Google OAuth → NEON_DIRECT_URL
+> + backup test → uptime monitor); rotate the exposed PAT + repoint remote.**
 
 ---
 
@@ -559,8 +588,13 @@ cd frontend && npm run build
   - WS10.4 Onboarding first-60s ← **DONE** ✓ (2026-07-21; branch
     ws10.4/onboarding; organic sandbox parse [group_id optional], group templates
     Roommates/Trip/Dinner, next-action empty states; backend 298, frontend 111)
-  - WS10.5 Monetization spec (doc) ← **NEXT** · WS10.6 Observability (PostHog +
-    Sentry, owner-configured) · WS10.7 Push (blocked on WS11/WS12)
+  - WS10.5 Monetization spec (doc) ← **DONE** ✓ (2026-07-21; branch
+    ws10.5/monetization; `planning-artifacts/monetization-spec.md` — freemium/
+    organizer-pays/annual-first, Pro $1.99/mo·$19.99/yr + Trip Pass $4.99 + Group Pro,
+    tier matrix w/ honest enforcement-today column, AI quota pinned to
+    config.py:131=20, 7 paywall placements, 2–4% conversion target; no code)
+  - WS10.6 Observability (PostHog + Sentry, owner-configured) ← **NEXT** ·
+    WS10.7 Push (blocked on WS11/WS12)
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one
