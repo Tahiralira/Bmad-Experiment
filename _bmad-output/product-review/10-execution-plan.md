@@ -912,10 +912,29 @@ this file breaks that merge into runnable units.
             cross-origin :8000 wall and the absent GEMINI_API_KEY entirely.
           Status: DONE 2026-07-21 (branch ws10.4/onboarding)
 
-    - [ ] **WS10.5 — Monetization Spec** (DOC ONLY, no code)
+    - [x] **WS10.5 — Monetization Spec** (DOC ONLY, no code)
           Tier matrix, quota numbers (align w/ WS7 AI_FREE_MONTHLY_PARSES=20),
           paywall placements, USD-first pricing, 2–4% conversion target.
-          Status: pending
+          - [x] Wrote `_bmad-output/planning-artifacts/monetization-spec.md` — the
+                one-page accountable spec S1 §5 / S9 §6.4 demanded before Epic 6.
+                Consolidates S1 §5/§6, S2 §7/§9, S9 §6.4 into: model in one line
+                (freemium · organizer-pays · annual-first · USD-first); USD pricing
+                table (Pro $1.99/mo · $19.99/yr · Trip Pass $4.99 one-time · Group
+                Pro); tier matrix with an honest **Enforcement-today** column
+                (only the AI quota is a live gate); the AI quota section pinned to
+                the code (`AI_FREE_MONTHLY_PARSES = 20`, config.py:131 — spec number
+                matches, not "e.g."); 7-row paywall-placement table (surface /
+                trigger / soft-vs-hard gate / mediator-voice copy / build status);
+                non-negotiable free floor (network-effect protection — never gate a
+                Borrower); 2–4% conversion target + guardrail metrics (invite→join,
+                mute-rate kill switch) for WS10.6 to instrument; explicit
+                out-of-scope (NO billing built — beta ships free-only + instrumented,
+                monetization build-out is Phase 4); open decisions to re-verify at
+                launch; full source-traceability appendix.
+          Verification: DOC ONLY — no gates run (no code touched). Spec numbers
+          cross-checked against live code (config.py:131 = 20; BYOK exempt; payment
+          deep links free per WS10.2; per-group USD-default currency per WS10.1).
+          Status: DONE 2026-07-21
 
     - [ ] **WS10.6 — Observability: PostHog + Sentry** (owner's dedicated task)
           Depends on: WS10.1–.4. ALL instrumentation code, env-gated
