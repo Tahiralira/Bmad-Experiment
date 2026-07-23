@@ -7,11 +7,11 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-07-21 (WS10.4: FE-009 Playwright API interception for pixel proof)
+# Last Updated: 2026-07-23 (WS10.6: FE-010 posthog remote-config script vs CSP)
 
 metadata:
   version: "1.0"
-  total_patterns: 31
+  total_patterns: 32
   categories:
     - docker
     - database
@@ -648,6 +648,26 @@ testing:
     prevention: "When a screenshot's only blocker is live data/AI, intercept the API in Playwright rather than provisioning the backend; catch-all route registered first"
     stories_encountered: ["WS10.4"]
     tokens_saved_estimate: "~700 per occurrence"
+
+  - id: "FE-010"
+    title: "posthog-js loads a remote config.js script that a script-src 'self' CSP blocks"
+    symptoms:
+      - "PostHog fetches https://us-assets.i.posthog.com/array/<key>/config.js as a <script>"
+      - "Would be silently blocked in production (CSP script-src 'self') — flags/config never load"
+    root_cause: |
+      By default posthog-js pulls remote config + feature flags at init: a
+      config.js SCRIPT from us-assets.i.posthog.com plus a /flags XHR. The
+      XHR passes connect-src 'self' https:, but the script tag violates
+      script-src 'self' (vercel.json + nginx, WS8).
+    solution: |
+      Init with `advanced_disable_flags: true` (WS10.6, lib/analytics.ts).
+      The SDK logs "Remote config is disabled. Falling back to local config"
+      and the ONLY outbound traffic left is the /e/ capture endpoint over
+      fetch — verified in the browser via performance.getEntriesByType
+      ("resource"). We use no PostHog feature flags, so nothing is lost.
+    prevention: "Any new PostHog surface (or SDK bump) must keep advanced_disable_flags:true unless the CSP gains the posthog assets host; verify with the resource-entries check"
+    stories_encountered: ["WS10.6"]
+    tokens_saved_estimate: "~400 per occurrence"
 
 # =============================================================================
 # ARCHITECTURE PATTERNS

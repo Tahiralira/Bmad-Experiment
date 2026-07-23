@@ -12,7 +12,15 @@ import { ApiError, OpenAPI } from "./client"
 import { ThemeProvider } from "./components/theme-provider"
 import { Toaster } from "./components/ui/sonner"
 import "./index.css"
+import { initAnalytics, trackPageview } from "./lib/analytics"
+import { initErrorMonitoring } from "./lib/sentry"
 import { routeTree } from "./routeTree.gen"
+
+// WS10.6 observability — both are env-gated no-ops when their key is unset.
+// Sentry first (statically imported, so boot errors are caught); PostHog
+// loads lazily and flushes any events queued while it downloads.
+initErrorMonitoring()
+void initAnalytics()
 
 OpenAPI.BASE = import.meta.env.VITE_API_URL
 OpenAPI.TOKEN = async () => {
@@ -20,6 +28,15 @@ OpenAPI.TOKEN = async () => {
 }
 
 const router = createRouter({ routeTree })
+
+// Manual SPA pageviews (PostHog auto-pageviews are off). Dedupe consecutive
+// same-path resolutions so search-param churn doesn't inflate the count.
+let lastTrackedPath: string | null = null
+router.subscribe("onResolved", ({ toLocation }) => {
+  if (toLocation.pathname === lastTrackedPath) return
+  lastTrackedPath = toLocation.pathname
+  trackPageview(toLocation.pathname)
+})
 
 // S4-H1: only 401 (invalid/expired session) ends the session. 403 is a
 // BUSINESS authorization denial ("only the creator can edit") — surfacing it

@@ -111,6 +111,22 @@ VITE_API_URL=https://api.my-domain.example.com
 
 Then, when you run the frontend, it will use that URL as the base URL for the API.
 
+## Observability (optional, WS10.6)
+
+Three optional build-time variables wire up analytics and error monitoring;
+leaving them unset makes both a complete no-op (nothing is downloaded):
+
+```env
+VITE_POSTHOG_KEY=phc_...          # PostHog project API key
+VITE_POSTHOG_HOST=                # only for non-US PostHog Cloud (e.g. https://eu.i.posthog.com)
+VITE_SENTRY_DSN=https://...       # Sentry React project DSN
+```
+
+The event taxonomy and privacy rules live in
+[`_bmad-output/planning-artifacts/analytics-spec.md`](../_bmad-output/planning-artifacts/analytics-spec.md);
+owner setup steps in [`deployment.md`](../deployment.md) §6.5. Add new events
+in `src/lib/analytics.ts` (`EVENTS`) and the spec together.
+
 ## Code Structure
 
 The frontend code is structured as follows:

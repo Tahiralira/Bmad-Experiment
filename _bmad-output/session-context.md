@@ -1,8 +1,8 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-21 (WS10.5 done — Monetization Spec, doc only:
-tier matrix + quota numbers pinned to code + paywall placements + USD-first pricing
-+ 2–4% conversion target; WS10 split into atomic sub-sessions WS10.1–WS10.7)
+**Last Updated:** 2026-07-23 (WS10.6 done — Observability: PostHog taxonomy +
+Sentry both sides, all env-gated no-op-unset; owner configures instances per
+deployment.md §6.5; WS10 split into atomic sub-sessions WS10.1–WS10.7)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -420,12 +420,63 @@ tier matrix + quota numbers pinned to code + paywall placements + USD-first pric
 > free floor a hard constraint the doc can veto scope against — that's the whole
 > point of writing it.
 >
-> **Next: WS10.6 (Observability: PostHog + Sentry) — env-gated instrumentation
-> code lands here (event taxonomy, activation funnel, the guardrail metrics
-> WS10.5 §8 named), OWNER configures the instances on Render + Vercel. Then WS10.7
-> (Push — blocked on WS11/WS12). OWNER ACTIONS (unchanged): follow deployment.md
-> (merge to main → Neon → Render → Vercel → DNS → Google OAuth → NEON_DIRECT_URL
-> + backup test → uptime monitor); rotate the exposed PAT + repoint remote.**
+> WS10.6 (Observability: PostHog + Sentry) DONE 2026-07-23 on branch
+> `ws10.6/observability`: **the beta is measurable — every WS10.5 §8 metric
+> that can exist today has an event, and errors report home.** All env-gated:
+> unset keys = complete no-op (nothing even downloads). (a)
+> `frontend/src/lib/analytics.ts` — typed `domain.entity.action` taxonomy
+> (22 live events; the EVENTS map is the single source of truth, spec doc
+> changes in the same commit) + PostHog wrapper: posthog-js DYNAMICALLY
+> imported (own 77 kB gz chunk, fetched only when VITE_POSTHOG_KEY is set;
+> pre-load events queue and flush in order), identify(user UUID) ONLY — no
+> email/name (owner decision, matches S5-M7), autocapture/replay/auto-
+> pageviews OFF, `advanced_disable_flags: true` (the remote config.js script
+> would violate the prod CSP script-src 'self' — FE-010), and `sanitizeUrl`
+> scrubs invite/verify tokens + OAuth ?code= from every outbound URL
+> (an invite token in an analytics payload is a join credential). (b) ~20
+> call sites: auth signed_up/logged_in/logged_out; group created
+> (template/currency/strict) + settings updated; invite created/viewed
+> (anonymous-capable)/joined (explicit|oauth_return) — the invite→join
+> guardrail; ai parse started/completed/failed + quota.exhausted (paywall
+> fuel gauge); expense created (source + was_edited = Trust Score)/
+> confirmed/rejected; settlement claim created/confirmed (claim_age_hours =
+> settlement velocity)/rejected; payment method/link/copy by provider;
+> deduped SPA $pageviews. Reserved, NOT captured: nudge.notification.sent/
+> muted (WS12 kill switch), billing.paywall.* (Phase 4). (c) Sentry
+> frontend `@sentry/react` STATIC import (boot errors are the point;
+> ~+5 kB gz tree-shaken, errors-only), gated on VITE_SENTRY_DSN, scrubbed
+> beforeSend/beforeBreadcrumb; root errorComponent now passes the error to
+> captureException (was swallowed). Backend init confirmed + `environment`
+> tag. (d) Docs: `planning-artifacts/analytics-spec.md` (taxonomy contract,
+> metric→event mapping, 5 dashboard recipes, privacy invariants, honest
+> blind spots — lazy auto-confirm sweeps settle server-side so
+> claim.confirmed undercounts); deployment.md §6.5 owner runbook + §7
+> funnel-proof line; frontend/README env vars. Backend **298 passed / 0
+> skipped**; frontend typecheck green, **127 passed** (+16), main chunk
+> **175.55 kB gz** (≤250). Live smoke: dev server + throwaway key → app
+> boots clean, chunk lazy-loads, distinct_id persisted, ONLY /e/ capture
+> traffic (no config.js, no /flags).
+> Key learnings: (1) posthog-js by default injects a REMOTE config.js
+> <script> — under script-src 'self' it dies silently; `advanced_disable_
+> flags: true` drops both that script and the /flags XHR, leaving only
+> fetch-based capture (verify via performance.getEntriesByType("resource")).
+> (2) Analytics SDK loading should match its failure cost: Sentry static
+> (missing a boot error defeats its purpose), PostHog lazy behind a queue
+> (losing 300ms of analytics costs nothing, 77 kB gz off the main chunk).
+> (3) Put track() calls in mutation onSuccess at the API-hook layer when the
+> event needs no UI context, at the component only when it does (template
+> choice, was_edited diff) — grep the hook's call sites first; a hook-level
+> event on a hook used twice double-fires. (4) The browser pane's network
+> reader missed cross-origin capture requests; performance resource entries
+> inside the page are the reliable proof.
+>
+> **Next: WS10.7 (Push) is BLOCKED on WS11/WS12 → next runnable session is
+> WS11 (Docs Floor + Test Journeys + PWA Shell). OWNER ACTIONS: deployment.md
+> first-deploy walkthrough now includes §6.5 (create PostHog project + two
+> Sentry projects, set VITE_POSTHOG_KEY / VITE_SENTRY_DSN on Vercel and
+> SENTRY_DSN on Render) and the §7 checklist gained the cold
+> invite→join→activation funnel proof; rotate the exposed PAT + repoint
+> remote (unchanged).**
 
 ---
 
@@ -593,8 +644,13 @@ cd frontend && npm run build
     organizer-pays/annual-first, Pro $1.99/mo·$19.99/yr + Trip Pass $4.99 + Group Pro,
     tier matrix w/ honest enforcement-today column, AI quota pinned to
     config.py:131=20, 7 paywall placements, 2–4% conversion target; no code)
-  - WS10.6 Observability (PostHog + Sentry, owner-configured) ← **NEXT** ·
-    WS10.7 Push (blocked on WS11/WS12)
+  - WS10.6 Observability ← **DONE** ✓ (2026-07-23; branch
+    ws10.6/observability; 22-event domain.entity.action taxonomy + PostHog
+    wrapper [UUID-only identity, no autocapture/replay/flags, token-scrubbed
+    URLs, lazy chunk], Sentry frontend static + backend env tag, analytics-spec
+    + deployment.md §6.5 owner runbook; backend 298, frontend 127, main chunk
+    175.55 kB gz; owner sets the env keys to switch it on)
+  - WS10.7 Push (blocked on WS11/WS12) → **next runnable: WS11**
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

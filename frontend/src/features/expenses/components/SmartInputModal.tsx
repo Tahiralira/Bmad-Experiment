@@ -6,6 +6,7 @@ import FocusTrap from "focus-trap-react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
+import { EVENTS, track } from "@/lib/analytics"
 import {
   Select,
   SelectContent,
@@ -163,6 +164,19 @@ export function SmartInputModal({
     try {
       // Create expense and capture the result
       const expense = await createExpenseMutation.mutateAsync(editedData)
+
+      // WS10.6: the PRD's Trust Score is the AI edit rate (<10%) — compare
+      // what the AI parsed against what the user actually confirmed.
+      const wasEdited = parsedData
+        ? editedData.amount !== parsedData.amount ||
+          editedData.description.trim() !== parsedData.description.trim() ||
+          (editedData.payer_id ?? parsedData.payer_id) !== parsedData.payer_id
+        : null
+      track(EVENTS.EXPENSE_CREATED, {
+        source: "ai",
+        was_edited: wasEdited,
+        confidence: parsedData?.confidence_score ?? null,
+      })
 
       // Invalidate queries to refresh expense list and group balances
       queryClient.invalidateQueries({ queryKey: ["expenses"] })

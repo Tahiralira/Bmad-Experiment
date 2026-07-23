@@ -25,6 +25,9 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":
         dsn=str(settings.SENTRY_DSN),
         traces_sample_rate=1.0,
         send_default_pii=False,
+        # WS10.6: tag events with the deploy environment so staging noise
+        # never pollutes production triage (mirrors the frontend init).
+        environment=settings.ENVIRONMENT,
     )
 
 app = FastAPI(

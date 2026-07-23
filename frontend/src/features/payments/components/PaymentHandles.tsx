@@ -2,6 +2,7 @@ import { Check, Copy, ExternalLink } from "lucide-react"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { EVENTS, track } from "@/lib/analytics"
 
 import { useCounterpartyPaymentMethods } from "../api/payments"
 import type { PaymentMethod } from "../types"
@@ -73,6 +74,8 @@ function PaymentHandleRow({ method }: { method: PaymentMethod }) {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(method.handle)
+      // WS10.6: settle-moment payment intent (the copy path — IBANs, custom)
+      track(EVENTS.PAYMENT_HANDLE_COPIED, { provider: method.provider })
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -100,6 +103,10 @@ function PaymentHandleRow({ method }: { method: PaymentMethod }) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Pay via ${method.provider_name}`}
+              onClick={() =>
+                // WS10.6: settle-moment payment intent (the deep-link path)
+                track(EVENTS.PAYMENT_LINK_CLICKED, { provider: method.provider })
+              }
             >
               <ExternalLink className="h-3.5 w-3.5" />
               Pay

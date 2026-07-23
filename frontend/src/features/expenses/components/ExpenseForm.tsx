@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { EVENTS, track } from "@/lib/analytics"
 
 import { useCreateExpense } from "../api/expenses"
 import type { ExpenseCreate } from "../types"
@@ -33,6 +34,7 @@ export function ExpenseForm({
 
     try {
       await createExpense.mutateAsync(expenseData)
+      track(EVENTS.EXPENSE_CREATED, { source: "manual" })
       setAmount("")
       setDescription("")
       onSuccess?.()

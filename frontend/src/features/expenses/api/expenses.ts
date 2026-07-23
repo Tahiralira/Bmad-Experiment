@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
+import { EVENTS, track } from "@/lib/analytics"
 import { DEFAULT_CURRENCY, formatCurrency } from "@/lib/currency"
 import { OpenAPI } from "@/shared/api"
 import type {
@@ -216,6 +217,8 @@ export function useConfirmExpense() {
   return useMutation<ExpenseSplit, Error, string>({
     mutationFn: (expenseId) => confirmExpense(expenseId),
     onSuccess: () => {
+      // WS10.6: activation funnel step 3 (first confirmed expense)
+      track(EVENTS.EXPENSE_CONFIRMED)
       queryClient.invalidateQueries({ queryKey: ["pending-confirmations"] })
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
@@ -252,6 +255,7 @@ export function useRejectExpense() {
   return useMutation<ExpenseRejectResponse, Error, { expenseId: string; reason?: string }>({
     mutationFn: ({ expenseId, reason }) => rejectExpense(expenseId, reason),
     onSuccess: () => {
+      track(EVENTS.EXPENSE_REJECTED)
       queryClient.invalidateQueries({ queryKey: ["pending-confirmations"] })
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
@@ -367,6 +371,7 @@ export function useSettleExpense() {
   return useMutation<SettlementClaimPublic, Error, string>({
     mutationFn: (expenseId) => settleExpense(expenseId),
     onSuccess: () => {
+      track(EVENTS.CLAIM_CREATED, { kind: "per_expense" })
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["pending-settlements"] })
@@ -418,7 +423,17 @@ export function useConfirmSettlement() {
 
   return useMutation<SettlementClaimPublic, Error, string>({
     mutationFn: (claimId) => confirmSettlement(claimId),
-    onSuccess: () => {
+    onSuccess: (claim) => {
+      // WS10.6: settlement velocity — how long the claim sat open before
+      // the counterparty confirmed (PRD's time-to-settle proxy).
+      const ageMs = Date.now() - Date.parse(claim.created_at)
+      track(EVENTS.CLAIM_CONFIRMED, {
+        kind: claim.expense_split_id ? "per_expense" : "aggregate",
+        claim_age_hours: Number.isFinite(ageMs)
+          ? Math.round((ageMs / 36e5) * 10) / 10
+          : null,
+        covered_expense_count: claim.covered_expense_count,
+      })
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["pending-settlements"] })
@@ -454,7 +469,10 @@ export function useRejectSettlement() {
 
   return useMutation<SettlementClaimPublic, Error, string>({
     mutationFn: (claimId) => rejectSettlement(claimId),
-    onSuccess: () => {
+    onSuccess: (claim) => {
+      track(EVENTS.CLAIM_REJECTED, {
+        kind: claim.expense_split_id ? "per_expense" : "aggregate",
+      })
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["pending-settlements"] })
@@ -552,6 +570,10 @@ export function useSettleUp(currency: string = DEFAULT_CURRENCY) {
   return useMutation<SettlementClaimPublic, Error, AggregateSettleUpRequest>({
     mutationFn: createAggregateSettlement,
     onSuccess: (claim) => {
+      track(EVENTS.CLAIM_CREATED, {
+        kind: "aggregate",
+        covered_expense_count: claim.covered_expense_count,
+      })
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["aggregate-claims"] })

@@ -33,5 +33,7 @@ export const Route = createRootRoute({
     </>
   ),
   notFoundComponent: () => <NotFound />,
-  errorComponent: () => <ErrorComponent />,
+  // Pass the error through so it reaches Sentry (WS10.6) — the previous
+  // `() => <ErrorComponent />` swallowed it unreported.
+  errorComponent: ({ error }) => <ErrorComponent error={error} />,
 })

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { request as __request } from "@/client/core/request"
 import { AuthLayout } from "@/components/Common/AuthLayout"
+import { EVENTS, track } from "@/lib/analytics"
 import { OpenAPI } from "@/shared/api"
 import { getApiErrorMessage } from "@/utils"
 
@@ -65,6 +66,7 @@ function OAuthCallbackPage() {
       })
         .then(async (response) => {
           localStorage.setItem("access_token", response.access_token)
+          track(EVENTS.AUTH_LOGGED_IN, { method: "oauth" })
           // WS10.3: if the user arrived via an invite, auto-accept it and
           // land them inside the group (one-tap OAuth join).
           const inviteToken = processPendingInvite()
@@ -77,6 +79,7 @@ function OAuthCallbackPage() {
                   url: `/api/v1/expense-groups/invite/${inviteToken}/accept`,
                 },
               )
+              track(EVENTS.INVITE_JOINED, { method: "oauth_return" })
               if (result?.group?.id) {
                 navigate({
                   to: "/groups/$groupId",

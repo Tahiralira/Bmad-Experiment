@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
+import { useEffect } from "react"
 
 import { request as __request } from "@/client/core/request"
+import {
+  EVENTS,
+  identifyUser,
+  resetAnalytics,
+  track,
+} from "@/lib/analytics"
 import { AuthService, OpenAPI, type UserPublic, UsersService } from "@/shared/api"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
 import { handleError } from "@/utils"
@@ -21,6 +28,12 @@ const useAuth = () => {
     enabled: isLoggedIn(),
   })
 
+  // WS10.6: tie analytics to the opaque user UUID (never email/name).
+  // identifyUser dedupes repeat calls, so every useAuth mount is safe.
+  useEffect(() => {
+    if (user?.id) identifyUser(user.id)
+  }, [user?.id])
+
   const logout = () => {
     // Revoke the token server-side (WS8/S5-H1) — clearing localStorage alone
     // would leave the JWT valid until expiry. Fire-and-forget: the local
@@ -29,6 +42,10 @@ const useAuth = () => {
       method: "POST",
       url: "/api/v1/auth/logout",
     }).catch(() => {})
+    // Capture while still identified, THEN detach analytics identity so a
+    // shared device doesn't cross-attribute the next session (WS10.6).
+    track(EVENTS.AUTH_LOGGED_OUT)
+    resetAnalytics()
     localStorage.removeItem("access_token")
     queryClient.removeQueries({ queryKey: ["currentUser"] })
     navigate({ to: "/login" })
@@ -50,6 +67,7 @@ const useAuth = () => {
       return response
     },
     onSuccess: () => {
+      track(EVENTS.AUTH_LOGGED_IN, { method: "magic_link" })
       queryClient.invalidateQueries({ queryKey: ["currentUser"] })
       navigate({ to: "/" })
     },
