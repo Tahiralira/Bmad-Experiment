@@ -936,7 +936,7 @@ this file breaks that merge into runnable units.
           deep links free per WS10.2; per-group USD-default currency per WS10.1).
           Status: DONE 2026-07-21
 
-    - [ ] **WS10.6 — Observability: PostHog + Sentry** (owner's dedicated task)
+    - [x] **WS10.6 — Observability: PostHog + Sentry** (owner's dedicated task)
           Depends on: WS10.1–.4. ALL instrumentation code, env-gated
           (VITE_POSTHOG_KEY / SENTRY_DSN, no-op unset): PostHog event taxonomy
           (`domain.entity.action`) + activation funnel (group ≥2 members + ≥1
@@ -944,9 +944,51 @@ this file breaks that merge into runnable units.
           rate, mute rate); Sentry frontend (@sentry/react) + confirm backend DSN
           wiring (sentry-sdk already 2.65 from WS8). OWNER configures the instances
           on Render + Vercel.
-          Verification: cold invite→join→activation funnel visible in PostHog
-          (owner-run once instances exist).
-          Status: pending
+          - [x] `frontend/src/lib/analytics.ts` — typed 22-event taxonomy (the
+                EVENTS map is the single source of truth) + env-gated PostHog
+                wrapper: posthog-js via DYNAMIC import (stays out of the main
+                chunk; pre-load events queue and flush in order), identify by
+                opaque user UUID ONLY (no email/name — owner decision), autocapture
+                + session replay + auto-pageviews all OFF, `advanced_disable_flags`
+                (CSP: the remote config.js script would violate script-src 'self',
+                FE-010), capability-URL scrubbing (`sanitizeUrl` strips invite/
+                verify tokens + OAuth ?code= from every outbound URL property).
+          - [x] ~20 call sites wired: auth signed_up/logged_in(oauth|magic_link)/
+                logged_out; group created (template/currency/strict_mode) +
+                settings updated; invite created/viewed(anon-capable)/joined
+                (explicit|oauth_return); ai parse started/completed/failed +
+                quota.exhausted (the 429 — paywall fuel gauge); expense created
+                (source ai|manual + was_edited = PRD Trust Score)/confirmed/
+                rejected; settlement claim created/confirmed(claim_age_hours =
+                settlement velocity)/rejected; payment method.added/link.clicked/
+                handle.copied; deduped SPA $pageviews via router.subscribe.
+                Reserved (NOT captured — features absent): nudge.notification.
+                sent/muted (WS12 kill switch), billing.paywall.viewed/converted
+                (Phase 4).
+          - [x] Sentry frontend: `@sentry/react` STATICALLY imported (boot/white-
+                screen errors are the point), errors-only (no tracing/replay),
+                gated on VITE_SENTRY_DSN, sendDefaultPii false, beforeSend +
+                beforeBreadcrumb scrub token URLs, router errorComponent now
+                passes the error through to captureException (it was swallowed).
+          - [x] Sentry backend: WS8 wiring confirmed (SENTRY_DSN + non-local gate,
+                render.yaml slot exists); added `environment` tag to init.
+          - [x] Docs: `planning-artifacts/analytics-spec.md` (taxonomy contract,
+                metric→event mapping, 5 PostHog dashboard recipes, privacy
+                invariants, known blind spots: lazy auto-confirm sweeps are
+                server-side → claim.confirmed undercounts); deployment.md §6.5
+                owner runbook (PostHog + 2 Sentry projects + env vars) + §7 funnel
+                proof checklist line; frontend/README observability section.
+          Verification: DONE 2026-07-23 (code side) — backend **298 passed / 0
+          skipped** (no schema change); frontend typecheck green, **127 passed**
+          (+16 analytics/scrub unit tests), build green — main chunk **175.55 kB
+          gz** (budget ≤250; Sentry ~+5 kB tree-shaken, posthog-js in a lazy
+          77 kB gz chunk fetched only when a key is set). LIVE smoke (vite dev +
+          throwaway key, browser pane): app boots clean, posthog chunk lazy-loads,
+          SDK persists distinct_id to localStorage, and the ONLY outbound
+          observability request is the /e/ capture call (no config.js script, no
+          /flags — CSP-safe). Cold invite→join→activation funnel visible in
+          PostHog remains OWNER-RUN (deployment.md §7) once instances exist.
+          Status: DONE 2026-07-23 (branch ws10.6/observability)
 
     - [ ] **WS10.7 — Push Permission Flow + Email-first Notifications**
           ⚠️ BLOCKED on WS11 (service worker) + WS12 (delivery backend); the

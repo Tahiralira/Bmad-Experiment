@@ -111,6 +111,8 @@ Starter ($7/mo).
 3. Environment variable: `VITE_API_URL` = `https://api.cleardues.site`
    (until DNS is live: `https://cleardues-api.onrender.com`). This is baked
    in at build time — changing it later means clicking **Redeploy**.
+   Optional observability vars (`VITE_POSTHOG_KEY`, `VITE_SENTRY_DSN`) are
+   set up in §6.5 — the app runs fine without them.
 4. **Deploy.** You get a live `https://cleardues-xxx.vercel.app` URL.
    [vercel.json](./frontend/vercel.json) rides along automatically: SPA
    deep-links, security headers, and asset caching are already configured.
@@ -182,6 +184,44 @@ Neon's free plan only keeps a ~6-hour restore history — the nightly
    `pg_restore -d "<NEON_DIRECT_URL>" --clean --if-exists <file>.dump`
    (Neon Pro alternative: restore the branch from its history window.)
 
+## §6.5 Observability — PostHog + Sentry (~15 minutes, WS10.6)
+
+All the instrumentation code already ships in the app and is **env-gated**:
+without these variables it is a complete no-op (nothing is even downloaded).
+Setting the variables is the entire "integration."
+
+**PostHog (product analytics — frontend only):**
+
+1. [posthog.com](https://posthog.com) → sign up (free tier: 1M events/mo) →
+   create project **ClearDues** → copy the **Project API key** (`phc_…`).
+2. Vercel → project → Settings → Environment Variables:
+   - `VITE_POSTHOG_KEY` = the `phc_…` key
+   - `VITE_POSTHOG_HOST` = only if your project is NOT on US Cloud
+     (EU: `https://eu.i.posthog.com`; unset defaults to US)
+3. **Redeploy** (build-time vars, same rule as `VITE_API_URL`).
+4. In PostHog, build the saved views the spec defines — funnel + dashboards
+   are step-by-step in
+   [analytics-spec.md](./_bmad-output/planning-artifacts/analytics-spec.md) §5.
+
+**Sentry (error monitoring — frontend + backend):**
+
+1. [sentry.io](https://sentry.io) → sign up (free tier) → create TWO
+   projects: one **React** (`cleardues-frontend`), one **FastAPI**
+   (`cleardues-api`). Each has its own DSN — don't share one.
+2. Vercel env var: `VITE_SENTRY_DSN` = the React project's DSN → Redeploy.
+3. Render env var: `SENTRY_DSN` = the FastAPI project's DSN (the blueprint
+   already has the empty slot) → it redeploys itself. The backend only
+   sends events when `ENVIRONMENT` ≠ `local` (it's `staging` on Render).
+4. Sanity check: Sentry → both projects → trigger any error (e.g. visit a
+   malformed group URL) and confirm an event arrives tagged with the
+   right `environment`.
+
+Privacy posture (already enforced in code — nothing to configure): analytics
+identifies users by opaque UUID only, no email/name; autocapture and session
+replay are OFF; invite/verify tokens and OAuth codes are scrubbed from every
+URL before events leave the browser; Sentry runs with `send_default_pii=False`
+on both sides.
+
 ## §7 Verify the whole thing
 
 - [ ] `https://api.cleardues.site/api/v1/utils/health-check/` → `true`
@@ -190,6 +230,10 @@ Neon's free plan only keeps a ~6-hour restore history — the nightly
 - [ ] Create a group + expense → appears in the ledger (this proves
       Neon + migrations + CORS end-to-end)
 - [ ] Backup workflow ran green; restore drill done once
+- [ ] WS10.6 funnel proof (needs §6.5 done): from a logged-out browser,
+      open an invite link → join via Google → confirm one expense. In
+      PostHog, Activity shows `group.invite.viewed` → `auth.user.logged_in`
+      → `group.invite.joined` → `expense.expense.confirmed` for that person.
 - [ ] Free uptime monitor (uptimerobot.com) pinging the health-check URL and
       `https://cleardues.site` — the monitor, not you, should be the first to
       know it's down. (Bonus: pinging keeps the Render instance warm.)

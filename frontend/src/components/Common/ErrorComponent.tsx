@@ -1,7 +1,18 @@
 import { Link } from "@tanstack/react-router"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { captureError } from "@/lib/sentry"
 
-const ErrorComponent = () => {
+interface ErrorComponentProps {
+  /** The error that tripped the route boundary — reported to Sentry (WS10.6). */
+  error?: unknown
+}
+
+const ErrorComponent = ({ error }: ErrorComponentProps) => {
+  useEffect(() => {
+    if (error !== undefined) captureError(error)
+  }, [error])
+
   return (
     <div
       className="flex min-h-screen items-center justify-center flex-col p-4"

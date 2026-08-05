@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
+import { EVENTS, track } from "@/lib/analytics"
 import { GroupsService, OpenAPI } from "@/shared/api"
 import { getApiErrorMessage } from "@/utils"
 import type {
@@ -134,6 +135,16 @@ export function useUpdateGroupSettings(groupId: string) {
     mutationFn: (data) => updateGroupSettings(groupId, data),
     onSuccess: (settings, variables) => {
       queryClient.setQueryData(["groups", groupId, "settings"], settings)
+      // WS10.6: one event per changed field (the UI PATCHes one at a time)
+      for (const setting of [
+        "strict_mode",
+        "ai_personality",
+        "currency",
+      ] as const) {
+        if (variables[setting] !== undefined) {
+          track(EVENTS.GROUP_SETTINGS_UPDATED, { setting })
+        }
+      }
       if (variables.strict_mode !== undefined) {
         toast.success(
           settings.strict_mode
@@ -198,6 +209,9 @@ async function listInvites(groupId: string): Promise<GroupInvitesResponse> {
 export function useCreateInvite() {
   return useMutation({
     mutationFn: createInvite,
+    onSuccess: () => {
+      track(EVENTS.INVITE_CREATED)
+    },
   })
 }
 
@@ -216,6 +230,9 @@ export function useAcceptInvite() {
   return useMutation({
     mutationFn: acceptInvite,
     onSuccess: () => {
+      // The signed-in explicit Join; the OAuth-return auto-join tracks
+      // itself in auth.callback.tsx with method: "oauth_return".
+      track(EVENTS.INVITE_JOINED, { method: "explicit" })
       // Invalidate groups list to show new membership
       queryClient.invalidateQueries({ queryKey: ["groups"] })
     },

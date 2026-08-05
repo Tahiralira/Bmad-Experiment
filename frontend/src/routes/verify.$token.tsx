@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { AuthService } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import { isLoggedIn } from "@/hooks/useAuth"
+import { EVENTS, track } from "@/lib/analytics"
 
 export const Route = createFileRoute("/verify/$token")({
   component: VerifyMagicLink,
@@ -35,6 +36,9 @@ function VerifyMagicLink() {
     onSuccess: (data) => {
       // Store the access token
       localStorage.setItem("access_token", data.access_token)
+      // This route verifies a REGISTRATION magic link — the one client-side
+      // moment that is unambiguously a signup (WS10.6 activation funnel t0).
+      track(EVENTS.AUTH_SIGNED_UP, { method: "magic_link" })
       // Invalidate user query to refresh
       queryClient.invalidateQueries({ queryKey: ["currentUser"] })
       // Redirect to dashboard

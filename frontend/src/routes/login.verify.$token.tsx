@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { AuthService } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import { isLoggedIn } from "@/hooks/useAuth"
+import { EVENTS, track } from "@/lib/analytics"
 import { processPendingInvite } from "./invite.$token"
 
 export const Route = createFileRoute("/login/verify/$token")({
@@ -36,6 +37,7 @@ function VerifyLoginMagicLink() {
     onSuccess: (data) => {
       // Store the access token
       localStorage.setItem("access_token", data.access_token)
+      track(EVENTS.AUTH_LOGGED_IN, { method: "magic_link" })
       // Invalidate user query to refresh
       queryClient.invalidateQueries({ queryKey: ["currentUser"] })
       // Check for pending invite token from before login

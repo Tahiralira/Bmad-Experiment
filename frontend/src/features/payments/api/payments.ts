@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { request as __request } from "@/client/core/request"
+import { EVENTS, track } from "@/lib/analytics"
 import { OpenAPI } from "@/shared/api"
 import { getApiErrorMessage } from "@/utils"
 import type {
@@ -49,7 +50,9 @@ export function useCreatePaymentMethod() {
   const queryClient = useQueryClient()
   return useMutation<PaymentMethod, Error, PaymentMethodCreate>({
     mutationFn: createPaymentMethod,
-    onSuccess: () => {
+    onSuccess: (method) => {
+      // Provider code only — never the handle itself (it's a payment address)
+      track(EVENTS.PAYMENT_METHOD_ADDED, { provider: method.provider })
       queryClient.invalidateQueries({ queryKey: MY_KEY })
       toast.success("Payment method saved")
     },

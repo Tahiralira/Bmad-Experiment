@@ -10,12 +10,13 @@
  */
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import { OAuthButtons } from "@/features/auth/components/OAuthButtons"
 import { useAcceptInvite, useInvitePreview } from "@/features/groups/api/groups"
 import { isLoggedIn } from "@/hooks/useAuth"
+import { EVENTS, track } from "@/lib/analytics"
 import { getApiErrorMessage } from "@/utils"
 
 const PENDING_INVITE_KEY = "pending_invite_token"
@@ -42,6 +43,15 @@ function InviteLandingPage() {
   // Stash the token so the sign-in return (OAuth callback or magic-link
   // verify) can auto-accept and land the user in the group.
   const stashToken = () => sessionStorage.setItem(PENDING_INVITE_KEY, token)
+
+  // WS10.6: top of the invite→join guardrail funnel. Fires for anonymous
+  // visitors too (PostHog anonymous event — no identity attached).
+  const previewLoaded = !!preview.data
+  useEffect(() => {
+    if (previewLoaded) {
+      track(EVENTS.INVITE_VIEWED, { logged_in: loggedIn })
+    }
+  }, [previewLoaded, loggedIn])
 
   const handleJoin = () => {
     setJoinError(null)

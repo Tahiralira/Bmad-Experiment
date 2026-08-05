@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { EVENTS, track } from "@/lib/analytics"
 import { SUPPORTED_CURRENCIES, guessLocaleCurrency } from "@/lib/currency"
 import { useCustomToast } from "@/shared/hooks/useCustomToast"
 
@@ -84,6 +85,13 @@ export function CreateGroupForm({ onSuccess }: Props) {
         ...(selectedTemplate
           ? { strict_mode: selectedTemplate.strictMode }
           : {}),
+      })
+      // WS10.6: tracked here (not in useCreateGroup) — only the form knows
+      // which onboarding template was used. Never the group's name (PII-ish).
+      track(EVENTS.GROUP_CREATED, {
+        template: templateId ?? "none",
+        currency,
+        strict_mode: selectedTemplate?.strictMode ?? false,
       })
       showSuccessToast("Group created successfully!")
       if (onSuccess) {
