@@ -23,6 +23,27 @@ Each platform connects to your GitHub repo and redeploys itself on every push
 
 ---
 
+## Status — what is already live
+
+**Verified 2026-08-05.** The stack below is deployed and serving; the sections
+that follow are the runbook for how it got there (and how to rebuild it), not a
+to-do list. Only §6.5 is outstanding.
+
+| Section | State | Evidence |
+|---|---|---|
+| §1 Neon | ✅ live | nightly backup workflow green since 2026-08-02 |
+| §2 Render | ✅ live | `api.cleardues.site/api/v1/utils/health-check/` → `200 true` |
+| §3 Vercel | ✅ live | `cleardues.site` serves the SPA, no console errors |
+| §4 Domain + DNS | ✅ live | apex + `www` → Vercel, `api` → Render, TLS issued on all three |
+| §5 Google OAuth | ✅ live | `/auth/oauth/google/login` → 302 to Google with the correct `redirect_uri` |
+| §6 Backups | ✅ live | `NEON_DIRECT_URL` set; 4 consecutive green runs |
+| **§6.5 Observability** | ❌ **not set up** | live bundle contains no `phc_` key and no Sentry DSN — analytics and error reporting are collecting **nothing** |
+
+§6.5 is three environment variables and two redeploys. Until it's done, all the
+WS10.6 instrumentation ships as a no-op, exactly as designed when unset.
+
+---
+
 ## §0 Prerequisites (one-time)
 
 1. Accounts (all free, sign up with your GitHub account so repo access is
@@ -30,16 +51,10 @@ Each platform connects to your GitHub repo and redeploys itself on every push
    [vercel.com](https://vercel.com).
 2. **Get this code onto `main`.** Render/Vercel default to deploying the
    `main` branch, and GitHub only runs *scheduled* workflows (our nightly DB
-   backup) from the default branch. The product currently lives on the
-   `ws9.6/repo-restructure` branch chain, so:
-
-   ```bash
-   git checkout main
-   git merge ws9.6/repo-restructure
-   git push origin main
-   ```
-
-   (CI runs automatically on that push — wait for the green check.)
+   backup) from the default branch. **Already done** — every work session
+   through WS10.6 has landed on `main` via pull request. Keep it that way: land
+   each `wsN/*` branch with a PR so CI gates the merge, and Render/Vercel pick
+   up the deploy automatically.
 3. Buy `cleardues.site` at a registrar (Porkbun/Namecheap — ~$3–10 the first
    year; check the *renewal* price before buying). You can do all of §1–§3
    before the domain exists and add it in §4 later.
@@ -188,7 +203,9 @@ Neon's free plan only keeps a ~6-hour restore history — the nightly
 
 All the instrumentation code already ships in the app and is **env-gated**:
 without these variables it is a complete no-op (nothing is even downloaded).
-Setting the variables is the entire "integration."
+Setting the variables is the entire "integration." The frontend vars are
+documented in [frontend/.env.example](./frontend/.env.example); the backend's
+`SENTRY_DSN` is in the root [.env.example](./.env.example).
 
 **PostHog (product analytics — frontend only):**
 

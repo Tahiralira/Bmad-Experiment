@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
   __resetAnalyticsForTests,
@@ -28,6 +28,16 @@ function makeFakePostHog() {
 
 beforeEach(() => {
   __resetAnalyticsForTests()
+  // initAnalytics falls back to import.meta.env for both of these, so a real
+  // .env.local would otherwise leak in: a key flips the env-gating tests, and a
+  // non-US host breaks the default-api_host assertion. Unset them so every test
+  // supplies its own key/host when it wants one.
+  vi.stubEnv("VITE_POSTHOG_KEY", undefined)
+  vi.stubEnv("VITE_POSTHOG_HOST", undefined)
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe("event taxonomy", () => {
