@@ -1,286 +1,170 @@
-# Full Stack FastAPI Template
+# ClearDues
 
-<a href="https://github.com/fastapi/full-stack-fastapi-template/actions?query=workflow%3A%22Test+Docker+Compose%22" target="_blank"><img src="https://github.com/fastapi/full-stack-fastapi-template/workflows/Test%20Docker%20Compose/badge.svg" alt="Test Docker Compose"></a>
-<a href="https://github.com/fastapi/full-stack-fastapi-template/actions?query=workflow%3A%22Test+Backend%22" target="_blank"><img src="https://github.com/fastapi/full-stack-fastapi-template/workflows/Test%20Backend/badge.svg" alt="Test Backend"></a>
-<a href="https://coverage-badge.samuelcolvin.workers.dev/redirect/fastapi/full-stack-fastapi-template" target="_blank"><img src="https://coverage-badge.samuelcolvin.workers.dev/fastapi/full-stack-fastapi-template.svg" alt="Coverage"></a>
+**Shared expenses that settle themselves.**
 
-## Technology Stack and Features
+ClearDues is an AI-powered "Agentic Mediator" for group expenses. You describe a
+cost in plain language ("dinner was 84, split with Sam and Ali"); it parses,
+splits, and tracks it. When someone owes you, ClearDues does the asking — a
+progressive sequence of nudges that starts gentle and escalates on its own — so
+you never have to send the awkward message yourself.
 
-- ⚡ [**FastAPI**](https://fastapi.tiangolo.com) for the Python backend API.
-  - 🧰 [SQLModel](https://sqlmodel.tiangolo.com) for the Python SQL database interactions (ORM).
-  - 🔍 [Pydantic](https://docs.pydantic.dev), used by FastAPI, for the data validation and settings management.
-  - 💾 [PostgreSQL](https://www.postgresql.org) as the SQL database.
-- 🚀 [React](https://react.dev) for the frontend.
-  - 💃 Using TypeScript, hooks, [Vite](https://vitejs.dev), and other parts of a modern frontend stack.
-  - 🎨 [Tailwind CSS](https://tailwindcss.com) and [shadcn/ui](https://ui.shadcn.com) for the frontend components.
-  - 🤖 An automatically generated frontend client.
-  - 🧪 [Playwright](https://playwright.dev) for End-to-End testing.
-  - 🦇 Dark mode support.
-- 🐋 [Docker Compose](https://www.docker.com) for development and production.
-- 🔒 Secure password hashing by default.
-- 🔑 JWT (JSON Web Token) authentication.
-- 📫 Email based password recovery.
-- 📬 [Mailcatcher](https://mailcatcher.me) for local email testing during development.
-- ✅ Tests with [Pytest](https://pytest.org).
-- 📞 [Traefik](https://traefik.io) as a reverse proxy / load balancer.
-- 🚢 Deployment instructions using Docker Compose, including how to set up a frontend Traefik proxy to handle automatic HTTPS certificates.
-- 🏭 CI (continuous integration) and CD (continuous deployment) based on GitHub Actions.
+The bet: the hard part of splitting expenses was never the arithmetic. It's the
+social cost of collecting.
 
-### Dashboard Login
+---
 
-[![API docs](img/login.png)](https://github.com/fastapi/full-stack-fastapi-template)
+## Status
 
-### Dashboard - Admin
+**Pre-beta. Deployed, not launched.** Not accepting external signups yet.
 
-[![API docs](img/dashboard.png)](https://github.com/fastapi/full-stack-fastapi-template)
+| | |
+|---|---|
+| Live app | [cleardues.site](https://cleardues.site) |
+| API | [api.cleardues.site](https://api.cleardues.site/api/v1/utils/health-check/) |
+| Stage | Work sessions WS1–WS11 complete; private beta lands after WS13 |
 
-### Dashboard - Items
+What works today: magic-link and Google sign-in, groups with invites, AI expense
+parsing with a confirmation step, a double-entry ledger, per-expense and
+aggregate settle-up, payment handles/links, and analytics instrumentation.
 
-[![API docs](img/dashboard-items.png)](https://github.com/fastapi/full-stack-fastapi-template)
+What does **not** exist yet, despite appearing in older architecture docs: the
+nudge engine itself (WS12–13), web push, Celery/Redis, and offline support.
+`_bmad-output/planning-artifacts/architecture.md` describes several of these as
+present — it is out of date and flagged as such.
 
-### Dashboard - Dark Mode
+The plan of record is
+[`_bmad-output/product-review/10-execution-plan.md`](./_bmad-output/product-review/10-execution-plan.md).
 
-[![API docs](img/dashboard-dark.png)](https://github.com/fastapi/full-stack-fastapi-template)
+---
 
-### Interactive API Documentation
+## Stack
 
-[![API docs](img/docs.png)](https://github.com/fastapi/full-stack-fastapi-template)
+| Layer | Choice |
+|---|---|
+| Backend | FastAPI (Python 3.13), SQLModel, Alembic |
+| Frontend | React 19, TypeScript, Vite, TanStack Router + Query |
+| Database | PostgreSQL 17 |
+| AI | Hosted LLM parsing with a per-user quota |
+| Local dev | Docker Compose (+ Adminer, mailcatcher, hot reload) |
+| Production | Vercel (SPA) · Render (API) · Neon (Postgres) |
 
-## How To Use It
+No Redux — server state lives in TanStack Query, UI state in React local state.
 
-You can **just fork or clone** this repository and use it as is.
+---
 
-✨ It just works. ✨
+## Quickstart
 
-### How to Use a Private Repository
-
-If you want to have a private repository, GitHub won't allow you to simply fork it as it doesn't allow changing the visibility of forks.
-
-But you can do the following:
-
-- Create a new GitHub repo, for example `my-full-stack`.
-- Clone this repository manually, set the name with the name of the project you want to use, for example `my-full-stack`:
+Requires [Docker](https://www.docker.com/) and Docker Compose.
 
 ```bash
-git clone git@github.com:fastapi/full-stack-fastapi-template.git my-full-stack
+git clone https://github.com/Tahiralira/Bmad-Experiment.git cleardues
 ```
-
-- Enter into the new directory:
 
 ```bash
-cd my-full-stack
+cd cleardues && cp .env.example .env && cp frontend/.env.example frontend/.env.local
 ```
 
-- Set the new origin to your new repository, copy it from the GitHub interface, for example:
-
-```bash
-git remote set-url origin git@github.com:octocat/my-full-stack.git
-```
-
-- Add this repo as another "remote" to allow you to get updates later:
-
-```bash
-git remote add upstream git@github.com:fastapi/full-stack-fastapi-template.git
-```
-
-- Push the code to your new repository:
-
-```bash
-git push -u origin master
-```
-
-### Update From the Original Template
-
-After cloning the repository, and after doing changes, you might want to get the latest changes from this original template.
-
-- Make sure you added the original repository as a remote, you can check it with:
-
-```bash
-git remote -v
-
-origin    git@github.com:octocat/my-full-stack.git (fetch)
-origin    git@github.com:octocat/my-full-stack.git (push)
-upstream    git@github.com:fastapi/full-stack-fastapi-template.git (fetch)
-upstream    git@github.com:fastapi/full-stack-fastapi-template.git (push)
-```
-
-- Pull the latest changes without merging:
-
-```bash
-git pull --no-commit upstream master
-```
-
-This will download the latest changes from this template without committing them, that way you can check everything is right before committing.
-
-- If there are conflicts, solve them in your editor.
-
-- Once you are done, commit the changes:
-
-```bash
-git merge --continue
-```
-
-### Configure
-
-You can then update configs in the `.env` files to customize your configurations.
-
-Before deploying it, make sure you change at least the values for:
-
-- `SECRET_KEY`
-- `FIRST_SUPERUSER_PASSWORD`
-- `POSTGRES_PASSWORD`
-
-You can (and should) pass these as environment variables from secrets.
-
-Read the [deployment.md](./deployment.md) docs for more details.
-
-### Generate Secret Keys
-
-Some environment variables in the `.env` file have a default value of `changethis`.
-
-You have to change them with a secret key, to generate secret keys you can run the following command:
+Fill in `.env` — at minimum `SECRET_KEY`, `FIRST_SUPERUSER_PASSWORD`, and
+`POSTGRES_PASSWORD`. Generate each secret with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Copy the content and use that as password / secret key. And run that again to generate another secure key.
-
-## How To Use It - Alternative With Copier
-
-This repository also supports generating a new project using [Copier](https://copier.readthedocs.io).
-
-It will copy all the files, ask you configuration questions, and update the `.env` files with your answers.
-
-### Install Copier
-
-You can install Copier with:
+Then bring the stack up:
 
 ```bash
-pip install copier
+docker compose up -d
 ```
 
-Or better, if you have [`pipx`](https://pipx.pypa.io/), you can run it with:
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| API | http://localhost:8000 |
+| API docs | http://localhost:8000/docs |
+| Adminer (DB) | http://localhost:8080 |
+| Mailcatcher | http://localhost:1080 |
+
+Sign-in emails go to Mailcatcher locally — nothing leaves your machine.
+
+Longer setup notes, including running either half outside Docker, are in
+[development.md](./development.md).
+
+---
+
+## Tests
 
 ```bash
-pipx install copier
+docker compose exec backend pytest -q
 ```
-
-**Note**: If you have `pipx`, installing copier is optional, you could run it directly.
-
-### Generate a Project With Copier
-
-Decide a name for your new project's directory, you will use it below. For example, `my-awesome-project`.
-
-Go to the directory that will be the parent of your project, and run the command with your project's name:
 
 ```bash
-copier copy https://github.com/fastapi/full-stack-fastapi-template my-awesome-project --trust
+cd frontend && npm run typecheck && npm run test && npm run build
 ```
 
-If you have `pipx` and you didn't install `copier`, you can run it directly:
+The dependency lock must stay in sync — CI enforces it:
 
 ```bash
-pipx run copier copy https://github.com/fastapi/full-stack-fastapi-template my-awesome-project --trust
+docker compose exec backend uv lock --check
 ```
 
-**Note** the `--trust` option is necessary to be able to execute a [post-creation script](https://github.com/fastapi/full-stack-fastapi-template/blob/master/.copier/update_dotenv.py) that updates your `.env` files.
+CI ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) runs backend
+pytest + lock check and frontend typecheck + unit tests + build on every push to
+`main` and every PR.
 
-### Input Variables
+---
 
-Copier will ask you for some data, you might want to have at hand before generating the project.
+## Layout
 
-But don't worry, you can just update any of that in the `.env` files afterwards.
-
-The input variables, with their default values (some auto generated) are:
-
-- `project_name`: (default: `"FastAPI Project"`) The name of the project, shown to API users (in .env).
-- `stack_name`: (default: `"fastapi-project"`) The name of the stack used for Docker Compose labels and project name (no spaces, no periods) (in .env).
-- `secret_key`: (default: `"changethis"`) The secret key for the project, used for security, stored in .env, you can generate one with the method above.
-- `first_superuser`: (default: `"admin@example.com"`) The email of the first superuser (in .env).
-- `first_superuser_password`: (default: `"changethis"`) The password of the first superuser (in .env).
-- `smtp_host`: (default: "") The SMTP server host to send emails, you can set it later in .env.
-- `smtp_user`: (default: "") The SMTP server user to send emails, you can set it later in .env.
-- `smtp_password`: (default: "") The SMTP server password to send emails, you can set it later in .env.
-- `emails_from_email`: (default: `"info@example.com"`) The email account to send emails from, you can set it later in .env.
-- `postgres_password`: (default: `"changethis"`) The password for the PostgreSQL database, stored in .env, you can generate one with the method above.
-- `sentry_dsn`: (default: "") The DSN for Sentry, if you are using it, you can set it later in .env.
-
-## Backend Development
-
-Backend docs: [backend/README.md](./backend/README.md).
-
-## Frontend Development
-
-Frontend docs: [frontend/README.md](./frontend/README.md).
-
-## Deployment
-
-Deployment docs: [deployment.md](./deployment.md).
-
-## Development
-
-General development docs: [development.md](./development.md).
-
-This includes using Docker Compose, custom local domains, `.env` configurations, etc.
-
-## Release Notes
-
-Check the file [release-notes.md](./release-notes.md).
-
-## OAuth / Social Authentication Setup
-
-ClearDues supports social login with **Google** and **GitHub**. Follow these steps to configure OAuth providers:
-
-### Google OAuth Setup
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select an existing one
-3. Navigate to **APIs & Services** > **Credentials**
-4. Click **Create Credentials** > **OAuth 2.0 Client IDs**
-5. Configure the OAuth consent screen:
-   - User Type: External (for public apps)
-   - Add your app name and support email
-6. Create OAuth 2.0 Client ID:
-   - Application type: **Web application**
-   - Authorized redirect URIs: `http://localhost:8000/api/v1/auth/oauth/google/callback`
-7. Copy the **Client ID** and **Client Secret** to your `.env` file:
-   ```
-   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   GOOGLE_CLIENT_SECRET=your-client-secret
-   ```
-
-### GitHub OAuth Setup
-
-1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
-2. Click **New OAuth App**
-3. Fill in the application details:
-   - Application name: ClearDues (or your app name)
-   - Homepage URL: `http://localhost:5173`
-   - Authorization callback URL: `http://localhost:8000/api/v1/auth/oauth/github/callback`
-4. Click **Register application**
-5. Copy the **Client ID** and generate a new **Client Secret**
-6. Add to your `.env` file:
-   ```
-   GITHUB_CLIENT_ID=your-github-client-id
-   GITHUB_CLIENT_SECRET=your-github-client-secret
-   ```
-
-### Environment Variables
-
-Add these OAuth-related variables to your `.env` file:
-
-```bash
-# OAuth Settings (Social Authentication)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-OAUTH_REDIRECT_BASE_URL=http://localhost:8000
+```
+backend/
+  app/
+    features/         auth · groups · expenses · ai · notifications
+    models.py         imports EVERY feature model module — new ones must be added
+    alembic/          migrations
+  tests/
+frontend/
+  src/
+    features/         auth · groups · expenses · payments · dashboard
+    client/           generated OpenAPI client (npm run generate-client)
+    routes/           TanStack Router file-based routes
+    lib/              analytics, sentry, shared utilities
+  tests/              Playwright end-to-end journeys
+_bmad-output/         planning artifacts, product review, execution plan
+scripts/
 ```
 
-For production, update `OAUTH_REDIRECT_BASE_URL` to your production backend URL and update the redirect URIs in Google/GitHub console accordingly.
+Code is organised by feature, not by layer, on both sides. API and database use
+`snake_case`; the frontend uses `camelCase` with `PascalCase` components. The
+service layer owns database access.
+
+Two rules that bite if you miss them:
+
+- A new backend feature model module **must** be imported in
+  `backend/app/models.py`, or Alembic and the test suite will not see its tables.
+- The frontend API client is generated from the backend's OpenAPI schema. After
+  changing an endpoint's signature, run `npm run generate-client` in `frontend/`
+  rather than hand-writing types.
+
+---
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [development.md](./development.md) | Local setup, Docker Compose, mailcatcher, linting |
+| [deployment.md](./deployment.md) | Vercel + Render + Neon runbook (the live setup) |
+| [deployment-vps.md](./deployment-vps.md) | Docker-Compose-on-a-VPS fallback |
+| [SECURITY.md](./SECURITY.md) | How to report a vulnerability |
+| [CLAUDE.md](./CLAUDE.md) | Working agreements for AI-assisted development |
+
+---
 
 ## License
 
-The Full Stack FastAPI Template is licensed under the terms of the MIT license.
+MIT — see [LICENSE](./LICENSE).
+
+ClearDues began from
+[full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template)
+by Sebastián Ramírez, also MIT. Very little of the original remains, but the
+copyright notice does, as the license requires.

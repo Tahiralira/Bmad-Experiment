@@ -76,24 +76,49 @@ development_status:
 
   # Epic 3: Smart Expense Entry (8 stories) - UX-Enhanced
   # ✅ Epic 3 COMPLETE! All 8 stories done.
-  # ⚠️ BEFORE PRODUCTION: Must complete Epic 2.5 retrospective action items:
-  #   - Remove console.log placeholders (RETRO-2.5-H1) - 1 hour
-  #   - Fix group detail navigation (RETRO-2.5-H2) - 3-4 hours
-  #   - Add automated testing infrastructure (RETRO-2.5-H3) - 4-6 hours setup
-  # See: technical-debt-log.yaml > retrospective_actions > epic_2_5_retrospective
-  # ⚠️ BEFORE PRODUCTION: Must complete Epic 3 retrospective action items (see epic-3-retro-2026-02-17.md):
-  #   - Complete Story 3.8 implementation (2-3 hours)
-  #   - Resolve Story 3.6 status inconsistency (30 minutes)
-  #   - Remove console.log placeholders (1 hour)
-  #   - Fix group detail navigation (3-4 hours)
-  #   - Add Security to AC Checklist from Epic 1 (2 hours)
-  #   - Define "Minimum Viable Story" Standard from Epic 2 (2-3 hours)
-  #   - Clarify Code Review Scoping from Epic 2 (1 hour)
-  #   - Document Docker Volume Workaround from Epic 1 (30 minutes)
-  #   - Setup Automated Testing Infrastructure (4-6 hours) - BLOCKER for Epic 4
-  #   - Document Story Status Workflow (this week)
-  #   - Create Deferred Task Tracking Standard (this week)
-  # Total prep effort: ~15-17 hours before Epic 4 can start
+  # ✅ BEFORE-PRODUCTION BLOCKERS — RECONCILED 2026-08-25 (WS11, S7-M4).
+  #
+  # These two lists sat here as live "⚠️ BEFORE PRODUCTION" warnings while
+  # epic-4 and epic-5 were marked done above them. Every item is now annotated
+  # done / deferred-with-link / dropped-with-reason. A tracking file whose
+  # warnings can be ignored without trace trains everyone to ignore its
+  # warnings — hence DoD v2 rule 4: no epic closes past a live BLOCKER.
+  #
+  # Epic 2.5 retrospective items
+  # (technical-debt-log.yaml > retrospective_actions > epic_2_5_retrospective):
+  #   - RETRO-2.5-H1 console.log placeholders → DONE. Zero `console.log` in
+  #     frontend/src outside tests (verified WS11).
+  #   - RETRO-2.5-H2 group detail navigation → DONE in WS5. The route exists
+  #     (routes/_layout/groups_.$groupId.tsx) and Dashboard.tsx:113 links to
+  #     `/groups/$groupId`.
+  #   - RETRO-2.5-H3 automated testing infrastructure → DONE in WS1 (vitest,
+  #     root CI) and extended in WS11 (Playwright journeys in CI).
+  #   - RETRO-2.5-M1 Storybook component catalog → DEFERRED, post-beta. Not a
+  #     blocker: the design system is one app's, with one consumer.
+  #   - RETRO-2.5-M2 dark mode on a real OS toggle → DONE-as-DROPPED. WS3 shipped
+  #     16 both-theme screenshots at 375px and 1280px (ws3-screenshots/) via
+  #     Playwright colorScheme, which sets `prefers-color-scheme` exactly as an OS
+  #     toggle does — from the page there is no difference, so the "real OS"
+  #     distinction buys nothing. DoD v2 rule 2 now requires these per UI story.
+  #
+  # Epic 3 retrospective items (epic-3-retro-2026-02-17.md):
+  #   - Complete Story 3.8 → DONE (3-8 marked done below).
+  #   - Resolve Story 3.6 status inconsistency → DONE (3-6 marked done below).
+  #   - Remove console.log placeholders → DONE (same as RETRO-2.5-H1).
+  #   - Fix group detail navigation → DONE (same as RETRO-2.5-H2).
+  #   - Security in the AC checklist → DONE: CLAUDE.md "Security Checklist for
+  #     Story Acceptance Criteria" (7 headings).
+  #   - "Minimum Viable Story" standard → DONE: CLAUDE.md "MVS Standard" (14 items).
+  #   - Code review scoping → DONE: CLAUDE.md "Code Review Scoping" severity table.
+  #   - Docker volume workaround → DONE: solution-patterns.yaml DOCKER-006, also
+  #     in CLAUDE.md's Known Issues table.
+  #   - Setup Automated Testing Infrastructure — "BLOCKER for Epic 4" → DONE, but
+  #     LATE: it landed in WS1 (2026-07-07), long after epic-4 closed. This is the
+  #     bypass S7-M4 caught. Recorded, not papered over.
+  #   - Document Story Status Workflow → DROPPED. Superseded: work runs from
+  #     10-execution-plan.md work sessions, not story-by-story status transitions.
+  #   - Create Deferred Task Tracking Standard → DONE: technical-debt-log.yaml is
+  #     that standard (status_legend: open/in_progress/resolved/wont_fix).
   #
   # WS7 (2026-07-14, branch ws7/real-ai): story 3.3 became REAL for the
   # first time — the review found it was a Potemkin slice (B-C1 swapped-args

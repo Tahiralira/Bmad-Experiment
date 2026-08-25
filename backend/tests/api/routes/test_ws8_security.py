@@ -89,8 +89,18 @@ def test_security_headers_present(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_rate_limit_trips_on_auth_endpoint(client: TestClient) -> None:
-    """The auth tier (10/minute per IP) returns a mediator-voice 429."""
+def test_rate_limit_trips_on_auth_endpoint(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The auth tier returns a mediator-voice 429 once the per-IP cap is hit.
+
+    The cap is pinned here rather than inherited: RATE_LIMIT_AUTH is an env
+    override (WS11) that the e2e stack raises to 1000/minute, and a developer
+    running both suites on one .env would otherwise watch this test go green
+    on a limit that never trips. Same lesson as the WS10.6 analytics tests —
+    a security test must not depend on ambient environment.
+    """
+    monkeypatch.setattr(settings, "RATE_LIMIT_AUTH", "10/minute")
     limiter.enabled = True
     try:
         codes = []

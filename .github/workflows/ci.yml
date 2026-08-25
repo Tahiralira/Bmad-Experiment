@@ -76,3 +76,92 @@ jobs:
         run: npm run test
       - name: Build
         run: npm run build
+
+  e2e:
+    name: End-to-end journeys
+    runs-on: ubuntu-latest
+    # The four smoke journeys (WS11): magic-link sign-in, group create+invite,
+    # expense confirm, settle-up. They drive the real stack — Postgres, the
+    # API, the production frontend image, and mailcatcher for the sign-in
+    # emails — because that chain is exactly what kept breaking untested.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write the .env compose reads
+        run: |
+          cat > .env <<'EOF'
+          DOMAIN=localhost
+          FRONTEND_HOST=http://localhost:5173
+          ENVIRONMENT=local
+          PROJECT_NAME=ClearDues
+          STACK_NAME=cleardues
+          BACKEND_CORS_ORIGINS=http://localhost,http://localhost:5173
+          SECRET_KEY=ci-only-secret-key-do-not-reuse
+          FIRST_SUPERUSER=admin@example.com
+          FIRST_SUPERUSER_PASSWORD=ci-only-password-1234
+          # The journeys register ~20 real users in under a minute; the
+          # production default of 10/minute would 429 the suite. Only this
+          # tier is raised — the global 200/minute default stays on, and
+          # backend pytest still covers the limit itself.
+          RATE_LIMIT_AUTH=1000/minute
+          SMTP_HOST=mailcatcher
+          SMTP_PORT=1025
+          SMTP_TLS=false
+          SMTP_SSL=false
+          EMAILS_FROM_EMAIL=noreply@example.com
+          POSTGRES_SERVER=db
+          POSTGRES_PORT=5432
+          POSTGRES_DB=app
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=ci-only-postgres-password
+          DOCKER_IMAGE_BACKEND=backend
+          DOCKER_IMAGE_FRONTEND=frontend
+          EOF
+
+      - name: Start the stack
+        run: docker compose up -d --wait db backend frontend mailcatcher
+
+      - name: Wait for the API and the frontend to answer
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/v1/utils/health-check/ \
+               && curl -sf -o /dev/null http://localhost:5173/; then
+              echo "stack is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "stack did not come up in time"
+          docker compose logs --tail 80
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Run the journeys
+        run: npx playwright test --project=chromium
+        working-directory: frontend
+        env:
+          VITE_API_URL: http://localhost:8000
+          MAILCATCHER_HOST: http://localhost:1080
+
+      - name: Collect stack logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

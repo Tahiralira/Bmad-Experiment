@@ -1,29 +1,50 @@
 # Security Policy
 
-Security is very important for this project and its community. 🔒
+ClearDues handles money people owe each other. We take reports seriously.
 
-Learn more about it below. 👇
+## Supported versions
 
-## Versions
+ClearDues is a continuously deployed application, not a distributed library.
+Only the currently deployed version at [cleardues.site](https://cleardues.site)
+is supported — there are no maintained older releases to patch.
 
-The latest version or release is supported.
+## Reporting a vulnerability
 
-You are encouraged to write tests for your application and update your versions frequently after ensuring that your tests are passing. This way you will benefit from the latest features, bug fixes, and **security fixes**.
+Email **security@cleardues.site**. If you are not sure whether what you found is
+a real issue, report it anyway.
 
-## Reporting a Vulnerability
+Please include:
 
-If you think you found a vulnerability, and even if you are not sure about it, please report it right away by sending an email to: security@tiangolo.com. Please try to be as explicit as possible, describing all the steps and example code to reproduce the security issue.
+- What the issue is, and what an attacker could do with it
+- Step-by-step reproduction, with example requests or code where relevant
+- Which URL or environment you observed it on
 
-I (the author, [@tiangolo](https://twitter.com/tiangolo)) will review it thoroughly and get back to you.
+You will get an acknowledgement within **3 business days** and an assessment
+with a fix timeline within **10 business days**. ClearDues is pre-beta and
+maintained by a very small team, so responses come from a person, not a queue.
 
-## Public Discussions
+## Please do not
 
-Please restrain from publicly discussing a potential security vulnerability. 🙊
+- Publicly disclose the issue before we have had a chance to fix it. Private
+  disclosure first limits the blast radius for real users.
+- Access, modify, or delete data belonging to accounts that are not yours. If a
+  proof of concept requires a second account, create one.
+- Run automated scanners, load tests, or brute-force attempts against the
+  production deployment. Run the stack locally instead —
+  [development.md](./development.md) gets you a full environment in one command.
 
-It's better to discuss privately and try to find a solution first, to limit the potential impact as much as possible.
+Good-faith research that follows the above will not be pursued or reported.
 
----
+## Scope
 
-Thanks for your help!
+In scope: `cleardues.site`, `api.cleardues.site`, and this repository.
 
-The community and I thank you for that. 🙇
+Out of scope: findings against third-party platforms we build on (Vercel,
+Render, Neon, PostHog, Sentry) — report those to the respective vendor. Also out
+of scope: missing security headers with no demonstrated impact, and reports
+generated solely by an automated scanner with no working proof of concept.
+
+## Thank you
+
+Reports that lead to a fix get credited in the changelog, if you would like the
+credit.

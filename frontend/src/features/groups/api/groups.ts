@@ -1,9 +1,22 @@
+/**
+ * Groups API hooks.
+ *
+ * WS11 exemplar: every call goes through the generated `GroupsService`. There
+ * are no hand-built `__request(OpenAPI, { method, url })` calls left in this
+ * file — a renamed path or a changed body now fails `npm run typecheck`
+ * instead of 404-ing in front of a user.
+ *
+ * The generated services map only 422 to a message; that is fine. FastAPI
+ * sends its own `detail` on every HTTPException and `getApiErrorMessage`
+ * reads `body.detail` first, so the server's wording is what users see —
+ * exactly as it was with the hand-written error maps.
+ */
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
-import { request as __request } from "@/client/core/request"
 import { EVENTS, track } from "@/lib/analytics"
-import { GroupsService, OpenAPI } from "@/shared/api"
+import { GroupsService } from "@/shared/api"
 import { getApiErrorMessage } from "@/utils"
 import type {
   ExpenseGroup,
@@ -40,85 +53,31 @@ export function useUserGroups() {
 
 // === Group Detail (WS5/B-H7 — backs the /groups/$groupId screen) ===
 
-async function getGroupDetail(groupId: string): Promise<ExpenseGroupDetail> {
-  return __request(OpenAPI, {
-    method: "GET",
-    url: `/api/v1/expense-groups/${groupId}`,
-    errors: {
-      401: "Unauthorized",
-      403: "You are not a member of this group",
-      404: "Group not found",
-    },
-  })
-}
-
 export function useGroupDetail(groupId: string) {
   return useQuery<ExpenseGroupDetail, Error>({
     queryKey: ["groups", groupId, "detail"],
-    queryFn: () => getGroupDetail(groupId),
+    queryFn: () => GroupsService.getGroupDetail({ groupId }),
     enabled: !!groupId,
   })
 }
 
 // === Pairwise Balances (WS6/S2-F9) ===
 
-async function getPairwiseBalances(
-  groupId: string,
-): Promise<PairwiseBalancesResponse> {
-  return __request(OpenAPI, {
-    method: "GET",
-    url: `/api/v1/expense-groups/${groupId}/pairwise-balances`,
-    errors: {
-      401: "Unauthorized",
-      403: "You are not a member of this group",
-      404: "Group not found",
-    },
-  })
-}
-
 export function usePairwiseBalances(groupId: string) {
   return useQuery<PairwiseBalancesResponse, Error>({
     queryKey: ["pairwise-balances", groupId],
-    queryFn: () => getPairwiseBalances(groupId),
+    queryFn: () => GroupsService.getPairwiseBalances({ groupId }),
     enabled: !!groupId,
   })
 }
 
 // === Group Settings (WS6 strict mode + WS7 AI personality) ===
 
-async function getGroupSettings(groupId: string): Promise<GroupSettings> {
-  return __request(OpenAPI, {
-    method: "GET",
-    url: `/api/v1/expense-groups/${groupId}/settings`,
-    errors: {
-      401: "Unauthorized",
-      403: "You are not a member of this group",
-      404: "Group not found",
-    },
-  })
-}
-
 export function useGroupSettings(groupId: string) {
   return useQuery<GroupSettings, Error>({
     queryKey: ["groups", groupId, "settings"],
-    queryFn: () => getGroupSettings(groupId),
+    queryFn: () => GroupsService.getGroupSettings({ groupId }),
     enabled: !!groupId,
-  })
-}
-
-async function updateGroupSettings(
-  groupId: string,
-  data: GroupSettingsUpdate,
-): Promise<GroupSettings> {
-  return __request(OpenAPI, {
-    method: "PATCH",
-    url: `/api/v1/expense-groups/${groupId}/settings`,
-    body: data,
-    errors: {
-      401: "Unauthorized",
-      403: "Only the group owner can change group settings",
-      404: "Group not found",
-    },
   })
 }
 
@@ -132,7 +91,8 @@ export function useUpdateGroupSettings(groupId: string) {
   const queryClient = useQueryClient()
 
   return useMutation<GroupSettings, Error, GroupSettingsUpdate>({
-    mutationFn: (data) => updateGroupSettings(groupId, data),
+    mutationFn: (data) =>
+      GroupsService.updateGroupSettings({ groupId, requestBody: data }),
     onSuccess: (settings, variables) => {
       queryClient.setQueryData(["groups", groupId, "settings"], settings)
       // WS10.6: one event per changed field (the UI PATCHes one at a time)
@@ -168,47 +128,9 @@ export function useUpdateGroupSettings(groupId: string) {
 // === Invite API (WS8/S5-M4: preview via GET, join via explicit POST,
 // owner revocation, usage caps) ===
 
-async function createInvite(groupId: string): Promise<GroupInviteResponse> {
-  return __request(OpenAPI, {
-    method: "POST",
-    url: `/api/v1/expense-groups/${groupId}/invites`,
-  })
-}
-
-async function getInvitePreview(token: string): Promise<InvitePreview> {
-  return __request(OpenAPI, {
-    method: "GET",
-    url: `/api/v1/expense-groups/invite/${token}`,
-  })
-}
-
-async function acceptInvite(token: string): Promise<GroupInviteResponse> {
-  return __request(OpenAPI, {
-    method: "POST",
-    url: `/api/v1/expense-groups/invite/${token}/accept`,
-  })
-}
-
-async function revokeInvite(
-  groupId: string,
-  inviteId: string,
-): Promise<{ message: string }> {
-  return __request(OpenAPI, {
-    method: "DELETE",
-    url: `/api/v1/expense-groups/${groupId}/invites/${inviteId}`,
-  })
-}
-
-async function listInvites(groupId: string): Promise<GroupInvitesResponse> {
-  return __request(OpenAPI, {
-    method: "GET",
-    url: `/api/v1/expense-groups/${groupId}/invites`,
-  })
-}
-
 export function useCreateInvite() {
   return useMutation({
-    mutationFn: createInvite,
+    mutationFn: (groupId: string) => GroupsService.createInvite({ groupId }),
     onSuccess: () => {
       track(EVENTS.INVITE_CREATED)
     },
@@ -218,7 +140,7 @@ export function useCreateInvite() {
 export function useInvitePreview(token: string) {
   return useQuery<InvitePreview, Error>({
     queryKey: ["invite-preview", token],
-    queryFn: () => getInvitePreview(token),
+    queryFn: () => GroupsService.previewInvite({ token }),
     enabled: !!token,
     retry: false,
   })
@@ -227,8 +149,8 @@ export function useInvitePreview(token: string) {
 export function useAcceptInvite() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: acceptInvite,
+  return useMutation<GroupInviteResponse, Error, string>({
+    mutationFn: (token: string) => GroupsService.acceptInvite({ token }),
     onSuccess: () => {
       // The signed-in explicit Join; the OAuth-return auto-join tracks
       // itself in auth.callback.tsx with method: "oauth_return".
@@ -241,7 +163,8 @@ export function useAcceptInvite() {
 
 export function useRevokeInvite(groupId: string) {
   return useMutation({
-    mutationFn: (inviteId: string) => revokeInvite(groupId, inviteId),
+    mutationFn: (inviteId: string) =>
+      GroupsService.revokeInvite({ groupId, inviteId }),
     onSuccess: (result) => {
       toast.success(result.message)
     },
@@ -254,31 +177,17 @@ export function useRevokeInvite(groupId: string) {
 export function useGroupInvites(groupId: string, enabled: boolean) {
   return useQuery<GroupInvitesResponse, Error>({
     queryKey: ["groups", groupId, "invites"],
-    queryFn: () => listInvites(groupId),
+    queryFn: () => GroupsService.listInvites({ groupId }),
     enabled,
   })
 }
 
 // === Members API ===
 
-async function getGroupMembers(
-  groupId: string,
-): Promise<GroupMembersListResponse> {
-  return __request(OpenAPI, {
-    method: "GET",
-    url: `/api/v1/expense-groups/${groupId}/members`,
-    errors: {
-      401: "Unauthorized",
-      403: "You are not a member of this group",
-      404: "Group not found",
-    },
-  })
-}
-
 export function useGroupMembers(groupId: string) {
   return useQuery<GroupMembersListResponse, Error>({
     queryKey: ["groups", groupId, "members"],
-    queryFn: () => getGroupMembers(groupId),
+    queryFn: () => GroupsService.listGroupMembers({ groupId }),
     enabled: !!groupId,
   })
 }

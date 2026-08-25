@@ -107,6 +107,30 @@ From [monetization-spec §8](./monetization-spec.md) and the PRD success criteri
    `settlement.claim.confirmed`; plus payment-provider breakdown from
    `payment.link.clicked` / `payment.handle.copied`.
 
+### 5a. Existing PostHog instance (recorded WS11)
+
+A PostHog project and a first pass of auto-generated insights already exist —
+created 2026-07-27 by `npx @posthog/wizard`, **not** hand-built to the §5
+definitions above. Project **529917** (US Cloud).
+
+| Asset | URL |
+|---|---|
+| Dashboard "Analytics basics (wizard)" | https://us.posthog.com/project/529917/dashboard/1909960 |
+| Activation funnel (wizard) | https://us.posthog.com/project/529917/insights/25PU8gZi |
+| Invite conversion funnel (wizard) | https://us.posthog.com/project/529917/insights/z2lmKB2J |
+| AI parse success rate (wizard) | https://us.posthog.com/project/529917/insights/ibED0V0R |
+| Settlement velocity (wizard) | https://us.posthog.com/project/529917/insights/6JKT8BVr |
+| Expense creation by source (wizard) | https://us.posthog.com/project/529917/insights/WaF4MzPX |
+
+⚠️ These are a starting point, not the contract. Each still has to be
+reconciled against its §5 definition before the WS13 weekly metric review —
+in particular the 48h conversion window on activation, and median (not mean)
+`claim_age_hours` on settlement velocity. §5 wins where they disagree.
+
+Nothing has been recorded into this project yet: the live bundle still carries
+no `phc_` key (deployment.md §6.5, §40). The key exists in the owner's local
+`frontend/.env.local` and needs pasting into Vercel.
+
 ## 6. Sentry
 
 - **Frontend** (`lib/sentry.ts`): `@sentry/react`, statically imported so

@@ -997,30 +997,83 @@ this file breaks that merge into runnable units.
           preference store; actual delivery folds into WS12.
           Status: pending (blocked)
 
-- [ ] **WS11 — Docs Floor + Test Journeys + PWA Shell** (≈3 days)
+- [x] **WS11 — Docs Floor + Test Journeys + PWA Shell** (≈3 days) — **DONE** 2026-08-25
       Goal: the repo survives its first external reader; real flows have automated
       coverage; the app is installable.
       Depends on: WS8 (template deletion settles what docs describe).
       Inputs: 07 (top-10 table), 04 (H5, H4).
+      Branch: `ws11/docs-e2e-pwa`.
       Tasks:
-      - [ ] Repo-root README (what/status/stack/quickstart/layout) + LICENSE decision;
+      - [x] Repo-root README (what/status/stack/quickstart/layout) + LICENSE decision;
             strip the template README.md (at repo root since WS9.6) to dev setup;
             delete template badges/screenshots/
             release-notes/img/ (S7-H1, M6)
-      - [ ] backend/README rewrite: feature-based architecture, real migration
+            → README rewritten; LICENSE = MIT, copyright ClearDues, with the
+            template-derivation notice kept; `release-notes.md` (755 lines of
+            upstream changelog) and all 7 `img/` template screenshots deleted.
+      - [x] backend/README rewrite: feature-based architecture, real migration
             workflow (S7-H2); SECURITY.md contact fixed (S7-M1)
-      - [ ] Reconcile session-context/sprint-status numbers; annotate the bypassed
+            → SECURITY.md now points at security@cleardues.site with scope and
+            safe-harbour text. **Owner action: that mailbox must actually exist.**
+      - [x] Reconcile session-context/sprint-status numbers; annotate the bypassed
             BLOCKER items (S7-M2, M4)
-      - [ ] Decide + document the one API-client pattern (regenerate OpenAPI client
+            → counts corrected to 33/47 done, 14 remaining (was "32 done, 13
+            remaining"); Epic 6-7 0/10 (was 0/18); Epic 8 1/4 (was 0/4). All 11
+            bypassed "⚠️ BEFORE PRODUCTION" items annotated done /
+            deferred-with-link / dropped-with-reason in sprint-status.yaml, and the
+            4 verifiably-fixed retro items flipped to `resolved` in
+            technical-debt-log.yaml. The Epic-4 blocker bypass is recorded as a
+            bypass, not papered over.
+      - [x] Decide + document the one API-client pattern (regenerate OpenAPI client
             vs bless hand-rolled) and migrate one feature as the exemplar (S7-M3)
-      - [ ] Delete 4 template Playwright specs; write 3–4 ClearDues smoke journeys
+            → DECISION: regenerate. `scripts/generate-client.sh` + frontend/README
+            rule; **groups** is the migrated exemplar (zero hand-built `__request`
+            left in it). 32 call sites in auth/dashboard/expenses still to follow.
+            Two backend schemas tightened so the generated client stops lying:
+            `ExpenseGroupDetail` defaults dropped, `ai_personality` → `Literal`.
+            `scripts/generate-client.sh` itself was broken — it shelled out to a
+            host Python with the backend importable, which no checkout has — so
+            the newly-documented workflow could not run. Rewritten to go through
+            `docker compose exec`, with a guard against regenerating from an empty
+            dump; verified by running it (client comes back byte-identical).
+      - [x] Delete 4 template Playwright specs; write 3–4 ClearDues smoke journeys
             (magic link via mailcatcher, group create+invite, expense confirm,
             settle-up) wired into CI (S4-H5)
-      - [ ] PWA install shell: manifest, icons (v2 brand), service worker via
+            → 4 template specs + 3 template helpers deleted; 5 specs / 12 tests
+            written (the 4 journeys + a CSP-header guard). New `e2e` CI job stands
+            the real compose stack up and uploads the Playwright report.
+            **The suite was not actually green when written** — it passed once and
+            failed on re-run. Three defects, all fixed and each now a solution
+            pattern: (a) the suite trips the app's own 10/minute auth rate limit
+            after ~20 registrations → `RATE_LIMIT_AUTH` setting, default unchanged,
+            raised only for the e2e stack, limiting stays ON (TEST-008); (b) all
+            tests share one account, so hardcoded descriptions collided and
+            `.first()` confirmed other tests' expenses → unique labels + row-scoped
+            actions (TEST-007); (c) `waitForURL` returns while the previous list is
+            still mounted, so `getByText("1 member")` matched 6 list cards → wait
+            for the detail heading, and scope member-count assertions. A duplicate
+            `createGroup` in group-invite.spec.ts was deleted in favour of the
+            shared helper. Now **9 consecutive clean full-suite runs**.
+      - [x] PWA install shell: manifest, icons (v2 brand), service worker via
             vite-plugin-pwa, theme-color meta — install-shell only, offline data
             explicitly out (S4-H4)
+            → vite-plugin-pwa, 4 generated icons (192/512/maskable-512/apple-180),
+            per-scheme theme-color. `runtimeCaching: []` and an `/api/`
+            navigate-fallback denylist keep the SW off API responses — a stale
+            balance shown as current is worse than no balance.
       Verification: e2e smokes green in CI; Lighthouse PWA installability passes.
-      Status: pending
+      Result: backend **298 passed** (incl. the rate-limit test, now pinned to
+      10/minute so it cannot inherit the e2e override), `uv lock --check` in sync,
+      frontend **127 passed**, typecheck + build green, **12/12 Playwright
+      journeys pass — 9 runs in a row, plus a CI-shaped single-worker run**; main
+      chunk 175.79 kB gz (budget ≤250 ✓). PWA verified in real Chromium: the SW
+      registers, activates, and serves the navigation; manifest carries every
+      field Chrome's installability check requires (name, short_name, start_url,
+      standalone, 192+512+maskable icons, secure context); an `/api/` request is
+      passed through, not answered from cache. Lighthouse CLI was not installed,
+      so its individual criteria were asserted directly rather than via a
+      Lighthouse run.
+      Status: DONE
 
 ### PHASE 3 — The Differentiator → BETA
 

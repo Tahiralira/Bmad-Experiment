@@ -1,8 +1,9 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-07-23 (WS10.6 done — Observability: PostHog taxonomy +
-Sentry both sides, all env-gated no-op-unset; owner configures instances per
-deployment.md §6.5; WS10 split into atomic sub-sessions WS10.1–WS10.7)
+**Last Updated:** 2026-08-25 (WS11 done — Docs Floor + Test Journeys + PWA Shell:
+README/LICENSE/SECURITY floor, template exhaust deleted, 12 Playwright journeys in
+CI, generated-OpenAPI-client decision with groups as the exemplar, installable PWA
+shell with the SW deliberately kept off API responses)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -27,10 +28,18 @@ deployment.md §6.5; WS10 split into atomic sub-sessions WS10.1–WS10.7)
 | Epic 3: Expenses | **DONE** | 8/8 ✅ |
 | **Epic 4: Trust & Confirmation** | **DONE** | 5/5 ✅ |
 | **Epic 5: Settlement** | **IN-PROGRESS** | 2/3 |
-| Epic 6-7 | BACKLOG | 0/18 |
-| Epic 8: UX Polish | BACKLOG (Post-MVP) | 0/4 |
+| Epic 6-7 | BACKLOG | 0/10 |
+| Epic 8: UX Polish | BACKLOG (Post-MVP) | 1/4 |
 
-**Current Progress:** 32 stories completed, 13 remaining (Story 5.2 done ✅)
+**Current Progress:** 33 of 47 stories done, 14 remaining.
+
+> These counts are **derived from** `implementation-artifacts/sprint-status.yaml`
+> — that file is the source of truth, this table is a convenience copy.
+> Reconciled 2026-08-25 (WS11, S7-M2): the old row said "32 completed, 13
+> remaining", "Epic 6-7 0/18" (they hold 10 stories, not 18 — the 18 was
+> copied from CLAUDE.md's "Epic 4-7" row), and "Epic 8 0/4" (8-1
+> ai-personality-selector shipped early in WS7). If you touch a story status,
+> change sprint-status.yaml first and re-derive these.
 
 > **IMPORTANT:** Work now runs from the execution plan
 > (`_bmad-output/product-review/10-execution-plan.md`), not story-by-story.
@@ -650,7 +659,77 @@ cd frontend && npm run build
     URLs, lazy chunk], Sentry frontend static + backend env tag, analytics-spec
     + deployment.md §6.5 owner runbook; backend 298, frontend 127, main chunk
     175.55 kB gz; owner sets the env keys to switch it on)
-  - WS10.7 Push (blocked on WS11/WS12) → **next runnable: WS11**
+  - WS10.7 Push — **PARTIALLY UNBLOCKED by WS11** (the service worker now
+    exists). Runnable standalone slice: permission-prompt UX after the first
+    confirmed expense + subscription/preference store. Actual delivery still
+    needs WS12.
+- WS11 Docs Floor + Test Journeys + PWA Shell ← **DONE** ✓ (2026-08-25; branch
+  ws11/docs-e2e-pwa). Four things landed:
+  1. **Docs floor** — repo-root README (what/status/stack/quickstart/layout),
+     LICENSE re-attributed to ClearDues with the template-derivation notice kept,
+     backend/README rewritten around the feature-based layout + real Alembic
+     workflow, SECURITY.md given a real contact + scope + safe harbour.
+     `release-notes.md` (755 lines of upstream changelog) and all 7 template
+     `img/` screenshots deleted.
+  2. **Tracking reconciled** (S7-M2/M4) — counts were wrong in three places and
+     are now derived from sprint-status.yaml: **33 of 47 done, 14 remaining**
+     (was "32 done, 13 remaining"), Epic 6-7 **0/10** (was 0/18), Epic 8 **1/4**
+     (was 0/4). All 11 bypassed "⚠️ BEFORE PRODUCTION" items are annotated
+     done / deferred-with-link / dropped-with-reason. The Epic-4 testing-infra
+     BLOCKER really was bypassed — it landed in WS1, months after epic-4 closed
+     — and is now recorded as a bypass rather than quietly dropped.
+  3. **Test journeys** — 4 template Playwright specs + 3 template helpers
+     deleted; **12 tests across 5 specs** written (magic-link sign-in, group
+     create+invite, expense confirm/reject, settle-up, plus a CSP-header guard),
+     with a new `e2e` CI job that stands the real compose stack up and uploads
+     the Playwright report. **These were not green when written** — they passed
+     once, then failed. Three real defects, now fixed:
+     - The suite **trips the app's own auth rate limit** (10/minute per IP, WS8)
+       after ~20 registrations. Fix: `RATE_LIMIT_AUTH` setting, **default still
+       10/minute so production is unchanged**, raised to 1000/minute only for the
+       e2e stack (ci.yml + local .env); limiting stays ENABLED and every other
+       tier is untouched. `AUTH_LIMIT` became a *callable* so slowapi re-reads it
+       per request, which lets `test_ws8_security` pin 10/minute for itself
+       (solution-patterns TEST-008).
+     - **Every test shares one account** (one storageState), so `/pending` and
+       `/groups` mix all tests' rows. Hardcoded descriptions collided across
+       parallel tests, and `.first()` on the Confirm button confirmed *another*
+       test's expense. Fix: `uniqueLabel()` + row-scoped `actOnPending()`
+       (TEST-007).
+     - `waitForURL` returns while the previous route is **still mounted**, so
+       `getByText("1 member")` matched 6 list cards and died on strict mode. Fix:
+       wait for the detail `<h1>`, and assert member counts through
+       `expectMemberCount()`. A duplicate `createGroup` in group-invite.spec.ts
+       was deleted in favour of the shared helper.
+     Verified with **9 consecutive clean full-suite runs** plus a CI-shaped
+     single-worker run — one green run proves nothing here.
+  4. **PWA install shell** — vite-plugin-pwa, 4 brand icons, per-scheme
+     theme-color. `runtimeCaching: []` + an `/api/` navigate-fallback denylist
+     keep the SW off API responses on purpose: **offline data is out of scope**,
+     because a stale balance shown as current is worse than no balance.
+  Also: the API-client question (S7-M3) is **decided — regenerate**. There is a
+  `scripts/generate-client.sh`, the rule is in frontend/README, and **groups** is
+  the migrated exemplar; 32 hand-built `__request` call sites in
+  auth/dashboard/expenses are queued to follow. Two backend response schemas were
+  tightened so the generated client stops lying (`ExpenseGroupDetail` defaults
+  dropped; `ai_personality` → `Literal`). **`scripts/generate-client.sh` was
+  itself broken** — it ran `python -c "import app.main"` on the *host*, and the
+  backend's deps only exist in the image, so the freshly-documented command could
+  not run on any checkout. It goes through `docker compose exec` now, refuses to
+  regenerate from an empty dump, and was verified by actually running it.
+  Gates: backend **298 passed**, `uv lock --check` in sync, frontend **127
+  passed**, typecheck + build green, **12/12 journeys pass (9 runs in a row)**,
+  main chunk 175.79 kB gz.
+  Key learning: the in-app Browser pane **cannot register service workers at all**
+  — registration fails with "unknown error occurred when fetching the script"
+  while a plain fetch() of the same URL returns 200. Verify SW/PWA work in real
+  Chromium via Playwright instead (solution-patterns FE-011).
+  **Owner action:** `security@cleardues.site` (SECURITY.md) must be a real,
+  monitored mailbox before beta.
+
+**Next runnable: WS12 (Nudge Engine: Infra + Level 1)** — the product's reason to
+exist. WS10.7's standalone slice can be folded in or run first; its delivery half
+needs WS12 either way.
 
 **Key WS2 decisions for WS3:** framer-motion deleted, no shadows at rest, template
 components (Items/Admin/ChangePassword) NOT restyled (deleted in WS8), one

@@ -3,44 +3,76 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, PrivateCreateUserData, PrivateCreateUserResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
+import type { AiParsingParseExpenseData, AiParsingParseExpenseResponse, AuthRequestMagicLinkData, AuthRequestMagicLinkResponse, AuthVerifyMagicLinkData, AuthVerifyMagicLinkResponse, AuthRequestLoginMagicLinkData, AuthRequestLoginMagicLinkResponse, AuthVerifyLoginMagicLinkData, AuthVerifyLoginMagicLinkResponse, AuthLogoutResponse, AuthOauthLoginData, AuthOauthLoginResponse, AuthOauthCallbackData, AuthOauthCallbackResponse, AuthExchangeLoginCodeData, AuthExchangeLoginCodeResponse, ExpensesCreateExpenseData, ExpensesCreateExpenseResponse, ExpensesEditExpenseData, ExpensesEditExpenseResponse, ExpensesGetExpenseData, ExpensesGetExpenseResponse, ExpensesUpdateExpenseSplitData, ExpensesUpdateExpenseSplitResponse, ExpensesConfirmExpenseSplitEndpointData, ExpensesConfirmExpenseSplitEndpointResponse, ExpensesRejectExpenseSplitEndpointData, ExpensesRejectExpenseSplitEndpointResponse, ExpensesGetPendingConfirmationsResponse, ExpensesGetPendingSettlementsResponse, ExpensesGetPendingClaimsForOwnerData, ExpensesGetPendingClaimsForOwnerResponse, ExpensesGetExpenseAuditLogData, ExpensesGetExpenseAuditLogResponse, ExpensesSettleExpenseEndpointData, ExpensesSettleExpenseEndpointResponse, ExpensesConfirmSettlementClaimEndpointData, ExpensesConfirmSettlementClaimEndpointResponse, ExpensesRejectSettlementClaimEndpointData, ExpensesRejectSettlementClaimEndpointResponse, ExpensesCreateAggregateSettlementEndpointData, ExpensesCreateAggregateSettlementEndpointResponse, ExpensesListAggregateSettlementClaimsData, ExpensesListAggregateSettlementClaimsResponse, ExpensesGetExpenseSplitsData, ExpensesGetExpenseSplitsResponse, GroupsListUserGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupDetailData, GroupsGetGroupDetailResponse, GroupsListGroupExpensesData, GroupsListGroupExpensesResponse, GroupsGetPairwiseBalancesData, GroupsGetPairwiseBalancesResponse, GroupsGetGroupSettingsData, GroupsGetGroupSettingsResponse, GroupsUpdateGroupSettingsData, GroupsUpdateGroupSettingsResponse, GroupsListGroupMembersData, GroupsListGroupMembersResponse, GroupsGetMemberPaymentMethodsData, GroupsGetMemberPaymentMethodsResponse, GroupsCreateInviteData, GroupsCreateInviteResponse, GroupsListInvitesData, GroupsListInvitesResponse, GroupsRevokeInviteData, GroupsRevokeInviteResponse, GroupsPreviewInviteData, GroupsPreviewInviteResponse, GroupsAcceptInviteData, GroupsAcceptInviteResponse, GroupsGetGroupAuditLogData, GroupsGetGroupAuditLogResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersSetMyApiKeyData, UsersSetMyApiKeyResponse, UsersDeleteMyApiKeyResponse, UsersListMyPaymentMethodsResponse, UsersAddMyPaymentMethodData, UsersAddMyPaymentMethodResponse, UsersUpdateMyPaymentMethodData, UsersUpdateMyPaymentMethodResponse, UsersDeleteMyPaymentMethodData, UsersDeleteMyPaymentMethodResponse, UsersGetDashboardResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
 
-export class ItemsService {
+export class AiParsingService {
     /**
-     * Read Items
-     * Retrieve items.
+     * Parse Expense
+     * Parse natural language expense text using AI.
+     *
+     * Hosted-first (WS7): requests run on the server's Gemini key with a
+     * monthly free quota per user; users with a stored BYOK key use their own
+     * key, unmetered. Streams word-level commentary chunks via SSE, then the
+     * final parsed data.
+     *
+     * **Example request**:
+     * ```json
+     * {
+     * "text": "Paid 60 for lunch with the team",
+     * "group_id": "550e8400-e29b-41d4-a716-446655440000",
+     * "personality": "friendly"
+     * }
+     * ```
+     *
+     * **SSE events** (HTTP 200):
+     * - `{"type":"commentary","data":{"text":"Got "}}` — word-level chunks
+     * - `{"type":"complete","data":{...ExpenseParseResponse...}}`
+     * - `{"type":"error","error":"..."}` — mid-stream failure only
+     *
+     * **HTTP errors (before any streaming)**:
+     * - 401 not authenticated / 422 malformed body
+     * - 403 not a member of the group
+     * - 429 monthly free-parse quota exhausted
+     * - 503 hosted AI not configured and no BYOK key stored
+     *
+     * **Personality modes**: `professional`, `friendly` (default), `funny`.
      * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
-     * @returns ItemsPublic Successful Response
+     * @param data.requestBody
+     * @returns unknown Successful Response
      * @throws ApiError
      */
-    public static readItems(data: ItemsReadItemsData = {}): CancelablePromise<ItemsReadItemsResponse> {
+    public static parseExpense(data: AiParsingParseExpenseData): CancelablePromise<AiParsingParseExpenseResponse> {
         return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/v1/items/',
-            query: {
-                skip: data.skip,
-                limit: data.limit
-            },
+            method: 'POST',
+            url: '/api/v1/expenses/parse',
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: 'Validation Error'
             }
         });
     }
-    
+}
+
+export class AuthService {
     /**
-     * Create Item
-     * Create new item.
+     * Request Magic Link
+     * Request a magic link for passwordless registration.
+     *
+     * Generates a magic link token and sends it to the user's email.
+     * Returns a generic success message regardless of whether the email exists
+     * (to prevent email enumeration attacks).
+     *
+     * Rate limited per email (3/hour) and per IP (WS8/S5-H2).
      * @param data The data for the request.
      * @param data.requestBody
-     * @returns ItemPublic Successful Response
+     * @returns Message Successful Response
      * @throws ApiError
      */
-    public static createItem(data: ItemsCreateItemData): CancelablePromise<ItemsCreateItemResponse> {
+    public static requestMagicLink(data: AuthRequestMagicLinkData): CancelablePromise<AuthRequestMagicLinkResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/v1/items/',
+            url: '/api/v1/auth/register',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -50,19 +82,24 @@ export class ItemsService {
     }
     
     /**
-     * Read Item
-     * Get item by ID.
+     * Verify Magic Link
+     * Verify a magic link token and create the user account.
+     *
+     * If the token is valid:
+     * - Creates a new user account (passwordless)
+     * - Marks the token as used
+     * - Returns a JWT access token for the user
      * @param data The data for the request.
-     * @param data.id
-     * @returns ItemPublic Successful Response
+     * @param data.token
+     * @returns TokenWithUser Successful Response
      * @throws ApiError
      */
-    public static readItem(data: ItemsReadItemData): CancelablePromise<ItemsReadItemResponse> {
+    public static verifyMagicLink(data: AuthVerifyMagicLinkData): CancelablePromise<AuthVerifyMagicLinkResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/items/{id}',
+            url: '/api/v1/auth/verify/{token}',
             path: {
-                id: data.id
+                token: data.token
             },
             errors: {
                 422: 'Validation Error'
@@ -71,20 +108,245 @@ export class ItemsService {
     }
     
     /**
-     * Update Item
-     * Update an item.
+     * Request Login Magic Link
+     * Request a magic link for passwordless login.
+     *
+     * Only works for registered users. Returns generic message
+     * regardless of whether email exists (prevents enumeration).
+     *
+     * Rate limited per email (3/hour) and per IP (WS8/S5-H2).
      * @param data The data for the request.
-     * @param data.id
      * @param data.requestBody
-     * @returns ItemPublic Successful Response
+     * @returns Message Successful Response
      * @throws ApiError
      */
-    public static updateItem(data: ItemsUpdateItemData): CancelablePromise<ItemsUpdateItemResponse> {
+    public static requestLoginMagicLink(data: AuthRequestLoginMagicLinkData): CancelablePromise<AuthRequestLoginMagicLinkResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/auth/login',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Verify Login Magic Link
+     * Verify a login magic link token.
+     *
+     * Unlike registration verification, this does NOT create a user.
+     * User must already exist. Returns a revocable JWT
+     * (LOGIN_TOKEN_EXPIRE_DAYS).
+     * @param data The data for the request.
+     * @param data.token
+     * @returns TokenWithUser Successful Response
+     * @throws ApiError
+     */
+    public static verifyLoginMagicLink(data: AuthVerifyLoginMagicLinkData): CancelablePromise<AuthVerifyLoginMagicLinkResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/auth/login/verify/{token}',
+            path: {
+                token: data.token
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Logout
+     * Revoke the current access token server-side.
+     *
+     * Clearing localStorage alone leaves the JWT valid until expiry; this adds
+     * its jti to the revocation list so the token is dead everywhere.
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static logout(): CancelablePromise<AuthLogoutResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/auth/logout'
+        });
+    }
+    
+    /**
+     * Oauth Login
+     * Initiate OAuth login flow for the specified provider.
+     * Redirects user to provider's consent screen.
+     *
+     * Supported providers: google, github
+     * @param data The data for the request.
+     * @param data.provider
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static oauthLogin(data: AuthOauthLoginData): CancelablePromise<AuthOauthLoginResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/auth/oauth/{provider}/login',
+            path: {
+                provider: data.provider
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Oauth Callback
+     * Handle OAuth callback from provider.
+     *
+     * Exchanges the authorization code for provider tokens, creates/links the
+     * user, then redirects to the frontend with a SHORT-LIVED ONE-TIME CODE —
+     * never the JWT itself (WS8/S5-H1: query strings land in access logs,
+     * history, and Referer headers). The frontend swaps the code for the JWT
+     * at POST /auth/oauth/exchange.
+     * @param data The data for the request.
+     * @param data.provider
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static oauthCallback(data: AuthOauthCallbackData): CancelablePromise<AuthOauthCallbackResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/auth/oauth/{provider}/callback',
+            path: {
+                provider: data.provider
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Exchange Login Code
+     * Exchange a one-time OAuth login code for an access token.
+     *
+     * The code arrives via the OAuth callback redirect; it is single-use and
+     * expires in 2 minutes. The JWT is delivered in this POST response body —
+     * never in a URL.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns TokenWithUser Successful Response
+     * @throws ApiError
+     */
+    public static exchangeLoginCode(data: AuthExchangeLoginCodeData): CancelablePromise<AuthExchangeLoginCodeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/auth/oauth/exchange',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class ExpensesService {
+    /**
+     * Create Expense
+     * Create a new expense in a group.
+     *
+     * The current user must be a member of the group.
+     * If payer_id is not provided, defaults to the current user.
+     * New expenses start with status 'draft'.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns ExpensePublic Successful Response
+     * @throws ApiError
+     */
+    public static createExpense(data: ExpensesCreateExpenseData): CancelablePromise<ExpensesCreateExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expenses/',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Edit Expense
+     * Edit expense details. Only the creator can edit.
+     * Only DRAFT and PENDING_CONFIRMATION expenses can be edited.
+     *
+     * Changing the amount or the payer while splits exist re-opens consent:
+     * the splits are removed and the expense reverts to DRAFT for re-splitting.
+     * @param data The data for the request.
+     * @param data.expenseId
+     * @param data.requestBody
+     * @returns ExpensePublic Successful Response
+     * @throws ApiError
+     */
+    public static editExpense(data: ExpensesEditExpenseData): CancelablePromise<ExpensesEditExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/expenses/{expense_id}',
+            path: {
+                expense_id: data.expenseId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Expense
+     * Get a single expense. User must be a member of the expense's group.
+     * @param data The data for the request.
+     * @param data.expenseId
+     * @returns ExpensePublic Successful Response
+     * @throws ApiError
+     */
+    public static getExpense(data: ExpensesGetExpenseData): CancelablePromise<ExpensesGetExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expenses/{expense_id}',
+            path: {
+                expense_id: data.expenseId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Expense Split
+     * Update expense split configuration.
+     *
+     * The body is a discriminated union on `type`: equal (Story 3.5), unequal
+     * (Story 3.6), or percentage (Story 3.7) — malformed bodies (bad UUIDs,
+     * missing fields, out-of-range values, unknown types) are rejected with 422
+     * by schema validation (WS5/B-H6). Domain failures (non-members, sums that
+     * don't match the total) return 400.
+     *
+     * Only the expense creator can modify the split.
+     * Confirmed/settled expenses cannot have splits modified.
+     * @param data The data for the request.
+     * @param data.expenseId
+     * @param data.requestBody
+     * @returns ExpenseSplitResponse Successful Response
+     * @throws ApiError
+     */
+    public static updateExpenseSplit(data: ExpensesUpdateExpenseSplitData): CancelablePromise<ExpensesUpdateExpenseSplitResponse> {
         return __request(OpenAPI, {
             method: 'PUT',
-            url: '/api/v1/items/{id}',
+            url: '/api/v1/expenses/{expense_id}/split',
             path: {
-                id: data.id
+                expense_id: data.expenseId
             },
             body: data.requestBody,
             mediaType: 'application/json',
@@ -95,75 +357,600 @@ export class ItemsService {
     }
     
     /**
-     * Delete Item
-     * Delete an item.
+     * Confirm Expense Split Endpoint
+     * Confirm an expense split.
+     *
+     * User must have a split in this expense to confirm.
+     * Only pending_confirmation expenses can be confirmed.
+     *
+     * Returns the updated split with status 'confirmed'.
      * @param data The data for the request.
-     * @param data.id
+     * @param data.expenseId
+     * @returns ExpenseSplitPublic Successful Response
+     * @throws ApiError
+     */
+    public static confirmExpenseSplitEndpoint(data: ExpensesConfirmExpenseSplitEndpointData): CancelablePromise<ExpensesConfirmExpenseSplitEndpointResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expenses/{expense_id}/confirm',
+            path: {
+                expense_id: data.expenseId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Reject Expense Split Endpoint
+     * Reject an expense split.
+     *
+     * User must have a split in this expense to reject.
+     * Only pending_confirmation expenses can be rejected.
+     * Rejecting re-opens consent: all splits are removed and the expense
+     * reverts to DRAFT so the creator can re-split (WS4/H3 — no silent
+     * redistribution).
+     *
+     * Returns success message; remaining_splits is always 0.
+     * @param data The data for the request.
+     * @param data.expenseId
+     * @param data.requestBody
+     * @returns ExpenseRejectResponse Successful Response
+     * @throws ApiError
+     */
+    public static rejectExpenseSplitEndpoint(data: ExpensesRejectExpenseSplitEndpointData): CancelablePromise<ExpensesRejectExpenseSplitEndpointResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expenses/{expense_id}/reject',
+            path: {
+                expense_id: data.expenseId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Pending Confirmations
+     * Get all expenses pending confirmation for the current user.
+     *
+     * Returns expenses where user has a split with status 'pending'
+     * and expense status is 'pending_confirmation'.
+     * @returns PendingConfirmationPublic Successful Response
+     * @throws ApiError
+     */
+    public static getPendingConfirmations(): CancelablePromise<ExpensesGetPendingConfirmationsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expenses/pending-confirmations'
+        });
+    }
+    
+    /**
+     * Get Pending Settlements
+     * Get all expenses with pending settlement claims for the current user.
+     *
+     * Returns expenses where the user has submitted a settlement claim
+     * that is still awaiting owner confirmation (status: pending).
+     * @returns PendingSettlementPublic Successful Response
+     * @throws ApiError
+     */
+    public static getPendingSettlements(): CancelablePromise<ExpensesGetPendingSettlementsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expenses/pending-settlements'
+        });
+    }
+    
+    /**
+     * Get Pending Claims For Owner
+     * Get all pending settlement claims for expenses owned by the current user.
+     *
+     * Returns claims where the current user is the expense owner (payer)
+     * and the claim status is still 'pending'. Pass ?group_id= to scope the
+     * list to one group (WS5/S4-M6 — group screens must not show other
+     * groups' claims).
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns PendingSettlementPublic Successful Response
+     * @throws ApiError
+     */
+    public static getPendingClaimsForOwner(data: ExpensesGetPendingClaimsForOwnerData = {}): CancelablePromise<ExpensesGetPendingClaimsForOwnerResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expenses/settlement-claims/pending-for-owner',
+            query: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Expense Audit Log
+     * Get audit logs for a specific expense.
+     *
+     * User must be a member of the expense's group to view audit logs.
+     * Returns entries sorted by timestamp descending with pagination.
+     * @param data The data for the request.
+     * @param data.expenseId
+     * @param data.limit
+     * @param data.offset
+     * @returns AuditLogsPublic Successful Response
+     * @throws ApiError
+     */
+    public static getExpenseAuditLog(data: ExpensesGetExpenseAuditLogData): CancelablePromise<ExpensesGetExpenseAuditLogResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expenses/{expense_id}/audit-log',
+            path: {
+                expense_id: data.expenseId
+            },
+            query: {
+                limit: data.limit,
+                offset: data.offset
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Settle Expense Endpoint
+     * Mark an expense split as settled (claim payment).
+     *
+     * Creates a settlement claim for the current user's split in the expense.
+     * The claim starts with status 'pending' and awaits owner confirmation (Story 5.2).
+     *
+     * Returns 201 Created with the settlement claim details.
+     * Error responses: 400 (expense not confirmed), 403 (not involved),
+     * 404 (expense not found), 409 (already claimed)
+     * @param data The data for the request.
+     * @param data.expenseId
+     * @returns SettlementClaimPublic Successful Response
+     * @throws ApiError
+     */
+    public static settleExpenseEndpoint(data: ExpensesSettleExpenseEndpointData): CancelablePromise<ExpensesSettleExpenseEndpointResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expenses/{expense_id}/settle',
+            path: {
+                expense_id: data.expenseId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Confirm Settlement Claim Endpoint
+     * Confirm a settlement claim.
+     *
+     * Only the expense owner (payer) can confirm settlement claims.
+     * On confirmation: claim status → confirmed, split status → settled.
+     * If all splits in the expense are settled, expense status → settled.
+     *
+     * Error responses: 403 (not expense owner), 404 (claim not found),
+     * 409 (claim already processed)
+     * @param data The data for the request.
+     * @param data.claimId
+     * @returns SettlementClaimPublic Successful Response
+     * @throws ApiError
+     */
+    public static confirmSettlementClaimEndpoint(data: ExpensesConfirmSettlementClaimEndpointData): CancelablePromise<ExpensesConfirmSettlementClaimEndpointResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expenses/settlement-claims/{claim_id}/confirm',
+            path: {
+                claim_id: data.claimId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Reject Settlement Claim Endpoint
+     * Reject a settlement claim.
+     *
+     * Only the expense owner (payer) can reject settlement claims.
+     * On rejection: returns the claim with status "rejected" and rejected_at
+     * set; the claim record is then deleted (allows claimant to re-claim).
+     * Audit log preserves the rejection history.
+     *
+     * Error responses: 403 (not expense owner), 404 (claim not found),
+     * 409 (claim already processed, or the 72h dispute
+     * window closed — the claim auto-confirms instead)
+     * @param data The data for the request.
+     * @param data.claimId
+     * @returns SettlementClaimPublic Successful Response
+     * @throws ApiError
+     */
+    public static rejectSettlementClaimEndpoint(data: ExpensesRejectSettlementClaimEndpointData): CancelablePromise<ExpensesRejectSettlementClaimEndpointResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expenses/settlement-claims/{claim_id}/reject',
+            path: {
+                claim_id: data.claimId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Aggregate Settlement Endpoint
+     * Settle with one group member in a single move (WS6/S2 §4).
+     *
+     * Nets every confirmed, unclaimed expense split between the caller and the
+     * counterparty in the group into ONE claim ("I paid them the net amount"),
+     * awaiting the counterparty's single confirmation. Confirming settles all
+     * covered splits atomically. The per-expense settle path remains available
+     * for partial payments.
+     *
+     * Error responses: 400 (nothing to settle / wrong direction / bad
+     * counterparty), 403 (not a member), 404 (group not found), 409 (a racing
+     * settlement covered these expenses first)
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns SettlementClaimPublic Successful Response
+     * @throws ApiError
+     */
+    public static createAggregateSettlementEndpoint(data: ExpensesCreateAggregateSettlementEndpointData): CancelablePromise<ExpensesCreateAggregateSettlementEndpointResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expenses/settlement-claims/aggregate',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Aggregate Settlement Claims
+     * Pending aggregate settle-up claims involving the current user — as
+     * claimant (waiting on the counterparty) or as counterparty (awaiting
+     * the user's review). Pass ?group_id= to scope to one group.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns SettlementClaimsPublic Successful Response
+     * @throws ApiError
+     */
+    public static listAggregateSettlementClaims(data: ExpensesListAggregateSettlementClaimsData = {}): CancelablePromise<ExpensesListAggregateSettlementClaimsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expenses/settlement-claims/aggregate',
+            query: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Expense Splits
+     * Get who owes what on an expense, with member names.
+     * User must be a member of the expense's group.
+     * @param data The data for the request.
+     * @param data.expenseId
+     * @returns ExpenseSplitsPublic Successful Response
+     * @throws ApiError
+     */
+    public static getExpenseSplits(data: ExpensesGetExpenseSplitsData): CancelablePromise<ExpensesGetExpenseSplitsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expenses/{expense_id}/splits',
+            path: {
+                expense_id: data.expenseId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class GroupsService {
+    /**
+     * List User Groups
+     * List all expense groups the current user is a member of.
+     *
+     * Uses optimized single-query to fetch groups with member counts.
+     * @returns ExpenseGroupWithMembers Successful Response
+     * @throws ApiError
+     */
+    public static listUserGroups(): CancelablePromise<GroupsListUserGroupsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/'
+        });
+    }
+    
+    /**
+     * Create Group
+     * Create a new expense group.
+     *
+     * The authenticated user becomes the owner of the group and is
+     * automatically added as a member.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns ExpenseGroupPublic Successful Response
+     * @throws ApiError
+     */
+    public static createGroup(data: GroupsCreateGroupData): CancelablePromise<GroupsCreateGroupResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expense-groups/',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Group Detail
+     * Get one group with member count and the current user's net balance.
+     *
+     * Only group members can view group details. This is the backing endpoint
+     * for the /groups/$groupId screen (deep-linkable group detail).
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns ExpenseGroupDetail Successful Response
+     * @throws ApiError
+     */
+    public static getGroupDetail(data: GroupsGetGroupDetailData): CancelablePromise<GroupsGetGroupDetailResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/{group_id}',
+            path: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Group Expenses
+     * List a group's expenses, newest first, each with the current user's own
+     * split attached (my_split is null when they are not part of the split).
+     *
+     * Only group members can view the ledger.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.limit
+     * @param data.offset
+     * @returns GroupExpensesPublic Successful Response
+     * @throws ApiError
+     */
+    public static listGroupExpenses(data: GroupsListGroupExpensesData): CancelablePromise<GroupsListGroupExpensesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/{group_id}/expenses',
+            path: {
+                group_id: data.groupId
+            },
+            query: {
+                limit: data.limit,
+                offset: data.offset
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Pairwise Balances
+     * Who owes whom, exactly (WS6/S2-F9): per group member, what they owe the
+     * current user and what the current user owes them, with the net. The UI
+     * prerequisite for "Settle with X". Only group members can view.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns PairwiseBalancesPublic Successful Response
+     * @throws ApiError
+     */
+    public static getPairwiseBalances(data: GroupsGetPairwiseBalancesData): CancelablePromise<GroupsGetPairwiseBalancesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/{group_id}/pairwise-balances',
+            path: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Group Settings
+     * Get a group's settings (WS6 — strict mode). Only group members can view.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns GroupSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static getGroupSettings(data: GroupsGetGroupSettingsData): CancelablePromise<GroupsGetGroupSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/{group_id}/settings',
+            path: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Group Settings
+     * Update a group's settings. Owner only. Fields are optional — send only
+     * what changes.
+     *
+     * strict_mode (WS6) ON: every participant must explicitly confirm each
+     * expense. OFF (default): confirmation is opt-in — expenses auto-confirm
+     * after the objection window unless someone rejects first.
+     *
+     * ai_personality (WS7): commentary tone for AI expense parsing —
+     * professional | friendly | funny (capped at funny, UX-H5).
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.requestBody
+     * @returns GroupSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateGroupSettings(data: GroupsUpdateGroupSettingsData): CancelablePromise<GroupsUpdateGroupSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/expense-groups/{group_id}/settings',
+            path: {
+                group_id: data.groupId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Group Members
+     * List all members of a group with their details.
+     *
+     * Only group members can view the member list.
+     * Returns members ordered by role (owner first), then by join date.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns GroupMembersListResponse Successful Response
+     * @throws ApiError
+     */
+    public static listGroupMembers(data: GroupsListGroupMembersData): CancelablePromise<GroupsListGroupMembersResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/{group_id}/members',
+            path: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Member Payment Methods
+     * A group member's payment handles, so you can pay someone you owe at settle
+     * time (WS10.2 — "universal mark-as-paid").
+     *
+     * Authorized by SHARED group membership: the caller must be a member of the
+     * group AND the target must be a member of the SAME group (404 otherwise —
+     * handles aren't a directory to probe across the app). Handles are meant to
+     * be seen by the people who owe you, so within that boundary they are public.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.memberUserId
+     * @returns PaymentMethodsPublic Successful Response
+     * @throws ApiError
+     */
+    public static getMemberPaymentMethods(data: GroupsGetMemberPaymentMethodsData): CancelablePromise<GroupsGetMemberPaymentMethodsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/{group_id}/members/{member_user_id}/payment-methods',
+            path: {
+                group_id: data.groupId,
+                member_user_id: data.memberUserId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Invite
+     * Generate an invite link for a group.
+     *
+     * Only the group owner can generate invites. Links expire after 30 days
+     * and allow max_uses joins (default 10).
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.requestBody
+     * @returns GroupInviteResponse Successful Response
+     * @throws ApiError
+     */
+    public static createInvite(data: GroupsCreateInviteData): CancelablePromise<GroupsCreateInviteResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/expense-groups/{group_id}/invites',
+            path: {
+                group_id: data.groupId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Invites
+     * List a group's active invite links (owner only) — the revocation UI.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns GroupInvitesPublic Successful Response
+     * @throws ApiError
+     */
+    public static listInvites(data: GroupsListInvitesData): CancelablePromise<GroupsListInvitesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/expense-groups/{group_id}/invites',
+            path: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Revoke Invite
+     * Revoke an invite link (owner only, WS8/S5-M4). The link stops working
+     * immediately; existing members are unaffected.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.inviteId
      * @returns Message Successful Response
      * @throws ApiError
      */
-    public static deleteItem(data: ItemsDeleteItemData): CancelablePromise<ItemsDeleteItemResponse> {
+    public static revokeInvite(data: GroupsRevokeInviteData): CancelablePromise<GroupsRevokeInviteResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
-            url: '/api/v1/items/{id}',
+            url: '/api/v1/expense-groups/{group_id}/invites/{invite_id}',
             path: {
-                id: data.id
-            },
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-}
-
-export class LoginService {
-    /**
-     * Login Access Token
-     * OAuth2 compatible token login, get an access token for future requests
-     * @param data The data for the request.
-     * @param data.formData
-     * @returns Token Successful Response
-     * @throws ApiError
-     */
-    public static loginAccessToken(data: LoginLoginAccessTokenData): CancelablePromise<LoginLoginAccessTokenResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/login/access-token',
-            formData: data.formData,
-            mediaType: 'application/x-www-form-urlencoded',
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-    
-    /**
-     * Test Token
-     * Test access token
-     * @returns UserPublic Successful Response
-     * @throws ApiError
-     */
-    public static testToken(): CancelablePromise<LoginTestTokenResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/login/test-token'
-        });
-    }
-    
-    /**
-     * Recover Password
-     * Password Recovery
-     * @param data The data for the request.
-     * @param data.email
-     * @returns Message Successful Response
-     * @throws ApiError
-     */
-    public static recoverPassword(data: LoginRecoverPasswordData): CancelablePromise<LoginRecoverPasswordResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/password-recovery/{email}',
-            path: {
-                email: data.email
+                group_id: data.groupId,
+                invite_id: data.inviteId
             },
             errors: {
                 422: 'Validation Error'
@@ -172,19 +959,26 @@ export class LoginService {
     }
     
     /**
-     * Reset Password
-     * Reset password
+     * Preview Invite
+     * Preview an invite WITHOUT joining: inviter, group name, member count, expiry.
+     *
+     * PUBLIC (WS10.3): no auth required, so a logged-out invitee sees the group
+     * before deciding to sign in. `already_member` is only meaningful for an
+     * authenticated caller (False for anonymous visitors). Read-only — joining is
+     * the explicit POST below. Rate-limited per IP (defense-in-depth on an
+     * unauthenticated endpoint).
      * @param data The data for the request.
-     * @param data.requestBody
-     * @returns Message Successful Response
+     * @param data.token
+     * @returns InvitePreview Successful Response
      * @throws ApiError
      */
-    public static resetPassword(data: LoginResetPasswordData): CancelablePromise<LoginResetPasswordResponse> {
+    public static previewInvite(data: GroupsPreviewInviteData): CancelablePromise<GroupsPreviewInviteResponse> {
         return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/reset-password/',
-            body: data.requestBody,
-            mediaType: 'application/json',
+            method: 'GET',
+            url: '/api/v1/expense-groups/invite/{token}',
+            path: {
+                token: data.token
+            },
             errors: {
                 422: 'Validation Error'
             }
@@ -192,42 +986,52 @@ export class LoginService {
     }
     
     /**
-     * Recover Password Html Content
-     * HTML Content for Password Recovery
+     * Accept Invite
+     * Accept a group invite using the invite token (explicit POST — WS8/S5-M4).
+     *
+     * The authenticated user will be added as a member of the group.
      * @param data The data for the request.
-     * @param data.email
-     * @returns string Successful Response
+     * @param data.token
+     * @returns GroupInviteResponse Successful Response
      * @throws ApiError
      */
-    public static recoverPasswordHtmlContent(data: LoginRecoverPasswordHtmlContentData): CancelablePromise<LoginRecoverPasswordHtmlContentResponse> {
+    public static acceptInvite(data: GroupsAcceptInviteData): CancelablePromise<GroupsAcceptInviteResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/v1/password-recovery-html-content/{email}',
+            url: '/api/v1/expense-groups/invite/{token}/accept',
             path: {
-                email: data.email
+                token: data.token
             },
             errors: {
                 422: 'Validation Error'
             }
         });
     }
-}
-
-export class PrivateService {
+    
     /**
-     * Create User
-     * Create a new user.
+     * Get Group Audit Log
+     * Get audit logs for all expenses in a group.
+     *
+     * User must be a member of the group to view audit logs.
+     * Returns entries sorted by timestamp descending with pagination.
      * @param data The data for the request.
-     * @param data.requestBody
-     * @returns UserPublic Successful Response
+     * @param data.groupId
+     * @param data.limit
+     * @param data.offset
+     * @returns AuditLogsPublic Successful Response
      * @throws ApiError
      */
-    public static createUser(data: PrivateCreateUserData): CancelablePromise<PrivateCreateUserResponse> {
+    public static getGroupAuditLog(data: GroupsGetGroupAuditLogData): CancelablePromise<GroupsGetGroupAuditLogResponse> {
         return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/private/users/',
-            body: data.requestBody,
-            mediaType: 'application/json',
+            method: 'GET',
+            url: '/api/v1/expense-groups/{group_id}/audit-log',
+            path: {
+                group_id: data.groupId
+            },
+            query: {
+                limit: data.limit,
+                offset: data.offset
+            },
             errors: {
                 422: 'Validation Error'
             }
@@ -236,49 +1040,6 @@ export class PrivateService {
 }
 
 export class UsersService {
-    /**
-     * Read Users
-     * Retrieve users.
-     * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
-     * @returns UsersPublic Successful Response
-     * @throws ApiError
-     */
-    public static readUsers(data: UsersReadUsersData = {}): CancelablePromise<UsersReadUsersResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/v1/users/',
-            query: {
-                skip: data.skip,
-                limit: data.limit
-            },
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-    
-    /**
-     * Create User
-     * Create new user.
-     * @param data The data for the request.
-     * @param data.requestBody
-     * @returns UserPublic Successful Response
-     * @throws ApiError
-     */
-    public static createUser(data: UsersCreateUserData): CancelablePromise<UsersCreateUserResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/users/',
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-    
     /**
      * Read User Me
      * Get current user.
@@ -294,7 +1055,12 @@ export class UsersService {
     
     /**
      * Delete User Me
-     * Delete own user.
+     * Delete own account (soft delete — WS4/C4).
+     *
+     * Expenses and splits are records shared with other people, so the account
+     * is anonymized (PII scrubbed, login disabled) rather than hard-deleted;
+     * financial history and the audit trail stay intact. Deletion is blocked
+     * while the user still has unsettled expenses.
      * @returns Message Successful Response
      * @throws ApiError
      */
@@ -326,17 +1092,21 @@ export class UsersService {
     }
     
     /**
-     * Update Password Me
-     * Update own password.
+     * Set My Api Key
+     * Store the user's own Gemini API key (BYOK — WS7).
+     *
+     * Advanced escape hatch, deliberately absent from onboarding: hosted AI is
+     * the default. Parses with a stored key bypass the monthly free quota.
+     * The key is Fernet-encrypted at rest and never returned by any endpoint.
      * @param data The data for the request.
      * @param data.requestBody
      * @returns Message Successful Response
      * @throws ApiError
      */
-    public static updatePasswordMe(data: UsersUpdatePasswordMeData): CancelablePromise<UsersUpdatePasswordMeResponse> {
+    public static setMyApiKey(data: UsersSetMyApiKeyData): CancelablePromise<UsersSetMyApiKeyResponse> {
         return __request(OpenAPI, {
-            method: 'PATCH',
-            url: '/api/v1/users/me/password',
+            method: 'PUT',
+            url: '/api/v1/users/me/api-key',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -346,214 +1116,116 @@ export class UsersService {
     }
     
     /**
-     * Register User
-     * Create new user without the need to be logged in.
-     * @param data The data for the request.
-     * @param data.requestBody
-     * @returns UserPublic Successful Response
-     * @throws ApiError
-     */
-    public static registerUser(data: UsersRegisterUserData): CancelablePromise<UsersRegisterUserResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/users/signup',
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-    
-    /**
-     * Read User By Id
-     * Get a specific user by id.
-     * @param data The data for the request.
-     * @param data.userId
-     * @returns UserPublic Successful Response
-     * @throws ApiError
-     */
-    public static readUserById(data: UsersReadUserByIdData): CancelablePromise<UsersReadUserByIdResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/v1/users/{user_id}',
-            path: {
-                user_id: data.userId
-            },
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-    
-    /**
-     * Update User
-     * Update a user.
-     * @param data The data for the request.
-     * @param data.userId
-     * @param data.requestBody
-     * @returns UserPublic Successful Response
-     * @throws ApiError
-     */
-    public static updateUser(data: UsersUpdateUserData): CancelablePromise<UsersUpdateUserResponse> {
-        return __request(OpenAPI, {
-            method: 'PATCH',
-            url: '/api/v1/users/{user_id}',
-            path: {
-                user_id: data.userId
-            },
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-    
-    /**
-     * Delete User
-     * Delete a user.
-     * @param data The data for the request.
-     * @param data.userId
+     * Delete My Api Key
+     * Remove the user's stored Gemini API key (back to hosted AI).
      * @returns Message Successful Response
      * @throws ApiError
      */
-    public static deleteUser(data: UsersDeleteUserData): CancelablePromise<UsersDeleteUserResponse> {
+    public static deleteMyApiKey(): CancelablePromise<UsersDeleteMyApiKeyResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
-            url: '/api/v1/users/{user_id}',
-            path: {
-                user_id: data.userId
-            },
+            url: '/api/v1/users/me/api-key'
+        });
+    }
+    
+    /**
+     * List My Payment Methods
+     * List the current user's payment handles (Venmo, PayPal.Me, UPI, IBAN, …).
+     *
+     * Each carries a server-computed `pay_url` deep link where one exists, else
+     * it is copy-only (IBAN, plain-text custom handles).
+     * @returns PaymentMethodsPublic Successful Response
+     * @throws ApiError
+     */
+    public static listMyPaymentMethods(): CancelablePromise<UsersListMyPaymentMethodsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/users/me/payment-methods'
+        });
+    }
+    
+    /**
+     * Add My Payment Method
+     * Register a payment handle. Provider is validated against the supported
+     * registry (422 on unknown); a per-user cap keeps the list sane, and exact
+     * duplicates are rejected (409).
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns PaymentMethodPublic Successful Response
+     * @throws ApiError
+     */
+    public static addMyPaymentMethod(data: UsersAddMyPaymentMethodData): CancelablePromise<UsersAddMyPaymentMethodResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/users/me/payment-methods',
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: 'Validation Error'
             }
         });
     }
-}
-
-export class AuthService {
+    
     /**
-     * Request Magic Link
-     * Request a magic link for passwordless registration.
+     * Update My Payment Method
+     * Update one of the current user's payment handles (value or label). Editing
+     * to exactly duplicate another saved handle is rejected (409).
      * @param data The data for the request.
+     * @param data.methodId
      * @param data.requestBody
+     * @returns PaymentMethodPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateMyPaymentMethod(data: UsersUpdateMyPaymentMethodData): CancelablePromise<UsersUpdateMyPaymentMethodResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/v1/users/me/payment-methods/{method_id}',
+            path: {
+                method_id: data.methodId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete My Payment Method
+     * Remove one of the current user's payment handles.
+     * @param data The data for the request.
+     * @param data.methodId
      * @returns Message Successful Response
      * @throws ApiError
      */
-    public static requestMagicLink(data: { requestBody: { email: string } }): CancelablePromise<{ message: string }> {
+    public static deleteMyPaymentMethod(data: UsersDeleteMyPaymentMethodData): CancelablePromise<UsersDeleteMyPaymentMethodResponse> {
         return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/auth/register',
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-
-    /**
-     * Verify Magic Link
-     * Verify a magic link token and create the user account.
-     * @param data The data for the request.
-     * @param data.token
-     * @returns TokenWithUser Successful Response
-     * @throws ApiError
-     */
-    public static verifyMagicLink(data: { token: string }): CancelablePromise<{ access_token: string; token_type: string; user: { id: string; email: string; full_name: string | null; is_active: boolean; is_superuser: boolean } }> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/v1/auth/verify/{token}',
+            method: 'DELETE',
+            url: '/api/v1/users/me/payment-methods/{method_id}',
             path: {
-                token: data.token
+                method_id: data.methodId
             },
             errors: {
-                400: 'Bad Request',
                 422: 'Validation Error'
             }
         });
     }
-
+    
     /**
-     * Request Login Magic Link
-     * Request a magic link for passwordless login (existing users only).
-     * @param data The data for the request.
-     * @param data.requestBody
-     * @returns Message Successful Response
+     * Get Dashboard
+     * Get the current user's dashboard with group balances.
+     *
+     * Returns all groups the user is a member of with their net balance
+     * (positive if owed to user, negative if user owes).
+     * Groups are sorted by most recent activity.
+     * @returns DashboardResponse Successful Response
      * @throws ApiError
      */
-    public static requestLoginMagicLink(data: { requestBody: { email: string } }): CancelablePromise<{ message: string }> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/auth/login',
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-
-    /**
-     * Verify Login Magic Link
-     * Verify a login magic link token and return JWT (user must exist).
-     * @param data The data for the request.
-     * @param data.token
-     * @returns TokenWithUser Successful Response
-     * @throws ApiError
-     */
-    public static verifyLoginMagicLink(data: { token: string }): CancelablePromise<{ access_token: string; token_type: string; user: { id: string; email: string; full_name: string | null; is_active: boolean; is_superuser: boolean } }> {
+    public static getDashboard(): CancelablePromise<UsersGetDashboardResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/auth/login/verify/{token}',
-            path: {
-                token: data.token
-            },
-            errors: {
-                400: 'Bad Request',
-                404: 'Not Found',
-                422: 'Validation Error'
-            }
-        });
-    }
-}
-
-export class GroupsService {
-    /**
-     * Create Group
-     * Create a new expense group.
-     * @param data The data for the request.
-     * @param data.requestBody
-     * @returns ExpenseGroupPublic Successful Response
-     * @throws ApiError
-     */
-    public static createGroup(data: { requestBody: { name: string } }): CancelablePromise<{ id: string; name: string; created_by: string; created_at: string; updated_at: string }> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/expense-groups/',
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                401: 'Unauthorized',
-                422: 'Validation Error'
-            }
-        });
-    }
-
-    /**
-     * List User Groups
-     * List all expense groups the current user is a member of.
-     * @returns ExpenseGroupWithMembers[] Successful Response
-     * @throws ApiError
-     */
-    public static listUserGroups(): CancelablePromise<Array<{ id: string; name: string; created_by: string; created_at: string; updated_at: string; member_count: number }>> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/v1/expense-groups/',
-            errors: {
-                401: 'Unauthorized'
-            }
+            url: '/api/v1/users/me/dashboard'
         });
     }
 }

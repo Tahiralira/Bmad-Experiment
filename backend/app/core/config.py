@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # Disabled only by the test suite.
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_DEFAULT: str = "200/minute"
+    # The auth tier is the only limit the e2e suite has to fight: each journey
+    # registers real users through the real endpoint, so a 12-test run makes
+    # ~20 registrations in well under a minute (WS11). Overridable so the e2e
+    # stack can raise it; production keeps 10/minute. Everything else — the
+    # global default, the AI-parse and invite-preview tiers — stays fixed.
+    RATE_LIMIT_AUTH: str = "10/minute"
     FRONTEND_HOST: str = "http://localhost:5173"
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
 

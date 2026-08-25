@@ -7,7 +7,7 @@ import { isLoggedIn } from "@/hooks/useAuth"
 import { EVENTS, track } from "@/lib/analytics"
 import { processPendingInvite } from "./invite.$token"
 
-export const Route = createFileRoute("/login/verify/$token")({
+export const Route = createFileRoute("/login_/verify/$token")({
   component: VerifyLoginMagicLink,
   beforeLoad: async () => {
     if (isLoggedIn()) {

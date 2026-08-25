@@ -1,76 +1,59 @@
-export interface ExpenseGroup {
-  id: string
-  name: string
-  created_by: string
-  created_at: string
-  updated_at: string
-  member_count?: number
-}
+/**
+ * Groups feature types.
+ *
+ * WS11 — this file is now a **naming layer over the generated client**, not a
+ * second source of truth. Every shape here comes from `src/client/types.gen.ts`,
+ * which is generated from the backend's OpenAPI schema by
+ * `npm run generate-client`. It used to hand-restate all of them, which meant a
+ * backend field change compiled fine and broke at runtime.
+ *
+ * `groups` is WS11's exemplar for this pattern; the other features still carry
+ * hand-written types and are queued to follow.
+ *
+ * Two rules:
+ *  1. Never redeclare a shape the backend already describes. Alias it.
+ *  2. If a generated type is weaker than it should be (a bare `string` where
+ *     the API really returns a closed set), fix the **backend schema** and
+ *     regenerate — do not "correct" it here. That is how `ai_personality`
+ *     became a union rather than `string`.
+ */
+
+import type {
+  ExpenseGroupCreate as GeneratedExpenseGroupCreate,
+  ExpenseGroupDetail as GeneratedExpenseGroupDetail,
+  ExpenseGroupWithMembers,
+  GroupInvitePublic,
+  GroupInvitesPublic,
+  GroupMemberPublic as GeneratedGroupMemberPublic,
+  GroupMembersListResponse as GeneratedGroupMembersListResponse,
+  GroupInviteResponse as GeneratedGroupInviteResponse,
+  GroupSettingsPublic,
+  GroupSettingsUpdate as GeneratedGroupSettingsUpdate,
+  InvitePreview as GeneratedInvitePreview,
+  PairwiseBalanceItem as GeneratedPairwiseBalanceItem,
+  PairwiseBalancesPublic,
+} from "@/client"
+
+/** A group as it appears in the user's group list. */
+export type ExpenseGroup = ExpenseGroupWithMembers
 
 /**
  * Group detail (WS5/B-H7): backing type for /groups/$groupId.
- * net_balance is the current user's balance in this group — Decimal on the
+ * `net_balance` is the current user's balance in this group — Decimal on the
  * wire, e.g. "12.50" (positive = owed to the user).
  */
-export interface ExpenseGroupDetail extends ExpenseGroup {
-  member_count: number
-  net_balance: string
-  /** WS10.1: the group's ISO-4217 currency; the whole ledger renders in it */
-  currency: string
-}
+export type ExpenseGroupDetail = GeneratedExpenseGroupDetail
 
-export interface ExpenseGroupCreate {
-  name: string
-  /** WS10.1: locale-detected ISO-4217 currency for the new group (optional) */
-  currency?: string
-  /** WS10.4: onboarding template preset for the group's social contract.
-   * Omitted when no template is chosen (backend falls back to the default). */
-  strict_mode?: boolean
-}
-
-export interface GroupMember {
-  id: string
-  group_id: string
-  user_id: string
-  role: "owner" | "member"
-  joined_at: string
-}
+export type ExpenseGroupCreate = GeneratedExpenseGroupCreate
 
 // === Invite Types ===
 
-export interface GroupInvite {
-  id: string
-  group_id: string
-  token: string
-  expires_at: string
-  created_at: string
-  max_uses: number
-  use_count: number
-  revoked_at?: string | null
-  invite_url?: string
-}
-
-export interface GroupInviteResponse {
-  invite?: GroupInvite
-  group?: ExpenseGroup
-  message: string
-}
-
-export interface GroupInvitesResponse {
-  data: GroupInvite[]
-  count: number
-}
+export type GroupInvite = GroupInvitePublic
+export type GroupInviteResponse = GeneratedGroupInviteResponse
+export type GroupInvitesResponse = GroupInvitesPublic
 
 /** What an invited person sees BEFORE joining (WS8/S5-M4; public in WS10.3). */
-export interface InvitePreview {
-  group_id: string
-  group_name: string
-  member_count: number
-  expires_at: string
-  already_member: boolean
-  /** WS10.3: "<inviter> invited you to <group>" on the public landing. */
-  inviter_name: string | null
-}
+export type InvitePreview = GeneratedInvitePreview
 
 // === Pairwise Balances (WS6/S2-F9) ===
 
@@ -78,51 +61,22 @@ export interface InvitePreview {
  * One counterparty row of "who owes whom exactly". Decimal strings on the
  * wire; net = they_owe_you - you_owe_them (positive = they owe the user).
  */
-export interface PairwiseBalanceItem {
-  user_id: string
-  user_name: string | null
-  they_owe_you: string
-  you_owe_them: string
-  net: string
-}
-
-export interface PairwiseBalancesResponse {
-  data: PairwiseBalanceItem[]
-  count: number
-}
+export type PairwiseBalanceItem = GeneratedPairwiseBalanceItem
+export type PairwiseBalancesResponse = PairwiseBalancesPublic
 
 // === Group Settings (WS6 strict mode + WS7 AI personality) ===
 
-/** Capped at "funny" (UX-H5) — the roast mode was removed in WS7 */
-export type AIPersonality = "professional" | "friendly" | "funny"
+export type GroupSettings = GroupSettingsPublic
+export type GroupSettingsUpdate = GeneratedGroupSettingsUpdate
 
-export interface GroupSettings {
-  group_id: string
-  strict_mode: boolean
-  ai_personality: AIPersonality
-  /** WS10.1: the group's ISO-4217 currency */
-  currency: string
-}
-
-/** PATCH body — send only the fields that change */
-export interface GroupSettingsUpdate {
-  strict_mode?: boolean
-  ai_personality?: AIPersonality
-  currency?: string
-}
+/**
+ * Capped at "funny" (UX-H5) — the roast mode was removed in WS7.
+ * Derived from the response schema so the backend's `Literal` stays the one
+ * definition of what a personality can be.
+ */
+export type AIPersonality = GroupSettingsPublic["ai_personality"]
 
 // === Member Types ===
 
-export interface GroupMemberPublic {
-  id: string
-  user_id: string
-  role: "owner" | "member"
-  joined_at: string
-  full_name: string | null
-  email: string
-}
-
-export interface GroupMembersListResponse {
-  members: GroupMemberPublic[]
-  count: number
-}
+export type GroupMemberPublic = GeneratedGroupMemberPublic
+export type GroupMembersListResponse = GeneratedGroupMembersListResponse

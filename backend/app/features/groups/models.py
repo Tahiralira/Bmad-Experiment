@@ -56,12 +56,20 @@ class ExpenseGroupDetail(ExpenseGroupWithMembers):
 
     net_balance is the requesting user's balance in this group, computed the
     same way as the dashboard: positive = owed to the user, negative = user
-    owes. Decimal to the wire (serialized as a string, e.g. "12.50")."""
+    owes. Decimal to the wire (serialized as a string, e.g. "12.50").
 
-    net_balance: Decimal = Decimal("0.00")
+    No defaults on these three (WS11): the single construction site in
+    router.py always passes all of them, and a default here makes the field
+    optional in the OpenAPI schema — which lands in the generated frontend
+    client as `string | undefined` and forces every consumer to handle an
+    absence that cannot happen.
+    """
+
+    member_count: int
+    net_balance: Decimal
     # WS10.1: the group's ISO-4217 currency — every amount in this group is in
     # it, so the whole ledger screen renders through one code.
-    currency: str = DEFAULT_CURRENCY
+    currency: str
 
 
 # === Member Schemas ===
@@ -223,7 +231,11 @@ class GroupSettingsPublic(SQLModel):
 
     group_id: uuid.UUID
     strict_mode: bool
-    ai_personality: str
+    # Literal, not str (WS11): the generated frontend client mirrors this
+    # declaration exactly. As a bare `str` it emitted `ai_personality: string`,
+    # which silently loses the union the UI switches on. Type precision on the
+    # response schema is what makes the generated client worth having.
+    ai_personality: Literal["professional", "friendly", "funny"]
     currency: str
 
 

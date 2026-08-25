@@ -7,11 +7,12 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-07-23 (WS10.6: FE-010 posthog remote-config script vs CSP)
+# Last Updated: 2026-08-25 (WS11: FE-011 SW vs Browser pane; TEST-007 shared-account
+#               e2e isolation; TEST-008 e2e vs the auth rate limit)
 
 metadata:
   version: "1.0"
-  total_patterns: 32
+  total_patterns: 35
   categories:
     - docker
     - database
@@ -541,6 +542,57 @@ testing:
     stories_encountered: ["WS9"]
     tokens_saved_estimate: "~400 per occurrence"
 
+  - id: "TEST-007"
+    title: "Playwright suite shares ONE account, so every test lands in the same /pending queue"
+    symptoms:
+      - "A journey passes on the first run and fails on the next, with no code change"
+      - "strict mode violation: getByText('1 member') resolved to 6 elements"
+      - "toHaveCount(0) fails right after clicking Confirm — the row is still there"
+    root_cause: |
+      The chromium project reuses one storageState (playwright/.auth/user.json),
+      so ALL tests act as the same person. Three consequences bit at once (WS11):
+      (1) `/pending` and `/groups` span every group that account belongs to, so
+      parallel workers see each other's rows; (2) hardcoded expense descriptions
+      ("WS11 dinner" in two tests) collided; (3) `getByRole("button",
+      {name: /^Confirm/}).first()` clicked whatever was on top — often another
+      test's expense — leaving the target pending.
+      A fourth, separate race: TanStack Router flips the URL before the new route
+      renders, so `waitForURL` returns while the previous LIST is still mounted.
+    solution: |
+      Three rules, all applied in tests/utils/groups.ts (WS11):
+      1. Unique labels per test — `uniqueLabel("WS11 dinner")`, never a literal.
+      2. Never `.first()` on a shared list. Scope to the row:
+         `page.locator('[data-slot="card"]').filter({ hasText: description })`,
+         then click inside it (`actOnPending`).
+      3. After `waitForURL`, wait for something only the DESTINATION renders
+         (the detail `<h1>`) before asserting anything else.
+      Verified by running the full suite 9 consecutive times, not once.
+    prevention: "A single green e2e run proves nothing when the suite shares an account — run it 3+ times before calling it green. Any assertion on a cross-group screen (/pending, /groups) must be scoped to a row."
+    stories_encountered: ["WS11"]
+    tokens_saved_estimate: "~3000 per occurrence"
+
+  - id: "TEST-008"
+    title: "The e2e suite trips the app's own per-IP auth rate limit (429)"
+    symptoms:
+      - "registerAndSignIn hangs at the 'Check your email' heading"
+      - "backend logs: WARNING:slowapi:ratelimit 10 per 1 minute (172.18.0.1) exceeded"
+      - "Failures move around between runs and vanish when one spec runs alone"
+    root_cause: |
+      AUTH_LIMIT is 10/minute per IP (WS8). Every journey registers real users
+      through the real endpoint, so a 12-test run makes ~20 registrations from
+      one IP in well under a minute and throttles itself.
+    solution: |
+      `RATE_LIMIT_AUTH` setting (WS11), default "10/minute" so production is
+      unchanged; the e2e stack sets 1000/minute (ci.yml + local .env). Only the
+      auth tier moves — the global 200/minute default and the AI-parse and
+      invite-preview tiers stay fixed, and rate limiting stays ENABLED.
+      AUTH_LIMIT is a *callable* so slowapi re-reads it per request; that is
+      what lets test_ws8_security pin 10/minute via monkeypatch and stay honest
+      on a machine whose .env raises it.
+    prevention: "A security test must never inherit its threshold from ambient env — pin it in the test (same lesson as the WS10.6 analytics tests). When e2e failures wander between specs, check the backend log for 429 before suspecting selectors."
+    stories_encountered: ["WS11"]
+    tokens_saved_estimate: "~2500 per occurrence"
+
   - id: "DOCKER-005"
     title: "Slim/new-Python image build fails compiling a locked package"
     symptoms:
@@ -668,6 +720,32 @@ testing:
     prevention: "Any new PostHog surface (or SDK bump) must keep advanced_disable_flags:true unless the CSP gains the posthog assets host; verify with the resource-entries check"
     stories_encountered: ["WS10.6"]
     tokens_saved_estimate: "~400 per occurrence"
+
+  - id: "FE-011"
+    title: "Service worker never registers in the in-app Browser pane — the app is fine, the browser is not"
+    symptoms:
+      - "navigator.serviceWorker.getRegistrations() returns [] after load"
+      - "TypeError: Failed to register a ServiceWorker ... An unknown error occurred when fetching the script."
+      - "The SAME url fetched with fetch() returns 200 with content-type application/javascript"
+      - "Registering ANY script fails identically (sw.js and registerSW.js both)"
+    root_cause: |
+      The embedded Browser pane (mcp__Claude_Browser__*) does not permit
+      service worker script fetches. Nothing about the app causes it: the
+      script is served 200 same-origin with the right content-type, and the
+      WS8 CSP allows it (worker-src falls back through child-src to
+      script-src 'self'). The giveaway is that a plain fetch() of the exact
+      same URL succeeds while register() fails, and that an unrelated second
+      script fails with a byte-identical message.
+    solution: |
+      Do not debug the app. Verify service workers in real Chromium instead
+      — Playwright is already installed, so a ~40-line script that loads the
+      page, polls getRegistrations() until state === "activated", and reads
+      the manifest gives a trustworthy answer in seconds (WS11).
+      The Browser pane stays fine for manifest/meta/DOM checks, which need
+      no SW.
+    prevention: "Any PWA/SW verification (WS12 web push included) runs through Playwright, never the Browser pane. Treat a Browser-pane SW failure as a tooling result, not a bug report."
+    stories_encountered: ["WS11"]
+    tokens_saved_estimate: "~2000 per occurrence (avoids a full false-positive CSP/nginx hunt)"
 
 # =============================================================================
 # ARCHITECTURE PATTERNS

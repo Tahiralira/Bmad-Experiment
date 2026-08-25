@@ -17,7 +17,16 @@ from app.core.config import settings
 
 # Route-tier limits. Auth endpoints are brute-forceable; AI parse spends
 # real money per call.
-AUTH_LIMIT = "10/minute"
+# Configurable (WS11) so the e2e stack can raise it — see RATE_LIMIT_AUTH.
+# The default is unchanged; production is not affected.
+#
+# A callable, not a string: slowapi re-reads it per request, so the limit
+# follows `settings` instead of being frozen at import time. That is what lets
+# test_rate_limit_trips_on_auth_endpoint pin 10/minute for itself and stay
+# green on a developer machine whose .env raises the limit for the e2e stack.
+def AUTH_LIMIT() -> str:
+    return settings.RATE_LIMIT_AUTH
+
 AI_PARSE_LIMIT = "20/minute"
 # Public invite preview (WS10.3): unauthenticated, so a modest per-IP cap on
 # top of the global default. The token is unguessable (token_urlsafe(32)), so

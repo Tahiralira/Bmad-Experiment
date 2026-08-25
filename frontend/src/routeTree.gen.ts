@@ -20,7 +20,7 @@ import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPendingRouteImport } from './routes/_layout/pending'
 import { Route as LayoutGroupsRouteImport } from './routes/_layout/groups'
 import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
-import { Route as LoginVerifyTokenRouteImport } from './routes/login.verify.$token'
+import { Route as LoginVerifyTokenRouteImport } from './routes/login_.verify.$token'
 import { Route as LayoutGroupsGroupIdRouteImport } from './routes/_layout/groups_.$groupId'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -78,9 +78,9 @@ const LayoutActivityRoute = LayoutActivityRouteImport.update({
   getParentRoute: () => LayoutRoute,
 } as any)
 const LoginVerifyTokenRoute = LoginVerifyTokenRouteImport.update({
-  id: '/verify/$token',
-  path: '/verify/$token',
-  getParentRoute: () => LoginRoute,
+  id: '/login_/verify/$token',
+  path: '/login/verify/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const LayoutGroupsGroupIdRoute = LayoutGroupsGroupIdRouteImport.update({
   id: '/groups_/$groupId',
@@ -89,7 +89,7 @@ const LayoutGroupsGroupIdRoute = LayoutGroupsGroupIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/login': typeof LoginRouteWithChildren
+  '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/activity': typeof LayoutActivityRoute
   '/groups': typeof LayoutGroupsRoute
@@ -103,7 +103,7 @@ export interface FileRoutesByFullPath {
   '/login/verify/$token': typeof LoginVerifyTokenRoute
 }
 export interface FileRoutesByTo {
-  '/login': typeof LoginRouteWithChildren
+  '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/activity': typeof LayoutActivityRoute
   '/groups': typeof LayoutGroupsRoute
@@ -119,7 +119,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteWithChildren
-  '/login': typeof LoginRouteWithChildren
+  '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/groups': typeof LayoutGroupsRoute
@@ -130,7 +130,7 @@ export interface FileRoutesById {
   '/verify/$token': typeof VerifyTokenRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/groups_/$groupId': typeof LayoutGroupsGroupIdRoute
-  '/login/verify/$token': typeof LoginVerifyTokenRoute
+  '/login_/verify/$token': typeof LoginVerifyTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -175,16 +175,17 @@ export interface FileRouteTypes {
     | '/verify/$token'
     | '/_layout/'
     | '/_layout/groups_/$groupId'
-    | '/login/verify/$token'
+    | '/login_/verify/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   LayoutRoute: typeof LayoutRouteWithChildren
-  LoginRoute: typeof LoginRouteWithChildren
+  LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   InviteTokenRoute: typeof InviteTokenRoute
   VerifyTokenRoute: typeof VerifyTokenRoute
+  LoginVerifyTokenRoute: typeof LoginVerifyTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -266,12 +267,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutActivityRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/login/verify/$token': {
-      id: '/login/verify/$token'
-      path: '/verify/$token'
+    '/login_/verify/$token': {
+      id: '/login_/verify/$token'
+      path: '/login/verify/$token'
       fullPath: '/login/verify/$token'
       preLoaderRoute: typeof LoginVerifyTokenRouteImport
-      parentRoute: typeof LoginRoute
+      parentRoute: typeof rootRouteImport
     }
     '/_layout/groups_/$groupId': {
       id: '/_layout/groups_/$groupId'
@@ -304,23 +305,14 @@ const LayoutRouteChildren: LayoutRouteChildren = {
 const LayoutRouteWithChildren =
   LayoutRoute._addFileChildren(LayoutRouteChildren)
 
-interface LoginRouteChildren {
-  LoginVerifyTokenRoute: typeof LoginVerifyTokenRoute
-}
-
-const LoginRouteChildren: LoginRouteChildren = {
-  LoginVerifyTokenRoute: LoginVerifyTokenRoute,
-}
-
-const LoginRouteWithChildren = LoginRoute._addFileChildren(LoginRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   LayoutRoute: LayoutRouteWithChildren,
-  LoginRoute: LoginRouteWithChildren,
+  LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   InviteTokenRoute: InviteTokenRoute,
   VerifyTokenRoute: VerifyTokenRoute,
+  LoginVerifyTokenRoute: LoginVerifyTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
