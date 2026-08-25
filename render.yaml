@@ -71,3 +71,28 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      # ---- WS12 nudge engine ----
+      # Shared secret for the sweep endpoint. Render generates it; copy the
+      # value into the repo's NUDGE_CRON_SECRET Actions secret so the
+      # scheduler workflow can call it. While unset the endpoint 404s and no
+      # nudges are ever sent.
+      - key: NUDGE_CRON_SECRET
+        generateValue: true
+      # Web Push (VAPID). Generate a pair locally and paste both — see
+      # deployment.md §6.6. Leave blank to ship with email-only reminders;
+      # the client reads the public key and won't prompt without one.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      # SMTP — until these are set, `emails_enabled` is False and email
+      # reminders record as SKIPPED rather than failing. Any free tier
+      # (Resend/Mailgun/SES) turns them on with no code change.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAILS_FROM_EMAIL
+        sync: false

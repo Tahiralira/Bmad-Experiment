@@ -37,7 +37,7 @@ app/
     groups/         expense groups, membership, invites, settings, balances
     expenses/       expenses, splits, the ledger, settlement claims
     ai/             LLM expense parsing and quota
-    notifications/  placeholder — the nudge engine arrives in WS12
+    notifications/  the nudge engine: sweep, preferences, push + email delivery
   api/
     main.py         mounts every feature router
     deps.py         shared FastAPI dependencies
@@ -58,6 +58,34 @@ Each feature directory holds the same three files:
 | `service.py` | Business logic and **all** database access |
 
 Routers do not touch the database directly. The service layer owns it.
+(`notifications/` adds a fourth, `delivery.py`, which owns the two transports
+and nothing else.)
+
+### Scheduled work — there is no worker
+
+This service has **no Celery, no Redis, and no background process.** Render's
+free plan offers neither a background worker nor a cron job, so scheduled work
+is written as an ordinary idempotent function and triggered over HTTP:
+
+```
+.github/workflows/nudge-sweep.yml   (hourly cron)
+      │  POST, X-Nudge-Secret header
+      ▼
+POST /api/v1/notifications/internal/run-sweep
+      ▼
+notifications/service.py :: run_nudge_sweep()
+```
+
+The endpoint returns 404 unless `NUDGE_CRON_SECRET` is set, so an unconfigured
+deployment exposes nothing. Two properties make this safe to trigger from
+anywhere: the sweep is **idempotent** (a per-relationship cooldown, not the
+schedule, bounds how often anyone is contacted), and it accepts `?dry_run=true`
+to report what *would* happen without writing.
+
+Add new scheduled work the same way. Moving to a real worker later means
+changing the trigger, not the engine — the rationale and the conditions for
+revisiting it are in `_bmad-output/planning-artifacts/architecture.md` under
+"WS12 CORRECTION".
 
 ### The `models.py` rule
 
@@ -193,5 +221,16 @@ recompiling it — install the
 open the `.mjml` file, and run `MJML: Export to HTML` into `build/`. Commit both
 files.
 
+`nudge_reminder.html` is the exception: it is **hand-authored with no `.mjml`
+source**, because a committed build artifact whose source nobody generates it
+from drifts the moment someone re-exports. Edit that one directly, keeping it
+table-based and inline-styled.
+
+Templates render through `render_email_template()`, which is Jinja **without
+autoescape**. Escape any user-supplied value before putting it in the context —
+group names and display names both reach these templates.
+
 Locally, all outbound mail is captured by Mailcatcher at
-<http://localhost:1080> — nothing is actually sent.
+<http://localhost:1080> — nothing is actually sent. Because the local override
+sets `SMTP_HOST=mailcatcher`, `emails_enabled` is **true** in dev: nudge emails
+really do get sent, and land there.

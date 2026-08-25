@@ -163,12 +163,24 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6: Agentic Notifications & Nudges (5 stories)
-  epic-6: backlog
-  6-1-background-job-infrastructure-celery: backlog
-  6-2-schedule-level-1-notifications-initial-reminder: backlog
-  6-3-schedule-level-2-notifications-contextual-nudge: backlog
-  6-4-snooze-notification: backlog
-  6-5-settlement-cycle-configuration: backlog
+  # WS12 (2026-08-25) delivered the epic's core against the EXECUTION PLAN, not
+  # story-by-story. Statuses below are reconciled to what actually shipped.
+  epic-6: in-progress
+  # Descoped-with-reason, not built: Render's free plan has no background worker
+  # and no cron job, so Celery+Redis+beat would be a scheduler production cannot
+  # run. The substrate shipped as an idempotent run_nudge_sweep() triggered by a
+  # GitHub Actions cron. Story ACs ("worker connects to Redis", "docker-compose
+  # up celery-worker") are VOID — see architecture.md "WS12 CORRECTION".
+  6-1-background-job-infrastructure-celery: descoped
+  # Shipped, but RE-SCOPED per 02 Phase B: per-relationship-per-group, never
+  # per-expense as the story's AC assumed. Enforced by nudge_state's unique
+  # constraint. 24h threshold as specified.
+  6-2-schedule-level-1-notifications-initial-reminder: done
+  6-3-schedule-level-2-notifications-contextual-nudge: backlog  # WS13
+  # Shipped with a wider scope than the story: snooze (1/3/7d) AND mute, both
+  # per relationship, plus quiet hours and a global kill switch.
+  6-4-snooze-notification: done
+  6-5-settlement-cycle-configuration: deferred  # 02 Phase B: premium, later
   epic-6-retrospective: optional
 
   # Epic 7: Offline Capability & Sync (5 stories)

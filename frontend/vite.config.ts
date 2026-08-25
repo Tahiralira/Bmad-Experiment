@@ -73,6 +73,12 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [],
         cleanupOutdatedCaches: true,
+        // WS12: pull the push/notificationclick handlers into the generated
+        // SW. importScripts keeps WS11's generateSW precache (and its
+        // "never answer for /api" rules) untouched — switching to
+        // injectManifest to add two listeners would put that whole policy
+        // back in hand-written code.
+        importScripts: ["/push-sw.js"],
       },
       devOptions: {
         // Keep the SW out of `npm run dev`; a stale precache during hot

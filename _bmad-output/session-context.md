@@ -1,9 +1,10 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-08-25 (WS11 done — Docs Floor + Test Journeys + PWA Shell:
-README/LICENSE/SECURITY floor, template exhaust deleted, 12 Playwright journeys in
-CI, generated-OpenAPI-client decision with groups as the exemplar, installable PWA
-shell with the SW deliberately kept off API responses)
+**Last Updated:** 2026-08-25 (WS12 done — Nudge Engine: Infra + Level 1. The
+product's differentiator exists: per-relationship-per-group Level 1 reminders,
+web push + email fallback, snooze/mute/quiet-hours/kill-switch, scheduled by a
+GitHub Actions cron because free-tier Render has no worker. Celery/Redis
+explicitly DESCOPED with reason, not deferred silently.)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -28,10 +29,13 @@ shell with the SW deliberately kept off API responses)
 | Epic 3: Expenses | **DONE** | 8/8 ✅ |
 | **Epic 4: Trust & Confirmation** | **DONE** | 5/5 ✅ |
 | **Epic 5: Settlement** | **IN-PROGRESS** | 2/3 |
-| Epic 6-7 | BACKLOG | 0/10 |
+| **Epic 6: Nudges** | **IN-PROGRESS** | 2/5 done, 1 descoped, 1 deferred |
+| Epic 7: Offline | BACKLOG | 0/5 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 1/4 |
 
-**Current Progress:** 33 of 47 stories done, 14 remaining.
+**Current Progress:** 35 of 47 stories done, 10 remaining, 2 closed-without-build
+(6-1 descoped-with-reason, 6-5 deferred per 02 Phase B). WS12 also closed WS10.7,
+which was never a story.
 
 > These counts are **derived from** `implementation-artifacts/sprint-status.yaml`
 > — that file is the source of truth, this table is a convenience copy.
@@ -486,6 +490,90 @@ shell with the SW deliberately kept off API responses)
 > SENTRY_DSN on Render) and the §7 checklist gained the cold
 > invite→join→activation funnel proof; rotate the exposed PAT + repoint
 > remote (unchanged).**
+
+> WS12 (Nudge Engine: Infra + Level 1) DONE 2026-08-25 on branch
+> `ws12/nudge-engine`: **the reason the product exists now runs.** A debt
+> that has sat 24h produces exactly ONE gentle reminder — per relationship
+> per group, never per expense.
+> (a) **Scope amendment (owner decision):** the plan said "add redis +
+> celery worker + beat". Not built. Render's free plan has NO background
+> worker and NO cron job (both paid, $7/mo each), so that stack would have
+> been a scheduler production cannot run. The engine is a plain idempotent
+> `run_nudge_sweep()`; the TRIGGER is `.github/workflows/nudge-sweep.yml`
+> (hourly cron → `POST /notifications/internal/run-sweep`, shared-secret
+> header, 404s when unconfigured). Same code path in dev, CI and prod;
+> moving to Celery later changes the trigger, not the engine. Recorded as
+> "WS12 CORRECTION" in architecture.md — S6-H2 is answered by
+> descope-with-reason, and NFR7 (1k WebSockets) stays explicitly
+> unvalidated rather than quietly claimed.
+> (b) 03-H1's dead code is GONE: `publish_expense_confirmed_event` +
+> `notify_group_of_finalized_expense` + the orphan `REDIS_HOST`/`REDIS_PORT`
+> settings. The event envelope is adopted as `notification.event_type` on
+> the `domain.entity.action` convention — one vocabulary shared with the
+> WS10.6 analytics taxonomy, instead of a shape for a bus that never existed.
+> (c) **The per-relationship guarantee is STRUCTURAL, not disciplinary:**
+> `nudge_state` is UNIQUE(user, group, counterparty), so there is nowhere to
+> record a per-expense nudge. 12 unsettled dinners between two people = one
+> debt = one reminder (pinned by `test_twelve_expenses_produce_one_nudge`).
+> Debts net both directions; only the net debtor is nudged.
+> (d) Migration `c3d4e5f6a7b8`: `notification_preference`, `nudge_state`,
+> `notification` (stores the RENDERED copy — "what did it say to me" must
+> survive the balance changing), `push_subscription`.
+> (e) Suppressors: 24h age floor, 72h cooldown (this — not the sweep
+> interval — is the cadence), snooze 1/3/7d and mute per relationship, quiet
+> hours (per-user local, midnight-wrapping, default 22→08) that DEFER
+> without consuming the nudge, a global kill switch, and a minimum amount.
+> (f) Push is PRIMARY, email is a FALLBACK — a successful push suppresses
+> the email; never two buzzes for one debt. Email ships complete but inert
+> until SMTP is set (the WS10.6 env-gating pattern). `push-sw.js` is pulled
+> into WS11's generated SW via workbox `importScripts`, which leaves its
+> "never cache /api" policy untouched — far less risk than converting to
+> `injectManifest` to add two listeners.
+> (g) WS10.7 delivered here: the permission prompt appears only once the
+> user has a real open balance AND the browser supports push AND the server
+> has a VAPID key. A browser grants that prompt once — it is never spent on
+> a feature that would have nothing to say. Settings gained a Notifications
+> tab ordered kill-switch → channels/quiet-hours → per-relationship.
+> `NUDGE_MUTED` promoted out of RESERVED_EVENTS; `NUDGE_SENT` stays reserved
+> because delivery is server-side and there is no backend analytics client.
+> Backend **337 passed / 0 skipped** (+39), `alembic check` clean; frontend
+> typecheck green, **143 passed** (+16), main chunk **176.12 kB gz** (≤250).
+> LIVE PROOF: real VAPID keypair + real browser-side EC keys → the sweep
+> POSTed a 376-byte `aes128gcm` payload with an `authorization: vapid
+> t=<ES256 JWT>` header and reported `{push:sent: 1}` and no email. Email
+> proven separately through mailcatcher.
+> **15/15 Playwright journeys** (WS11's twelve + 3 new notification-settings
+> journeys), green twice in a row. Screenshots →
+> `_bmad-output/implementation-artifacts/ws12-screenshots/` (12: both themes ×
+> 375/1280, normal + muted + push prompt), captured by a dedicated `visual`
+> Playwright project excluded from CI. **Reviewing them caught two layout bugs
+> no other gate saw:** the fourth settings tab made the page scroll sideways at
+> 375px (body scrollWidth 444 vs a 375 viewport), and the push prompt's
+> `flex-1` copy collapsed to a ~100px column. Both fixed and re-shot.
+> Key learnings: (1) **pywebpush base64url-DECODES `vapid_private_key`** —
+> a pasted PEM (what most generators print) dies with an opaque ASN.1 error
+> at SEND time, not boot; the server now normalizes both forms, and the
+> runbook's key command was RUN before being documented (BACKEND-012).
+> (2) Make the product invariant a database constraint, not a code
+> convention — `nudge_state`'s unique key means a future contributor cannot
+> write a per-expense nudge even by accident. (3) Quiet hours must DEFER,
+> not consume: suppress before stamping `last_nudged_at`, or a nightly
+> schedule silently drops the nudge forever. (4) On Windows, Git Bash
+> rewrites `/app/...` args into Windows paths — `MSYS_NO_PATHCONV=1` on
+> every docker compose command carrying a container path (DOCKER-007); and
+> the non-root container needs `-u root` for `uv lock` and `alembic
+> revision` specifically (DOCKER-008). (5) A test expense stays
+> PENDING_CONFIRMATION unless the PAYER confirms their own split too — a
+> CONFIRMED-filtered query returning 0 is usually the fixture, not the query
+> (TEST-009).
+>
+> **Next: WS13 (Nudge Engine: Level 2 + Beta Launch) — the last session
+> before private beta. OWNER ACTIONS now include deployment.md §6.6: set the
+> Actions secrets `NUDGE_CRON_SECRET` + `API_BASE_URL` (nothing sends
+> without them, and the cron only fires from `main`), generate a VAPID
+> keypair, and optionally add a free SMTP tier — which also finally turns on
+> magic-link sign-in. Earlier owner actions still open: the deploy itself,
+> PostHog/Sentry keys, PAT rotation, uptime monitor.**
 
 ---
 

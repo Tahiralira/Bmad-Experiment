@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AiParsingParseExpenseData, AiParsingParseExpenseResponse, AuthRequestMagicLinkData, AuthRequestMagicLinkResponse, AuthVerifyMagicLinkData, AuthVerifyMagicLinkResponse, AuthRequestLoginMagicLinkData, AuthRequestLoginMagicLinkResponse, AuthVerifyLoginMagicLinkData, AuthVerifyLoginMagicLinkResponse, AuthLogoutResponse, AuthOauthLoginData, AuthOauthLoginResponse, AuthOauthCallbackData, AuthOauthCallbackResponse, AuthExchangeLoginCodeData, AuthExchangeLoginCodeResponse, ExpensesCreateExpenseData, ExpensesCreateExpenseResponse, ExpensesEditExpenseData, ExpensesEditExpenseResponse, ExpensesGetExpenseData, ExpensesGetExpenseResponse, ExpensesUpdateExpenseSplitData, ExpensesUpdateExpenseSplitResponse, ExpensesConfirmExpenseSplitEndpointData, ExpensesConfirmExpenseSplitEndpointResponse, ExpensesRejectExpenseSplitEndpointData, ExpensesRejectExpenseSplitEndpointResponse, ExpensesGetPendingConfirmationsResponse, ExpensesGetPendingSettlementsResponse, ExpensesGetPendingClaimsForOwnerData, ExpensesGetPendingClaimsForOwnerResponse, ExpensesGetExpenseAuditLogData, ExpensesGetExpenseAuditLogResponse, ExpensesSettleExpenseEndpointData, ExpensesSettleExpenseEndpointResponse, ExpensesConfirmSettlementClaimEndpointData, ExpensesConfirmSettlementClaimEndpointResponse, ExpensesRejectSettlementClaimEndpointData, ExpensesRejectSettlementClaimEndpointResponse, ExpensesCreateAggregateSettlementEndpointData, ExpensesCreateAggregateSettlementEndpointResponse, ExpensesListAggregateSettlementClaimsData, ExpensesListAggregateSettlementClaimsResponse, ExpensesGetExpenseSplitsData, ExpensesGetExpenseSplitsResponse, GroupsListUserGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupDetailData, GroupsGetGroupDetailResponse, GroupsListGroupExpensesData, GroupsListGroupExpensesResponse, GroupsGetPairwiseBalancesData, GroupsGetPairwiseBalancesResponse, GroupsGetGroupSettingsData, GroupsGetGroupSettingsResponse, GroupsUpdateGroupSettingsData, GroupsUpdateGroupSettingsResponse, GroupsListGroupMembersData, GroupsListGroupMembersResponse, GroupsGetMemberPaymentMethodsData, GroupsGetMemberPaymentMethodsResponse, GroupsCreateInviteData, GroupsCreateInviteResponse, GroupsListInvitesData, GroupsListInvitesResponse, GroupsRevokeInviteData, GroupsRevokeInviteResponse, GroupsPreviewInviteData, GroupsPreviewInviteResponse, GroupsAcceptInviteData, GroupsAcceptInviteResponse, GroupsGetGroupAuditLogData, GroupsGetGroupAuditLogResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersSetMyApiKeyData, UsersSetMyApiKeyResponse, UsersDeleteMyApiKeyResponse, UsersListMyPaymentMethodsResponse, UsersAddMyPaymentMethodData, UsersAddMyPaymentMethodResponse, UsersUpdateMyPaymentMethodData, UsersUpdateMyPaymentMethodResponse, UsersDeleteMyPaymentMethodData, UsersDeleteMyPaymentMethodResponse, UsersGetDashboardResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
+import type { AiParsingParseExpenseData, AiParsingParseExpenseResponse, AuthRequestMagicLinkData, AuthRequestMagicLinkResponse, AuthVerifyMagicLinkData, AuthVerifyMagicLinkResponse, AuthRequestLoginMagicLinkData, AuthRequestLoginMagicLinkResponse, AuthVerifyLoginMagicLinkData, AuthVerifyLoginMagicLinkResponse, AuthLogoutResponse, AuthOauthLoginData, AuthOauthLoginResponse, AuthOauthCallbackData, AuthOauthCallbackResponse, AuthExchangeLoginCodeData, AuthExchangeLoginCodeResponse, ExpensesCreateExpenseData, ExpensesCreateExpenseResponse, ExpensesEditExpenseData, ExpensesEditExpenseResponse, ExpensesGetExpenseData, ExpensesGetExpenseResponse, ExpensesUpdateExpenseSplitData, ExpensesUpdateExpenseSplitResponse, ExpensesConfirmExpenseSplitEndpointData, ExpensesConfirmExpenseSplitEndpointResponse, ExpensesRejectExpenseSplitEndpointData, ExpensesRejectExpenseSplitEndpointResponse, ExpensesGetPendingConfirmationsResponse, ExpensesGetPendingSettlementsResponse, ExpensesGetPendingClaimsForOwnerData, ExpensesGetPendingClaimsForOwnerResponse, ExpensesGetExpenseAuditLogData, ExpensesGetExpenseAuditLogResponse, ExpensesSettleExpenseEndpointData, ExpensesSettleExpenseEndpointResponse, ExpensesConfirmSettlementClaimEndpointData, ExpensesConfirmSettlementClaimEndpointResponse, ExpensesRejectSettlementClaimEndpointData, ExpensesRejectSettlementClaimEndpointResponse, ExpensesCreateAggregateSettlementEndpointData, ExpensesCreateAggregateSettlementEndpointResponse, ExpensesListAggregateSettlementClaimsData, ExpensesListAggregateSettlementClaimsResponse, ExpensesGetExpenseSplitsData, ExpensesGetExpenseSplitsResponse, GroupsListUserGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupDetailData, GroupsGetGroupDetailResponse, GroupsListGroupExpensesData, GroupsListGroupExpensesResponse, GroupsGetPairwiseBalancesData, GroupsGetPairwiseBalancesResponse, GroupsGetGroupSettingsData, GroupsGetGroupSettingsResponse, GroupsUpdateGroupSettingsData, GroupsUpdateGroupSettingsResponse, GroupsListGroupMembersData, GroupsListGroupMembersResponse, GroupsGetMemberPaymentMethodsData, GroupsGetMemberPaymentMethodsResponse, GroupsCreateInviteData, GroupsCreateInviteResponse, GroupsListInvitesData, GroupsListInvitesResponse, GroupsRevokeInviteData, GroupsRevokeInviteResponse, GroupsPreviewInviteData, GroupsPreviewInviteResponse, GroupsAcceptInviteData, GroupsAcceptInviteResponse, GroupsGetGroupAuditLogData, GroupsGetGroupAuditLogResponse, NotificationsGetMyPreferencesResponse, NotificationsUpdateMyPreferencesData, NotificationsUpdateMyPreferencesResponse, NotificationsGetVapidPublicKeyResponse, NotificationsRegisterPushSubscriptionData, NotificationsRegisterPushSubscriptionResponse, NotificationsDeletePushSubscriptionData, NotificationsDeletePushSubscriptionResponse, NotificationsListNudgeRelationshipsResponse, NotificationsUpdateNudgeRelationshipData, NotificationsUpdateNudgeRelationshipResponse, NotificationsRunSweepData, NotificationsRunSweepResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersSetMyApiKeyData, UsersSetMyApiKeyResponse, UsersDeleteMyApiKeyResponse, UsersListMyPaymentMethodsResponse, UsersAddMyPaymentMethodData, UsersAddMyPaymentMethodResponse, UsersUpdateMyPaymentMethodData, UsersUpdateMyPaymentMethodResponse, UsersDeleteMyPaymentMethodData, UsersDeleteMyPaymentMethodResponse, UsersGetDashboardResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
 
 export class AiParsingService {
     /**
@@ -1031,6 +1031,197 @@ export class GroupsService {
             query: {
                 limit: data.limit,
                 offset: data.offset
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class NotificationsService {
+    /**
+     * Get My Preferences
+     * The caller's notification preferences, defaulted on first read.
+     * @returns NotificationPreferencePublic Successful Response
+     * @throws ApiError
+     */
+    public static getMyPreferences(): CancelablePromise<NotificationsGetMyPreferencesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/notifications/preferences'
+        });
+    }
+    
+    /**
+     * Update My Preferences
+     * Partially update the caller's preferences. Omitted fields are left
+     * alone; `clear_quiet_hours` is the explicit way to remove the window,
+     * since a null hour otherwise means "unchanged".
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns NotificationPreferencePublic Successful Response
+     * @throws ApiError
+     */
+    public static updateMyPreferences(data: NotificationsUpdateMyPreferencesData): CancelablePromise<NotificationsUpdateMyPreferencesResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/v1/notifications/preferences',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Vapid Public Key
+     * The server's VAPID public key, or null when push is not configured.
+     *
+     * Public by design: it is a public key, and the client needs it BEFORE
+     * asking for notification permission — prompting for a permission the
+     * server cannot act on spends the one prompt a browser ever grants.
+     * @returns VapidPublicKeyResponse Successful Response
+     * @throws ApiError
+     */
+    public static getVapidPublicKey(): CancelablePromise<NotificationsGetVapidPublicKeyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/notifications/vapid-public-key'
+        });
+    }
+    
+    /**
+     * Register Push Subscription
+     * Register (or re-claim) a browser push endpoint for the caller.
+     *
+     * Re-registering an endpoint the caller already owns refreshes its keys
+     * instead of 409ing — browsers rotate subscription keys on their own
+     * schedule, and the client re-posts on every load, so this is the normal
+     * path, not an error.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @param data.userAgent
+     * @returns PushSubscriptionPublic Successful Response
+     * @throws ApiError
+     */
+    public static registerPushSubscription(data: NotificationsRegisterPushSubscriptionData): CancelablePromise<NotificationsRegisterPushSubscriptionResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/notifications/subscriptions',
+            headers: {
+                'user-agent': data.userAgent
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Push Subscription
+     * Unregister one of the caller's push endpoints (the browser unsubscribed,
+     * or the user switched push off). Deleting an endpoint that isn't there is
+     * a success — the desired state is "not subscribed" either way.
+     * @param data The data for the request.
+     * @param data.endpoint
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deletePushSubscription(data: NotificationsDeletePushSubscriptionData): CancelablePromise<NotificationsDeletePushSubscriptionResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/notifications/subscriptions',
+            query: {
+                endpoint: data.endpoint
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Nudge Relationships
+     * The caller's nudgeable relationships and their mute/snooze state — one
+     * row per (group, counterparty), which is the unit the engine addresses.
+     *
+     * Includes relationships with no state row yet (never nudged), so the
+     * settings screen can offer "mute this one" before the first reminder
+     * rather than only after it has already arrived.
+     * @returns NudgeRelationshipPublic Successful Response
+     * @throws ApiError
+     */
+    public static listNudgeRelationships(): CancelablePromise<NotificationsListNudgeRelationshipsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/notifications/relationships'
+        });
+    }
+    
+    /**
+     * Update Nudge Relationship
+     * Mute or snooze reminders about ONE relationship.
+     *
+     * Snooze defers (1/3/7 days per the duration picker); mute has no end
+     * date. `snooze_days: 0` clears an active snooze. Muting is the PRD's
+     * stop signal at relationship granularity — the user silences one awkward
+     * debt without going dark on the whole product.
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.counterpartyUserId
+     * @param data.requestBody
+     * @returns NudgeRelationshipPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateNudgeRelationship(data: NotificationsUpdateNudgeRelationshipData): CancelablePromise<NotificationsUpdateNudgeRelationshipResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/v1/notifications/relationships/{group_id}/{counterparty_user_id}',
+            path: {
+                group_id: data.groupId,
+                counterparty_user_id: data.counterpartyUserId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Run Sweep
+     * Run one nudge sweep. This is the scheduler's entry point.
+     *
+     * Render's free tier has no background worker and no cron job, so the
+     * trigger lives outside the app: a GitHub Actions cron POSTs here on a
+     * schedule (`.github/workflows/nudge-sweep.yml`). The engine itself is an
+     * ordinary function — swapping in Celery beat later changes the caller,
+     * not this code.
+     *
+     * Auth is a shared secret in `X-Nudge-Secret`, compared in constant time.
+     * When `NUDGE_CRON_SECRET` is unset the route 404s: an unconfigured
+     * deployment exposes no sweep endpoint at all, rather than one guarded by
+     * an empty string.
+     * @param data The data for the request.
+     * @param data.dryRun
+     * @param data.xNudgeSecret
+     * @returns NudgeSweepResult Successful Response
+     * @throws ApiError
+     */
+    public static runSweep(data: NotificationsRunSweepData = {}): CancelablePromise<NotificationsRunSweepResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/notifications/internal/run-sweep',
+            headers: {
+                'x-nudge-secret': data.xNudgeSecret
+            },
+            query: {
+                dry_run: data.dryRun
             },
             errors: {
                 422: 'Validation Error'

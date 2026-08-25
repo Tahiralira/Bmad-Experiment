@@ -58,6 +58,11 @@ export const EVENTS = {
   PAYMENT_METHOD_ADDED: "payment.method.added", // { provider }
   PAYMENT_LINK_CLICKED: "payment.link.clicked", // { provider }
   PAYMENT_HANDLE_COPIED: "payment.handle.copied", // { provider }
+
+  // WS12 — the PRD's kill-switch metric. { scope: "all" | "relationship" }.
+  // Never carries who was muted or the quiet-hours schedule: the rate is the
+  // signal, and when someone sleeps is not analytics data.
+  NUDGE_MUTED: "nudge.notification.muted",
 } as const
 
 /**
@@ -66,8 +71,11 @@ export const EVENTS = {
  * feature ships (DoD: no green assertions of absent behavior).
  */
 export const RESERVED_EVENTS = {
-  NUDGE_SENT: "nudge.notification.sent", // WS12
-  NUDGE_MUTED: "nudge.notification.muted", // WS12 — the mute-rate kill switch
+  // Still reserved after WS12: nudges are DELIVERED server-side by the sweep,
+  // and there is no backend analytics client, so the browser cannot honestly
+  // capture "sent". The `notification` table is the source of truth for send
+  // volume; mute RATE pairs that with NUDGE_MUTED above (analytics-spec §6).
+  NUDGE_SENT: "nudge.notification.sent",
   PAYWALL_VIEWED: "billing.paywall.viewed", // Phase 4 (monetization-spec §5)
   PAYWALL_CONVERTED: "billing.paywall.converted", // Phase 4
 } as const

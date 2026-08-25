@@ -1,5 +1,6 @@
 import secrets
 import warnings
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -121,10 +122,6 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
 
-    # Redis Settings
-    REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
-
     # === AI parsing (WS7 — hosted-first, 01 §6) ===
     # Server-side Gemini key: the DEFAULT path for every user. Empty means
     # hosted AI is unavailable (parse endpoint returns 503 unless the user
@@ -138,6 +135,35 @@ class Settings(BaseSettings):
     # Hard timeout for each model call — without it a slow upstream would
     # hold the SSE connection open indefinitely (B-H8).
     AI_PARSE_TIMEOUT_SECONDS: int = 30
+
+    # === Nudge engine (WS12 — Progressive Urgency, Level 1) ===
+    # Hours a debt must sit unsettled before its FIRST gentle reminder.
+    # Epic 6.2 says 24h: long enough that the reminder is never the second
+    # thing you see after agreeing to a split.
+    NUDGE_LEVEL_1_AFTER_HOURS: int = 24
+    # Minimum gap between two nudges about the SAME relationship. The debt
+    # ages continuously, so without a floor the sweep would re-nudge on
+    # every run — this, not the sweep interval, is what makes the cadence.
+    NUDGE_COOLDOWN_HOURS: int = 72
+    # Debts below this are not worth a notification in any currency. The
+    # amount is compared raw, not FX-converted: a "who owes whom" app that
+    # guesses at exchange rates to decide whether to interrupt someone has
+    # its priorities wrong.
+    NUDGE_MIN_AMOUNT: Decimal = Decimal("1.00")
+    # Shared secret for POST /notifications/internal/run-sweep. Empty
+    # DISABLES the endpoint (404) — the scheduler cannot be triggered by
+    # anyone who has not been given the secret, and an unconfigured
+    # deployment exposes no endpoint at all.
+    NUDGE_CRON_SECRET: str = ""
+
+    # Web Push (RFC 8030 / VAPID). Both empty = push delivery is off and
+    # the client is told so via GET /notifications/vapid-public-key, so it
+    # never prompts for a permission it cannot honour. Generate a pair with:
+    #   python -c "from py_vapid import Vapid01; v=Vapid01(); v.generate_keys();     #              print(v.private_key_pem().decode())"
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    # mailto: contact the push service can reach if this server misbehaves.
+    VAPID_SUBJECT: str = "mailto:security@cleardues.site"
 
     # Dedicated key for encrypting stored user API keys (B-C5/S5-C1):
     # any non-empty secret string works — the Fernet key is derived via HKDF.

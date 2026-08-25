@@ -1,0 +1,91 @@
+# Nudge sweep scheduler (WS12).
+#
+# This workflow IS the scheduler. Render's free plan has no background worker
+# and no cron job (both are paid-only), so rather than pay for a Celery beat
+# the trigger lives here and the engine stays an ordinary function behind
+# POST /api/v1/notifications/internal/run-sweep. Moving to Celery later means
+# deleting this file, not rewriting the engine.
+#
+# Cadence: hourly. The sweep does NOT decide how often anyone is nudged —
+# NUDGE_COOLDOWN_HOURS does (72h by default), and quiet hours defer the rest.
+# Running hourly just means a debt that becomes eligible is picked up within
+# the hour instead of the next day, and re-runs are idempotent by design.
+#
+# Setup (one-time, see deployment.md §6.6):
+# 1. Set NUDGE_CRON_SECRET on the Render service (a long random string).
+#    While it is unset the endpoint 404s and this workflow is a no-op.
+# 2. Repo Settings → Secrets and variables → Actions:
+#      NUDGE_CRON_SECRET = the same value
+#      API_BASE_URL      = https://api.cleardues.site  (no trailing slash)
+# 3. NOTE: scheduled workflows only run from the repo's DEFAULT branch — this
+#    file must be on main for the cron to fire. Manual runs work from any
+#    branch, and accept a dry_run to see what WOULD go out.
+name: Nudge sweep
+
+on:
+  schedule:
+    - cron: "7 * * * *" # hourly, off the hour to dodge the :00 stampede
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report what would be sent without sending or recording anything"
+        type: boolean
+        default: false
+
+# Two sweeps at once would race on the same nudge_state rows. The cooldown
+# makes that harmless rather than duplicative, but there is no reason to make
+# the database sort it out.
+concurrency:
+  group: nudge-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the sweep
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          NUDGE_CRON_SECRET: ${{ secrets.NUDGE_CRON_SECRET }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${API_BASE_URL:-}" ] || [ -z "${NUDGE_CRON_SECRET:-}" ]; then
+            echo "::notice::API_BASE_URL or NUDGE_CRON_SECRET not set — nothing to do."
+            exit 0
+          fi
+
+          # Render free instances sleep after 15 idle minutes and take ~1 min
+          # to wake. --max-time covers the cold start; a timeout here would
+          # otherwise look like an outage every time the app had been quiet.
+          response=$(mktemp)
+          code=$(curl -sS -o "$response" -w "%{http_code}" \
+            --max-time 180 --retry 2 --retry-connrefused --retry-delay 30 \
+            -X POST \
+            -H "X-Nudge-Secret: ${NUDGE_CRON_SECRET}" \
+            "${API_BASE_URL}/api/v1/notifications/internal/run-sweep?dry_run=${DRY_RUN}")
+
+          echo "HTTP ${code}"
+          cat "$response"
+          echo
+
+          if [ "$code" = "404" ]; then
+            echo "::warning::Sweep endpoint is disabled (NUDGE_CRON_SECRET unset on the API)."
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::Nudge sweep failed with HTTP ${code}"
+            exit 1
+          fi
+
+          # Surface the counts in the run summary so a silent engine (or one
+          # suppressing everything) is visible without opening logs.
+          {
+            echo "### Nudge sweep"
+            echo ""
+            echo '```json'
+            cat "$response"
+            echo ""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -71,6 +71,24 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
+      // The visual-proof spec lives in its own project below — it captures
+      // pixels and asserts nothing, so it has no business in the CI journeys.
+      testIgnore: /ws12-screenshots\.spec\.ts/,
+    },
+
+    /**
+     * Visual proof for DoD v2 #2 (screenshots at 375 and 1280, both themes).
+     * Deliberately NOT part of the CI run:
+     *   npx playwright test --project=visual
+     */
+    {
+      name: 'visual',
+      testMatch: /ws12-screenshots\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/user.json',
+      },
+      dependencies: ['setup'],
     },
 
     // {

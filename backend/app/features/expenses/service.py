@@ -588,12 +588,6 @@ def finalize_expense(
     session.flush()
     session.refresh(expense)
 
-    # Publish Redis event for notifications
-    publish_expense_confirmed_event(expense)
-
-    # Create notification records for group members
-    notify_group_of_finalized_expense(session, expense)
-
     after_data: dict = {"status": "confirmed"}
     if auto:
         after_data["auto_confirmed"] = (
@@ -611,69 +605,6 @@ def finalize_expense(
     session.flush()
 
     return expense
-
-
-def publish_expense_confirmed_event(expense: Expense) -> None:
-    """
-    Publish expense confirmed event to Redis Pub/Sub.
-
-    Uses a module-level Redis client for connection reuse.
-
-    Args:
-        expense: The finalized expense
-    """
-    import json
-    import logging
-
-    try:
-        import redis
-        from app.core.config import settings
-
-        # Module-level singleton to avoid creating connections per call
-        if not hasattr(publish_expense_confirmed_event, "_redis_client"):
-            publish_expense_confirmed_event._redis_client = redis.Redis(
-                host=settings.REDIS_HOST,
-                port=settings.REDIS_PORT,
-                decode_responses=True,
-            )
-
-        redis_client = publish_expense_confirmed_event._redis_client
-        event_data = {
-            "event_type": "billing.expense.confirmed",
-            "expense_id": str(expense.id),
-            "group_id": str(expense.group_id),
-            "amount": float(expense.amount),
-            "confirmed_at": expense.confirmed_at.isoformat() if expense.confirmed_at else None,
-        }
-        redis_client.publish("billing.expense.confirmed", json.dumps(event_data))
-    except Exception as e:
-        # Non-blocking: log but don't fail the finalization if Redis is unavailable
-        logging.getLogger(__name__).warning(
-            f"Failed to publish expense confirmed event: {e}"
-        )
-
-
-def notify_group_of_finalized_expense(session: Session, expense: Expense) -> None:
-    """
-    Create notification records for all group members about finalized expense.
-
-    Note: Actual notification delivery is handled by Epic 6 (Background Jobs).
-    This function prepares the notification data.
-
-    Args:
-        session: Database session
-        expense: The finalized expense
-    """
-    # Get all group members - using existing service function
-    from app.features.groups.models import GroupMember
-
-    members = session.exec(
-        select(GroupMember).where(GroupMember.group_id == expense.group_id)
-    ).all()
-
-    # Placeholder for notification creation
-    # Full implementation in Epic 6 when notification model is created
-    _ = members  # Will be used in Epic 6
 
 
 def confirm_expense_split(

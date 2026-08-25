@@ -990,12 +990,14 @@ this file breaks that merge into runnable units.
           PostHog remains OWNER-RUN (deployment.md §7) once instances exist.
           Status: DONE 2026-07-23 (branch ws10.6/observability)
 
-    - [ ] **WS10.7 — Push Permission Flow + Email-first Notifications**
-          ⚠️ BLOCKED on WS11 (service worker) + WS12 (delivery backend); the
-          notifications feature is still a placeholder. If run standalone: only the
-          permission-prompt UX (after first confirmed expense) + subscription/
-          preference store; actual delivery folds into WS12.
-          Status: pending (blocked)
+    - [x] **WS10.7 — Push Permission Flow + Email-first Notifications**
+          ~~BLOCKED on WS11 (service worker) + WS12 (delivery backend)~~ —
+          **DELIVERED INSIDE WS12** 2026-08-25, exactly as this entry predicted
+          ("actual delivery folds into WS12"). The permission prompt (gated on a
+          real open balance, on push support, and on the server actually having a
+          VAPID key), the `push_subscription` + `notification_preference` stores,
+          and both delivery channels all landed there. Nothing remains here.
+          Status: DONE 2026-08-25 (in branch ws12/nudge-engine)
 
 - [x] **WS11 — Docs Floor + Test Journeys + PWA Shell** (≈3 days) — **DONE** 2026-08-25
       Goal: the repo survives its first external reader; real flows have automated
@@ -1077,22 +1079,88 @@ this file breaks that merge into runnable units.
 
 ### PHASE 3 — The Differentiator → BETA
 
-- [ ] **WS12 — Nudge Engine: Infra + Level 1** (≈1 week)
+- [x] **WS12 — Nudge Engine: Infra + Level 1** (≈1 week) — **DONE** 2026-08-25
       Goal: the product's reason to exist gets a substrate and its first level.
       Depends on: WS6 (aggregate settle-up — nudges must be per-relationship),
       WS9 (somewhere to run), WS10 (telemetry).
       Inputs: 09 Phase 3, 02 Phase B, 03 (H1 — delete dead publisher first), 06 (H2).
+      Branch: `ws12/nudge-engine`.
+      **SCOPE AMENDMENT (owner decision, 2026-08-25):** this session's task list
+      said "add redis + celery worker + beat to compose". It was **not built**.
+      Render's free plan has no background worker and no cron job (both paid,
+      from $7/mo each), so a broker plus two processes would have bought a
+      scheduler production cannot run. Instead the engine is a plain idempotent
+      `run_nudge_sweep()` and the **trigger** is a GitHub Actions cron against a
+      secret-guarded HTTP endpoint — free, and the same code path in dev, CI and
+      production. Moving to Celery later changes the trigger, not the engine.
+      Recorded in architecture.md ("WS12 CORRECTION"). S6-H2's "provision the
+      worker tier" is therefore answered by *descope-with-reason*, not by
+      building it; NFR7 (1k WebSockets) stays explicitly unvalidated.
       Tasks:
-      - [ ] Delete `publish_expense_confirmed_event` + `notify_group_of_finalized_
-            expense` dead code; add redis + celery worker + beat to compose; declare
-            deps; adopt the event envelope for real
-      - [ ] Level 1 nudges: gentle reminders, **per-relationship per-group, never
+      - [x] Delete `publish_expense_confirmed_event` + `notify_group_of_finalized_
+            expense` dead code; ~~add redis + celery worker + beat to compose~~;
+            declare deps; adopt the event envelope for real
+            → both dead functions and their call sites deleted, plus the orphaned
+            `REDIS_HOST`/`REDIS_PORT` settings (03-H1's "dead code wearing the
+            architecture's uniform" is gone). Envelope adopted as the
+            `notification.event_type` field on the `domain.entity.action`
+            convention — the same vocabulary as the WS10.6 analytics taxonomy,
+            rather than a shape for a bus that does not exist. Dep added:
+            `pywebpush` (brings py-vapid + http-ece).
+      - [x] Level 1 nudges: gentle reminders, **per-relationship per-group, never
             per-expense** (written into ACs); channels: web push + email
-      - [ ] Snooze + quiet hours
-      - [ ] Notification permission UX from WS10 wired to real notifications
-      Verification: a scheduled nudge fires end-to-end (beat → worker → push/email)
-      on staging.
-      Status: pending
+            → enforced by the SCHEMA, not by discipline: `nudge_state` is
+            UNIQUE(user, group, counterparty), so there is nowhere to record a
+            per-expense nudge. Debts net across both directions and across every
+            expense between a pair; only the net debtor is nudged. Push is
+            primary, email is a FALLBACK (a successful push suppresses the
+            email — never two buzzes for one debt). Email ships complete but
+            inert until SMTP is set, the WS10.6 env-gating pattern.
+      - [x] Snooze + quiet hours
+            → snooze 1/3/7 days per relationship; mute per relationship; a global
+            kill switch. Quiet hours are per-user local wall-clock with a
+            midnight-wrapping window (default 22→08) and DEFER rather than
+            cancel — the state row is left untouched so the next sweep outside
+            the window still sends.
+      - [x] Notification permission UX from WS10 wired to real notifications
+            (this is WS10.7, which was blocked on exactly this session)
+            → the prompt appears only once the user has a real open balance, and
+            only if the browser can do push AND the server has a VAPID key —
+            a browser grants that prompt once, so it is never spent on a feature
+            that would have nothing to say. Settings gained a Notifications tab
+            (kill switch first, then channels/quiet hours, then per-relationship).
+      Verification: DONE — backend **337 passed / 0 skipped** (+39), `alembic
+      check` clean (migration `c3d4e5f6a7b8`, 4 tables); frontend typecheck green,
+      **143 passed** (+16), build green, main chunk **176.12 kB gz** (≤250);
+      `importScripts("/push-sw.js")` verified in the built SW. LIVE PROOF: a
+      Level 1 nudge was delivered end-to-end by web push — real VAPID keypair,
+      real browser-side EC keys, sweep → `aes128gcm`-encrypted 376-byte payload
+      POSTed with an `authorization: vapid t=<ES256 JWT>` header, and
+      `deliveries: {push:sent: 1}` with NO email, proving the fallback. Email
+      separately proven end-to-end via mailcatcher. **Found by running it:**
+      pywebpush base64url-DECODES `vapid_private_key`, so a pasted PEM dies with
+      an opaque ASN.1 error — the server now normalizes both forms, and the
+      runbook's key-generation command was executed verbatim before being
+      documented (WS9's lesson).
+      Visual proof (DoD v2 #2) → `_bmad-output/implementation-artifacts/
+      ws12-screenshots/` — 12 shots, both themes × 375/1280, of the
+      Notifications tab (normal + muted) and the push prompt, captured by a
+      dedicated `visual` Playwright project kept out of the CI journeys.
+      **Looking at them caught two real layout bugs that every other gate
+      passed:** (a) the fourth settings tab pushed the tab strip to 420px, so
+      the whole page scrolled sideways at 375px (`document.body.scrollWidth`
+      444 vs a 375 viewport — measured, not eyeballed) → the strip now wraps;
+      (b) the push prompt's `flex-1` copy shrank to a ~100px column instead of
+      pushing the buttons to their own line → it now stacks below `sm`. This
+      is exactly the Epic 2.5 failure mode (offscreen navigation shipped for
+      five months) and exactly why the rule exists.
+      e2e: **15/15 Playwright journeys** (the WS11 twelve, unchanged, plus 3
+      new notification-settings journeys proving the controls are reachable
+      and the off switch persists) — green on two consecutive full runs.
+      Not on staging: the deploy is still unperformed (WS9.5 owner actions
+      outstanding), so "on staging" could not be satisfied by anyone this
+      session. §6.6a's dry-run is the owner's one-click equivalent.
+      Status: DONE
 
 - [ ] **WS13 — Nudge Engine: Level 2 + Beta Launch** (≈1 week)
       Goal: progressive urgency ships; beta goes live.

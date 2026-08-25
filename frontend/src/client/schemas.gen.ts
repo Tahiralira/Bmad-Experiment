@@ -1176,6 +1176,266 @@ export const MessageSchema = {
     title: 'Message'
 } as const;
 
+export const NotificationPreferencePublicSchema = {
+    properties: {
+        nudges_enabled: {
+            type: 'boolean',
+            title: 'Nudges Enabled'
+        },
+        push_enabled: {
+            type: 'boolean',
+            title: 'Push Enabled'
+        },
+        email_enabled: {
+            type: 'boolean',
+            title: 'Email Enabled'
+        },
+        quiet_hours_start: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quiet Hours Start'
+        },
+        quiet_hours_end: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quiet Hours End'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        }
+    },
+    type: 'object',
+    required: ['nudges_enabled', 'push_enabled', 'email_enabled', 'quiet_hours_start', 'quiet_hours_end', 'timezone'],
+    title: 'NotificationPreferencePublic',
+    description: 'Response schema for GET/PUT /users/me/notification-preferences.'
+} as const;
+
+export const NotificationPreferenceUpdateSchema = {
+    properties: {
+        nudges_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Nudges Enabled'
+        },
+        push_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Push Enabled'
+        },
+        email_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email Enabled'
+        },
+        quiet_hours_start: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 23,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quiet Hours Start'
+        },
+        quiet_hours_end: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 23,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quiet Hours End'
+        },
+        timezone: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Timezone'
+        },
+        clear_quiet_hours: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Clear Quiet Hours'
+        }
+    },
+    type: 'object',
+    title: 'NotificationPreferenceUpdate',
+    description: `Request schema for PUT /users/me/notification-preferences. Every field
+is optional — a partial update leaves the rest untouched.`
+} as const;
+
+export const NudgeRelationshipPublicSchema = {
+    properties: {
+        group_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Group Id'
+        },
+        group_name: {
+            type: 'string',
+            title: 'Group Name'
+        },
+        counterparty_user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Counterparty User Id'
+        },
+        counterparty_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Counterparty Name'
+        },
+        muted: {
+            type: 'boolean',
+            title: 'Muted'
+        },
+        snoozed_until: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Snoozed Until'
+        }
+    },
+    type: 'object',
+    required: ['group_id', 'group_name', 'counterparty_user_id', 'counterparty_name', 'muted', 'snoozed_until'],
+    title: 'NudgeRelationshipPublic',
+    description: "One nudgeable relationship's mute/snooze state, for the settings UI."
+} as const;
+
+export const NudgeStateUpdateSchema = {
+    properties: {
+        muted: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Muted'
+        },
+        snooze_days: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 30,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Snooze Days'
+        }
+    },
+    type: 'object',
+    title: 'NudgeStateUpdate',
+    description: 'Request schema for muting or snoozing one relationship.'
+} as const;
+
+export const NudgeSweepResultSchema = {
+    properties: {
+        relationships_examined: {
+            type: 'integer',
+            title: 'Relationships Examined'
+        },
+        nudges_sent: {
+            type: 'integer',
+            title: 'Nudges Sent'
+        },
+        suppressed_quiet_hours: {
+            type: 'integer',
+            title: 'Suppressed Quiet Hours'
+        },
+        suppressed_snoozed: {
+            type: 'integer',
+            title: 'Suppressed Snoozed'
+        },
+        suppressed_muted: {
+            type: 'integer',
+            title: 'Suppressed Muted'
+        },
+        suppressed_cooldown: {
+            type: 'integer',
+            title: 'Suppressed Cooldown'
+        },
+        deliveries: {
+            additionalProperties: {
+                type: 'integer'
+            },
+            type: 'object',
+            title: 'Deliveries'
+        }
+    },
+    type: 'object',
+    required: ['relationships_examined', 'nudges_sent', 'suppressed_quiet_hours', 'suppressed_snoozed', 'suppressed_muted', 'suppressed_cooldown', 'deliveries'],
+    title: 'NudgeSweepResult',
+    description: "What one sweep did — the cron endpoint's response body."
+} as const;
+
 export const PairwiseBalanceItemSchema = {
     properties: {
         user_id: {
@@ -1478,6 +1738,56 @@ export const PercentageSplitRequestSchema = {
     required: ['splits'],
     title: 'PercentageSplitRequest',
     description: 'Request schema for creating percentage split.'
+} as const;
+
+export const PushSubscriptionCreateSchema = {
+    properties: {
+        endpoint: {
+            type: 'string',
+            maxLength: 500,
+            minLength: 1,
+            title: 'Endpoint'
+        },
+        p256dh: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'P256Dh'
+        },
+        auth: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Auth'
+        }
+    },
+    type: 'object',
+    required: ['endpoint', 'p256dh', 'auth'],
+    title: 'PushSubscriptionCreate',
+    description: 'Request schema for POST /users/me/push-subscriptions.'
+} as const;
+
+export const PushSubscriptionPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        endpoint: {
+            type: 'string',
+            title: 'Endpoint'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'endpoint', 'created_at'],
+    title: 'PushSubscriptionPublic',
+    description: 'Response schema for a registered push endpoint.'
 } as const;
 
 export const SettlementClaimPublicSchema = {
@@ -1866,4 +2176,26 @@ export const ValidationErrorSchema = {
     type: 'object',
     required: ['loc', 'msg', 'type'],
     title: 'ValidationError'
+} as const;
+
+export const VapidPublicKeyResponseSchema = {
+    properties: {
+        key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Key'
+        }
+    },
+    type: 'object',
+    required: ['key'],
+    title: 'VapidPublicKeyResponse',
+    description: `Response for GET /notifications/vapid-public-key. \`key\` is null when the
+server has no VAPID keypair configured — the client then knows push is
+unavailable and doesn't prompt for a permission it can't use.`
 } as const;

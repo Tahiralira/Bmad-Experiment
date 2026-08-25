@@ -403,6 +403,67 @@ export type Message = {
 };
 
 /**
+ * Response schema for GET/PUT /users/me/notification-preferences.
+ */
+export type NotificationPreferencePublic = {
+    nudges_enabled: boolean;
+    push_enabled: boolean;
+    email_enabled: boolean;
+    quiet_hours_start: (number | null);
+    quiet_hours_end: (number | null);
+    timezone: string;
+};
+
+/**
+ * Request schema for PUT /users/me/notification-preferences. Every field
+ * is optional — a partial update leaves the rest untouched.
+ */
+export type NotificationPreferenceUpdate = {
+    nudges_enabled?: (boolean | null);
+    push_enabled?: (boolean | null);
+    email_enabled?: (boolean | null);
+    quiet_hours_start?: (number | null);
+    quiet_hours_end?: (number | null);
+    timezone?: (string | null);
+    clear_quiet_hours?: (boolean | null);
+};
+
+/**
+ * One nudgeable relationship's mute/snooze state, for the settings UI.
+ */
+export type NudgeRelationshipPublic = {
+    group_id: string;
+    group_name: string;
+    counterparty_user_id: string;
+    counterparty_name: (string | null);
+    muted: boolean;
+    snoozed_until: (string | null);
+};
+
+/**
+ * Request schema for muting or snoozing one relationship.
+ */
+export type NudgeStateUpdate = {
+    muted?: (boolean | null);
+    snooze_days?: (number | null);
+};
+
+/**
+ * What one sweep did — the cron endpoint's response body.
+ */
+export type NudgeSweepResult = {
+    relationships_examined: number;
+    nudges_sent: number;
+    suppressed_quiet_hours: number;
+    suppressed_snoozed: number;
+    suppressed_muted: number;
+    suppressed_cooldown: number;
+    deliveries: {
+        [key: string]: (number);
+    };
+};
+
+/**
  * One counterparty row of the 'who owes whom exactly' view (S2-F9).
  *
  * Amounts are Decimal on the wire. net = they_owe_you - you_owe_them:
@@ -505,6 +566,24 @@ export type PercentageSplitRequest = {
 };
 
 /**
+ * Request schema for POST /users/me/push-subscriptions.
+ */
+export type PushSubscriptionCreate = {
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+};
+
+/**
+ * Response schema for a registered push endpoint.
+ */
+export type PushSubscriptionPublic = {
+    id: string;
+    endpoint: string;
+    created_at: string;
+};
+
+/**
  * Response schema for a settlement claim.
  *
  * Covers both shapes (WS6): per-expense claims (expense_split_id set) and
@@ -603,6 +682,15 @@ export type ValidationError = {
     ctx?: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * Response for GET /notifications/vapid-public-key. `key` is null when the
+ * server has no VAPID keypair configured — the client then knows push is
+ * unavailable and doesn't prompt for a permission it can't use.
+ */
+export type VapidPublicKeyResponse = {
+    key: (string | null);
 };
 
 export type AiParsingParseExpenseData = {
@@ -841,6 +929,46 @@ export type GroupsGetGroupAuditLogData = {
 };
 
 export type GroupsGetGroupAuditLogResponse = (AuditLogsPublic);
+
+export type NotificationsGetMyPreferencesResponse = (NotificationPreferencePublic);
+
+export type NotificationsUpdateMyPreferencesData = {
+    requestBody: NotificationPreferenceUpdate;
+};
+
+export type NotificationsUpdateMyPreferencesResponse = (NotificationPreferencePublic);
+
+export type NotificationsGetVapidPublicKeyResponse = (VapidPublicKeyResponse);
+
+export type NotificationsRegisterPushSubscriptionData = {
+    requestBody: PushSubscriptionCreate;
+    userAgent?: (string | null);
+};
+
+export type NotificationsRegisterPushSubscriptionResponse = (PushSubscriptionPublic);
+
+export type NotificationsDeletePushSubscriptionData = {
+    endpoint: string;
+};
+
+export type NotificationsDeletePushSubscriptionResponse = (void);
+
+export type NotificationsListNudgeRelationshipsResponse = (Array<NudgeRelationshipPublic>);
+
+export type NotificationsUpdateNudgeRelationshipData = {
+    counterpartyUserId: string;
+    groupId: string;
+    requestBody: NudgeStateUpdate;
+};
+
+export type NotificationsUpdateNudgeRelationshipResponse = (NudgeRelationshipPublic);
+
+export type NotificationsRunSweepData = {
+    dryRun?: boolean;
+    xNudgeSecret?: (string | null);
+};
+
+export type NotificationsRunSweepResponse = (NudgeSweepResult);
 
 export type UsersReadUserMeResponse = (UserPublic);
 

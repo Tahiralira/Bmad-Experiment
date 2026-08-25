@@ -21,16 +21,26 @@ social cost of collecting.
 |---|---|
 | Live app | [cleardues.site](https://cleardues.site) |
 | API | [api.cleardues.site](https://api.cleardues.site/api/v1/utils/health-check/) |
-| Stage | Work sessions WS1–WS11 complete; private beta lands after WS13 |
+| Stage | Work sessions WS1–WS12 complete; private beta lands after WS13 |
 
 What works today: magic-link and Google sign-in, groups with invites, AI expense
 parsing with a confirmation step, a double-entry ledger, per-expense and
-aggregate settle-up, payment handles/links, and analytics instrumentation.
+aggregate settle-up, payment handles/links, analytics instrumentation, and —
+since WS12 — **Level 1 nudges**: one gentle reminder when a balance has sat for
+a day, delivered by web push with an email fallback, with snooze, mute, quiet
+hours and an off switch.
 
-What does **not** exist yet, despite appearing in older architecture docs: the
-nudge engine itself (WS12–13), web push, Celery/Redis, and offline support.
-`_bmad-output/planning-artifacts/architecture.md` describes several of these as
-present — it is out of date and flagged as such.
+Reminders are addressed to a **relationship inside a group**, never to an
+expense: twelve unsettled dinners between the same two people are one debt and
+produce one reminder. That is enforced by a database constraint, not by
+convention.
+
+What does **not** exist yet: Level 2 escalation (WS13) and offline support.
+**Celery, Redis and WebSockets are descoped, not pending** — the nudge scheduler
+is a GitHub Actions cron calling an HTTP endpoint, because Render's free plan
+has no background worker. `_bmad-output/planning-artifacts/architecture.md` still
+describes the old async design in places; its "WS12 CORRECTION" section is the
+accurate account.
 
 The plan of record is
 [`_bmad-output/product-review/10-execution-plan.md`](./_bmad-output/product-review/10-execution-plan.md).
@@ -119,17 +129,19 @@ pytest + lock check and frontend typecheck + unit tests + build on every push to
 ```
 backend/
   app/
-    features/         auth · groups · expenses · ai · notifications
+    features/         auth · groups · expenses · ai · notifications (nudge engine)
     models.py         imports EVERY feature model module — new ones must be added
     alembic/          migrations
   tests/
 frontend/
   src/
-    features/         auth · groups · expenses · payments · dashboard
+    features/         auth · groups · expenses · payments · dashboard · notifications
     client/           generated OpenAPI client (npm run generate-client)
     routes/           TanStack Router file-based routes
     lib/              analytics, sentry, shared utilities
+  public/push-sw.js   web-push handlers, folded into the generated service worker
   tests/              Playwright end-to-end journeys
+.github/workflows/    CI, nightly DB backup, and the hourly nudge sweep
 _bmad-output/         planning artifacts, product review, execution plan
 scripts/
 ```
@@ -145,6 +157,11 @@ Two rules that bite if you miss them:
 - The frontend API client is generated from the backend's OpenAPI schema. After
   changing an endpoint's signature, run `npm run generate-client` in `frontend/`
   rather than hand-writing types.
+- There is no background worker. Scheduled work runs as an idempotent function
+  behind an HTTP endpoint, triggered by a GitHub Actions cron — see
+  `backend/app/features/notifications/service.py` and
+  `.github/workflows/nudge-sweep.yml`. Add scheduled work the same way; don't
+  reach for Celery without revisiting the decision in architecture.md.
 
 ---
 

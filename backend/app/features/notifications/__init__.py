@@ -1,2 +1,1 @@
-# Notifications feature - handles alerts, nudges, and background tasks
-# Placeholder for future stories (Epic 6: Agentic Notifications & Nudges)
+# Notifications feature (WS12 — nudge engine: infra + Level 1).

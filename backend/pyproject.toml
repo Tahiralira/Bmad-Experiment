@@ -32,6 +32,10 @@ dependencies = [
     # AI and encryption dependencies (Story 3.3)
     "google-genai>=1.0.0",
     "cryptography>=41.0.0",
+    # Web push (RFC 8030 / VAPID) for the WS12 nudge engine. Brings py-vapid
+    # + http-ece; no third-party push service is involved — payloads go to
+    # the browser vendor's own endpoint, encrypted with the client's keys.
+    "pywebpush>=2.0.0,<3.0.0",
 ]
 
 [tool.uv]

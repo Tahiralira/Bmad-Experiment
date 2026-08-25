@@ -44,9 +44,14 @@ the execution plan (`10-execution-plan.md`) first.
   `deployment.md`; compose-on-VPS kept as fallback in
   `deployment-vps.md`)
 
-**Planned but NOT yet present** (do not assume these exist): WebSockets, Redis
-Pub/Sub, Celery workers (all arrive with the nudge engine in WS12), PWA service
-worker (WS11).
+**Planned but NOT present, and now explicitly DESCOPED** (do not assume these
+exist): WebSockets, Redis Pub/Sub, Celery workers. WS12 shipped the nudge engine
+*without* them — Render's free plan has no background worker or cron job, so the
+scheduler is a GitHub Actions cron (`.github/workflows/nudge-sweep.yml`) calling
+`POST /notifications/internal/run-sweep`, and the engine is a plain idempotent
+`run_nudge_sweep()`. Rationale + revisit conditions: architecture.md
+"WS12 CORRECTION". NFR7 (1k concurrent WebSockets) is **unvalidated**, not met.
+The PWA service worker DOES exist (WS11), and carries web-push handlers (WS12).
 
 ## 📐 Architectural Patterns
 
@@ -155,6 +160,9 @@ naming, or personal preferences unless they cause bugs or maintenance burden.
 | Route not found 404 | Check TanStack Router file naming conventions |
 | Data not updating after mutation | Add `queryClient.invalidateQueries` |
 | Mapper "failed to locate a name" | Add the feature models module to `app/models.py` imports |
+| `docker compose exec ... /app/...` hits a Windows path | Git Bash path mangling — prefix `MSYS_NO_PATHCONV=1` (DOCKER-007) |
+| Permission denied on `uv lock` / `alembic revision` | Non-root image (WS9) — add `-u root`, then `docker compose cp` the artifact out (DOCKER-008) |
+| Web push dies with "ASN.1 parsing error" | pywebpush base64url-decodes the VAPID key; a PEM needs converting (BACKEND-012) |
 | `PendingRollbackError` cascade in tests | Already handled by conftest's autouse rollback fixture |
 | jsdom: focus-trap "no tabbable node" | Handled via `tabbableOptions.displayCheck` in test mode |
 | File exists locally but missing in fresh clone/CI | Broad .gitignore pattern — audit with `git ls-files --others --ignored --exclude-standard` (GIT-002) |

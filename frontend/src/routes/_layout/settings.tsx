@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import DeleteAccount from "@/components/UserSettings/DeleteAccount"
 import UserInformation from "@/components/UserSettings/UserInformation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { NotificationSettings } from "@/features/notifications"
 import { PaymentMethodsManager } from "@/features/payments"
 import useAuth from "@/hooks/useAuth"
 
@@ -13,6 +14,11 @@ const tabsConfig = [
     value: "payment-methods",
     title: "Payment methods",
     component: PaymentMethodsManager,
+  },
+  {
+    value: "notifications",
+    title: "Notifications",
+    component: NotificationSettings,
   },
   { value: "danger-zone", title: "Danger zone", component: DeleteAccount },
 ]
@@ -46,7 +52,12 @@ function UserSettings() {
       </div>
 
       <Tabs defaultValue="my-profile">
-        <TabsList>
+        {/* The base TabsList is a fixed-height inline-flex, so a fourth tab
+            (Notifications, WS12) pushed the strip to 420px and made the whole
+            page scroll sideways at 375px — measured, not guessed. Wrapping
+            keeps every tab reachable without a hidden scroll affordance;
+            `h-auto` is needed because the base sets a fixed h-9. */}
+        <TabsList className="h-auto flex-wrap justify-start">
           {finalTabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.title}

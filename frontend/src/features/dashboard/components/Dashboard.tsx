@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router"
 
 import { BalanceDisplay } from "@/components/ui/balance-display"
 import { Button } from "@/components/ui/button"
+import { PushPermissionPrompt } from "@/features/notifications"
 import { useDashboard } from "../api/dashboard"
 import type { GroupBalanceSummary } from "../types"
 import { OnboardingSandbox } from "./OnboardingSandbox"
@@ -51,8 +52,17 @@ export function Dashboard() {
     return <OnboardingSandbox />
   }
 
+  // The push prompt is offered only once there is a real balance to be
+  // reminded about (WS10.7/WS12). Asking earlier would spend the browser's
+  // one permission prompt on a feature that would have nothing to say.
+  const hasOpenBalance = data.groups.some(
+    (group) => Number(group.net_balance) !== 0,
+  )
+
   return (
     <div className="space-y-8">
+      <PushPermissionPrompt eligible={hasOpenBalance} />
+
       {/* Balance hero — a single total only makes sense in one currency
           (WS10.1). When groups span currencies, the backend sends currency:
           null; we drop the aggregate and let the per-group rows carry it. */}

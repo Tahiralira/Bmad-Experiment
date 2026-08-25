@@ -12,7 +12,7 @@
 
 metadata:
   version: "1.0"
-  total_patterns: 35
+  total_patterns: 40
   categories:
     - docker
     - database
@@ -838,6 +838,108 @@ git:
     prevention: "After editing .gitignore, run the ls-files audit above; treat any ignored file inside a source directory as a bug"
     stories_encountered: ["WS9.6"]
     tokens_saved_estimate: "~1000 per occurrence"
+
+  - id: "BACKEND-012"
+    title: "pywebpush rejects a PEM VAPID private key with an opaque ASN.1 error"
+    symptoms:
+      - "Web push fails with 'Could not deserialize key data ... ASN.1 parsing error: invalid length'"
+      - "The key is a perfectly valid PEM that cryptography loads fine on its own"
+    root_cause: |
+      `py_vapid.Vapid01.from_string` strips newlines and base64url-DECODES the
+      value it is handed — it never expects PEM armor. So the natural thing to
+      paste into a VAPID_PRIVATE_KEY env var (a PEM, which is what most key
+      generators print) is exactly the thing that fails, and it fails at send
+      time in production rather than at boot.
+    solution: |
+      Store the key base64url-encoded (raw 32-byte scalar OR DER), which is
+      what the `web-push` npm CLI emits. Better: normalize at the boundary so
+      either form works — `_vapid_private_key()` in
+      backend/app/features/notifications/delivery.py converts PEM to
+      base64url-DER and passes anything else through.
+    prevention: "Exercise the real send path (a local HTTP receiver standing in for the push service) before documenting a key format — reading the library docs would not have caught this"
+    stories_encountered: ["WS12"]
+    tokens_saved_estimate: "~1500 per occurrence"
+
+  - id: "DOCKER-007"
+    title: "Git Bash mangles container-absolute paths in docker compose commands"
+    symptoms:
+      - "rm: cannot remove 'C:/Program Files/Git/app/...': No such file or directory"
+      - "A /app/... path passed to docker compose exec resolves to a Windows path"
+    root_cause: |
+      MSYS path conversion rewrites any argument that looks like a POSIX
+      absolute path into a Windows path before the command ever reaches
+      Docker. It hits every `docker compose exec <svc> <cmd> /app/...` and
+      every `docker compose cp <svc>:/app/...`.
+    solution: |
+      Prefix the command with MSYS_NO_PATHCONV=1, e.g.
+      MSYS_NO_PATHCONV=1 docker compose exec -T backend alembic upgrade head
+    prevention: "On Windows, default to MSYS_NO_PATHCONV=1 for any docker compose command carrying a container path"
+    stories_encountered: ["WS12"]
+    tokens_saved_estimate: "~400 per occurrence"
+
+  - id: "DOCKER-008"
+    title: "Non-root container can't write uv.lock, alembic versions, or .pytest_cache"
+    symptoms:
+      - "error: failed to create directory `/app/.cache/uv`: Permission denied"
+      - "PermissionError writing to /app/app/alembic/versions/<new migration>.py"
+    root_cause: |
+      WS9's image hardening runs the backend as a non-root USER, but `uv lock`
+      and `alembic revision --autogenerate` both write into /app, and only
+      tests/ and htmlcov/ are volume-mounted.
+    solution: |
+      Run just those two commands as root with a writable cache, then copy the
+      artifact back to the host:
+      docker compose exec -T -u root -e UV_CACHE_DIR=/tmp/uvcache backend uv lock
+      docker compose cp backend:/app/uv.lock backend/uv.lock
+      docker compose exec -T -u root backend alembic revision --autogenerate -m "..."
+      docker compose cp backend:/app/app/alembic/versions/<file> backend/app/alembic/versions/
+    prevention: "Only generation commands need -u root; never run the app or pytest as root just to dodge this"
+    stories_encountered: ["WS12"]
+    tokens_saved_estimate: "~600 per occurrence"
+
+  - id: "TEST-009"
+    title: "A test expense never reaches CONFIRMED because the payer's own split is PENDING"
+    symptoms:
+      - "A freshly created + equal-split + 'confirmed' expense has status PENDING_CONFIRMATION"
+      - "Balance/ledger queries filtering on CONFIRMED silently return nothing"
+    root_cause: |
+      An equal split creates a row for EVERY participant including the payer,
+      and each starts PENDING. Finalization requires all of them confirmed, so
+      confirming only the non-payer members leaves the expense unfinalized —
+      and the test then measures an empty result set, not the behaviour.
+    solution: |
+      Pass EVERY participant's headers to the confirm loop, payer included:
+      _confirmed_expense(client, owner_headers, [owner_headers, member_headers], group_id)
+    prevention: "When a query over CONFIRMED rows returns 0 in a test, assert the expense's status before debugging the query — the fixture is the more likely culprit"
+    stories_encountered: ["WS12"]
+    tokens_saved_estimate: "~800 per occurrence"
+
+  - id: "FE-012"
+    title: "flex-1 + min-w-0 collapses copy into a sliver instead of wrapping the row"
+    symptoms:
+      - "At 375px a card's text renders as a tall ~100px column beside its buttons"
+      - "A fixed-width control row (tabs, button group) makes the whole page scroll sideways"
+    root_cause: |
+      `flex-wrap` only wraps when a child cannot shrink further. `flex-1
+      min-w-0` says the text CAN shrink to nothing, so flex starves the copy
+      rather than moving the buttons to their own line. Separately, an
+      `inline-flex w-fit h-9` control strip (shadcn TabsList) simply overflows
+      the viewport when one more item is added — WS12 added a fourth settings
+      tab and pushed document.body.scrollWidth to 444 at a 375 viewport.
+    solution: |
+      For a text-plus-actions row, stack explicitly instead of relying on
+      wrap: `flex flex-col gap-3 sm:flex-row sm:items-center` with the actions
+      in `sm:ml-auto`. For a control strip that must not overflow, allow
+      wrapping AND unset the fixed height: `className="h-auto flex-wrap
+      justify-start"`.
+    prevention: |
+      Measure rather than eyeball. In a Playwright probe:
+        document.body.scrollWidth vs document.documentElement.clientWidth
+      Any excess is horizontal page scroll on a phone. Both WS12 instances
+      passed typecheck, unit tests, build AND 15 e2e journeys — only the DoD
+      screenshots caught them, which is what that rule is for.
+    stories_encountered: ["WS12"]
+    tokens_saved_estimate: "~700 per occurrence"
 
 # =============================================================================
 # QUICK REFERENCE (Most Common Issues)

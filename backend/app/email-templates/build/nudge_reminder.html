@@ -1,0 +1,84 @@
+<!doctype html>
+<!--
+  WS12 nudge reminder. HAND-AUTHORED — unlike magic_link.html / test_email.html
+  there is no .mjml source for this one, because the repo's MJML workflow is a
+  manual VS Code export (backend/README) and a committed "build" artifact with
+  no reachable source would drift the moment anyone re-exported it. Edit this
+  file directly; keep it table-based and inline-styled so mail clients render it.
+
+  Context: project_name, title, body, link. `title` and `body` arrive
+  PRE-ESCAPED from delivery.py (Jinja autoescape is off in render_email_template).
+-->
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{ project_name }}</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#FCFCFB;">
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      style="background-color:#FCFCFB;"
+    >
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="max-width:480px;background-color:#FFFFFF;border:1px solid #E7E5E0;border-radius:12px;"
+          >
+            <tr>
+              <td
+                style="padding:28px 32px 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:#8A8578;"
+              >
+                {{ project_name }}
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="padding:0 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;line-height:1.35;font-weight:600;color:#1C1B18;"
+              >
+                {{ title }}
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="padding:12px 32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#57534E;"
+              >
+                {{ body }}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px 8px;">
+                <a
+                  href="{{ link }}"
+                  style="display:inline-block;padding:11px 20px;background-color:#1C1B18;color:#FCFCFB;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:500;text-decoration:none;border-radius:8px;"
+                  >Open {{ project_name }}</a
+                >
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="padding:20px 32px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#8A8578;border-top:1px solid #F2F0EB;"
+              >
+                You're getting this because you have an open balance. You can
+                change how often {{ project_name }} reminds you — or turn
+                reminders off entirely — in
+                <a href="{{ link }}/settings" style="color:#57534E;"
+                  >notification settings</a
+                >.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

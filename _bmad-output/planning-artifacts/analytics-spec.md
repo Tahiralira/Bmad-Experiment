@@ -58,15 +58,17 @@ listed properties. Amounts and free-text (names, descriptions, handles) are
 auto-confirm sweep (72h window) settles claims server-side with no client
 event — `settlement.claim.confirmed` undercounts by the auto-confirmed share;
 OAuth first-login is not distinguishable from a returning login client-side
-(use the person's first-seen date instead). Revisit both if/when WS12 adds
-server-side capture.
+(use the person's first-seen date instead). **WS12 did NOT add server-side
+capture** — it shipped no backend analytics client — so both blind spots
+remain, and nudge *sends* joined them (see §3). Where a metric needs a
+server-side count, the spec now names the SQL rather than inventing a
+client-side proxy.
 
 ## 3. Reserved names (do NOT capture before the feature exists)
 
 | Event | Lands with |
 |---|---|
-| `nudge.notification.sent` | WS12 nudge engine |
-| `nudge.notification.muted` | WS12 — **the kill-switch metric** (S1-W6) |
+| `nudge.notification.sent` | **Still reserved after WS12.** Nudges are DELIVERED server-side by the sweep, and there is no backend analytics client — the browser cannot honestly capture "sent". The `notification` table is the source of truth for send volume (see §4). |
 | `billing.paywall.viewed` | Phase 4 billing (monetization-spec §5) |
 | `billing.paywall.converted` | Phase 4 billing |
 
@@ -83,7 +85,7 @@ From [monetization-spec §8](./monetization-spec.md) and the PRD success criteri
 | **AI-quota-exhaustion rate** | % of AI users who hit the cap in a month | Unique persons with `ai.quota.exhausted` ÷ unique persons with `ai.parse.started` |
 | **Edit rate / Trust Score** (PRD <10%) | AI expenses edited before confirm | `expense.expense.created` where `source="ai"`: `was_edited=true` share |
 | **Settlement velocity** (PRD) | time debts sit before settling | `claim_age_hours` on `settlement.claim.confirmed` (claim-open → confirmed). NOTE: expense-confirmed → claim-created latency additionally visible as funnel time between `expense.expense.confirmed` and `settlement.claim.created` |
-| **Mute rate** (kill switch) | — **not measurable until WS12** | reserved `nudge.notification.muted` ÷ `nudge.notification.sent` |
+| **Mute rate** (kill switch) | share of nudged people who switch reminders off | **Numerator is live (WS12):** `nudge.notification.muted`, with `scope="all"` (global kill switch) or `scope="relationship"` (one debt silenced). **Denominator is NOT in PostHog** — sends happen server-side, so count `SELECT count(DISTINCT user_id) FROM notification WHERE status='SENT'` against the API database and divide. Do not substitute a client-side proxy: it would flatter the metric the PRD relies on to stop the product. |
 | **Payment-rail intent** | which providers people actually use at settle | `payment.link.clicked` + `payment.handle.copied` by `provider` |
 | Free→paid conversion, paywall per-surface rates | — Phase 4, needs billing | reserved `billing.paywall.*` |
 

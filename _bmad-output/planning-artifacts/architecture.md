@@ -123,8 +123,11 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 -   **Deployment Target:** Vercel (frontend) + Render (backend) + Neon (Postgres),
     free tiers until rollout (OWNER DECISION WS9.5, 2026-07-16 — supersedes both the
     original Railway selection and WS9's compose-on-VPS, which is kept as fallback in
-    `deployment-vps.md`). WS12's Redis/Celery lands on Render Key Value +
-    background workers.
+    `deployment-vps.md`). ~~WS12's Redis/Celery lands on Render Key Value +
+    background workers.~~ **Superseded (WS12, 2026-08-25):** neither was built —
+    free-tier Render has no background worker or cron job, so the nudge
+    scheduler is a GitHub Actions cron against an HTTP endpoint. See the WS12
+    correction under "API & Communication Patterns".
 
 ### Data Architecture
 
@@ -137,6 +140,28 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 -   **Auth Method:** **OAuth2 + JWT** (Provided by Starter).
 -   **Security:** "Walled Garden" - No public read access; all routes require valid Bearer token.
 -   **Sensitive Data:** All financial input sanitization via Pydantic validators.
+
+### ⚠️ WS12 CORRECTION (2026-08-25) — the async tier, as actually built
+
+The sections below describe a **planned** Redis Pub/Sub + Celery + WebSocket
+tier. WS12 built the nudge engine and **did not build that tier**. What exists
+today, and why:
+
+| Planned | Shipped in WS12 | Why |
+|---|---|---|
+| Celery worker + beat | `run_nudge_sweep()`, a plain idempotent service function | Render's free plan has **no background worker and no cron job** (both paid, from $7/mo each). A broker plus two processes would buy a scheduler production cannot run. |
+| Redis broker / Pub/Sub | none | Nothing to broker without a worker. Render Key Value's free tier is also non-persistent, so it would be a lossy queue. |
+| Celery beat schedule | `.github/workflows/nudge-sweep.yml` → `POST /notifications/internal/run-sweep` | GitHub Actions cron is a free scheduler the stack already uses (`db-backup.yml`). Shared-secret auth; the endpoint 404s when unconfigured. |
+| Event envelope over Redis | `event_type` on the `notification` row, `domain.entity.action` | Same vocabulary as the WS10.6 analytics taxonomy — one naming convention, no phantom bus. |
+| WebSockets, NFR7 (1k concurrent) | none | No WebSocket code has ever existed (03-technical-backend H1). NFR7 remains **unvalidated and unclaimed**, not "supported". |
+
+The dead `publish_expense_confirmed_event` / `notify_group_of_finalized_expense`
+pair — the "architecture's uniform on dead code" that H1 named — is **deleted**.
+
+This is a deferral, not a rejection: moving to Celery later means changing the
+**trigger**, not the engine. Revisit when nudge volume or latency justifies a
+paid worker. Until then, treat every Redis/Celery/WebSocket statement below as
+a future intention, not a description of the system.
 
 ### API & Communication Patterns
 
@@ -172,7 +197,7 @@ cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
 
 **Implementation Sequence:**
 1.  Init Project (FastAPI + Redux Starter).
-2.  Wire Neon + Render + Vercel per the WS9.5 guide (`deployment.md`); Redis lands with WS12 (Render Key Value).
+2.  Wire Neon + Render + Vercel per the WS9.5 guide (`deployment.md`). ~~Redis lands with WS12.~~ It did not — WS12 shipped a cron-triggered sweep instead (see the WS12 correction).
 3.  Implement "Real-time" socket layer (Redis connection).
 4.  Build "Offline" Mutation Queue (TanStack).
 
