@@ -429,6 +429,40 @@ export type NotificationPreferenceUpdate = {
 };
 
 /**
+ * The server-side half of the PRD's kill-switch metric (analytics-spec §4,
+ * "Mute rate").
+ *
+ * PostHog holds the numerator — `nudge.notification.muted`, fired by the
+ * browser when someone switches reminders off. It cannot hold the
+ * denominator: nudges are DELIVERED server-side by the sweep, so no
+ * browser ever witnesses a send, and a client-side proxy would flatter the
+ * one metric the PRD relies on to STOP the product. These counts come
+ * straight from the `notification` and `nudge_state` tables.
+ *
+ * `mute_rate` is the number the stop signal is read off: muted people ÷
+ * people who were actually reached. It is null when nobody has been
+ * nudged yet — a rate over an empty denominator is not 0%, it is unknown,
+ * and reporting it as 0% would read as "nobody minds" on day one.
+ */
+export type NudgeMetrics = {
+    window_days: number;
+    users_nudged: number;
+    users_muted_global: number;
+    users_muted_relationship: number;
+    users_muted_any: number;
+    mute_rate: (number | null);
+    notifications_sent: number;
+    sends_by_level: {
+        [key: string]: (number);
+    };
+    sends_by_channel: {
+        [key: string]: (number);
+    };
+    debts_cleared_after_nudge: number;
+    relationships_exhausted: number;
+};
+
+/**
  * One nudgeable relationship's mute/snooze state, for the settings UI.
  */
 export type NudgeRelationshipPublic = {
@@ -438,6 +472,8 @@ export type NudgeRelationshipPublic = {
     counterparty_name: (string | null);
     muted: boolean;
     snoozed_until: (string | null);
+    last_level?: (number | null);
+    reminders_exhausted?: boolean;
 };
 
 /**
@@ -449,15 +485,22 @@ export type NudgeStateUpdate = {
 };
 
 /**
- * What one sweep did — the cron endpoint's response body.
+ * What one sweep did — the cron endpoint's response body, and the only
+ * view an operator gets of a system whose success looks like silence.
+ * `nudges_by_level` is what makes Escalation Efficacy (PRD §Validation)
+ * measurable at all: how much of the ladder people actually needed.
  */
 export type NudgeSweepResult = {
     relationships_examined: number;
     nudges_sent: number;
+    nudges_by_level?: {
+        [key: string]: (number);
+    };
     suppressed_quiet_hours: number;
     suppressed_snoozed: number;
     suppressed_muted: number;
     suppressed_cooldown: number;
+    suppressed_exhausted?: number;
     deliveries: {
         [key: string]: (number);
     };
@@ -969,6 +1012,13 @@ export type NotificationsRunSweepData = {
 };
 
 export type NotificationsRunSweepResponse = (NudgeSweepResult);
+
+export type NotificationsGetNudgeMetricsData = {
+    windowDays?: number;
+    xNudgeSecret?: (string | null);
+};
+
+export type NotificationsGetNudgeMetricsResponse = (NudgeMetrics);
 
 export type UsersReadUserMeResponse = (UserPublic);
 

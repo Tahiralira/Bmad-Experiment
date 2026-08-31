@@ -172,6 +172,7 @@ Two rules that bite if you miss them:
 | [development.md](./development.md) | Local setup, Docker Compose, mailcatcher, linting |
 | [deployment.md](./deployment.md) | Vercel + Render + Neon runbook (the live setup) |
 | [deployment-vps.md](./deployment-vps.md) | Docker-Compose-on-a-VPS fallback |
+| [beta-launch.md](./beta-launch.md) | Private-beta runbook: pre-flight, weekly metric review, kill criteria, measured scheduler numbers |
 | [SECURITY.md](./SECURITY.md) | How to report a vulnerability |
 | [CLAUDE.md](./CLAUDE.md) | Working agreements for AI-assisted development |
 

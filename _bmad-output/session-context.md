@@ -1,10 +1,11 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-08-25 (WS12 done — Nudge Engine: Infra + Level 1. The
-product's differentiator exists: per-relationship-per-group Level 1 reminders,
-web push + email fallback, snooze/mute/quiet-hours/kill-switch, scheduled by a
-GitHub Actions cron because free-tier Render has no worker. Celery/Redis
-explicitly DESCOPED with reason, not deferred silently.)
+**Last Updated:** 2026-08-31 (WS13 code done — Nudge Engine: Level 2 + beta
+prep. Progressive Urgency is complete and FINITE: Level 1 → Level 2 → silence,
+because Level 3 is cut and a repeating top rung is just nagging. The
+"cleared without asking" notification ships, the PRD's kill-switch metric is
+finally computable, and the scheduler has measured numbers instead of
+aspirations. **The beta itself is NOT launched — nothing is deployed.**)
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -29,13 +30,15 @@ explicitly DESCOPED with reason, not deferred silently.)
 | Epic 3: Expenses | **DONE** | 8/8 ✅ |
 | **Epic 4: Trust & Confirmation** | **DONE** | 5/5 ✅ |
 | **Epic 5: Settlement** | **IN-PROGRESS** | 2/3 |
-| **Epic 6: Nudges** | **IN-PROGRESS** | 2/5 done, 1 descoped, 1 deferred |
+| **Epic 6: Nudges** | **DONE** | 4/6 done, 1 descoped, 1 deferred ✅ |
 | Epic 7: Offline | BACKLOG | 0/5 |
 | Epic 8: UX Polish | BACKLOG (Post-MVP) | 1/4 |
 
-**Current Progress:** 35 of 47 stories done, 10 remaining, 2 closed-without-build
-(6-1 descoped-with-reason, 6-5 deferred per 02 Phase B). WS12 also closed WS10.7,
-which was never a story.
+**Current Progress:** 37 of 48 stories done, 9 remaining, 2 closed-without-build
+(6-1 descoped-with-reason, 6-5 deferred per 02 Phase B). WS12 closed WS10.7 and
+WS13 added 6-7 ("cleared without asking"), neither of which was ever a numbered
+story — hence 48. Everything remaining is Epic 7 (offline) and Epic 8 (polish),
+both post-beta.
 
 > These counts are **derived from** `implementation-artifacts/sprint-status.yaml`
 > — that file is the source of truth, this table is a convenience copy.
@@ -567,13 +570,89 @@ which was never a story.
 > CONFIRMED-filtered query returning 0 is usually the fixture, not the query
 > (TEST-009).
 >
-> **Next: WS13 (Nudge Engine: Level 2 + Beta Launch) — the last session
-> before private beta. OWNER ACTIONS now include deployment.md §6.6: set the
-> Actions secrets `NUDGE_CRON_SECRET` + `API_BASE_URL` (nothing sends
-> without them, and the cron only fires from `main`), generate a VAPID
-> keypair, and optionally add a free SMTP tier — which also finally turns on
-> magic-link sign-in. Earlier owner actions still open: the deploy itself,
-> PostHog/Sentry keys, PAT rotation, uptime monitor.**
+> WS13 (Nudge Engine: Level 2 + Beta Prep) **CODE DONE** 2026-08-31 on branch
+> `ws13/nudge-level-2`. **The beta is NOT launched** — see owner actions below.
+> (a) **Level 2 ships; the ladder ENDS.** Tone: Level 2 retells the same debt
+> from the CREDITOR's side plus its age ("… covered this 4 days ago and is
+> still out of pocket"). Frequency: the cooldown narrows 72h → 48h at Level 2.
+> Two rules beyond the story AC, both load-bearing: **Level 2 requires a
+> Level 1 to have actually been SENT** (escalation follows the conversation,
+> not the calendar — a five-day-old debt the engine never mentioned still
+> opens gently), and **the engine goes quiet after 4 Level 2s**. With Level 3
+> cut, silence is the last rung; a top rung repeating forever IS the nagging
+> the product exists to remove. New column `nudge_state.level_2_count`,
+> migration `d4e5f6a7b8c9`. Settings says where each balance stands ("first
+> reminder sent" / "second reminder sent" / "no more reminders") so nobody
+> presses Mute blind.
+> (b) **Cut means the copy too.** `test_level_2_never_mentions_anyone_else`
+> asserts the Level 2 text never references other members. That is the line
+> between the rungs: Level 2 is about the person you owe, Level 3 would be
+> about your standing among your friends. Copy edits are how a cut level
+> grows back.
+> (c) **"Cleared without asking"** (02 §7 wow #2) goes to the CREDITOR,
+> **inline from settlement confirmation** (owner decision) — the value of this
+> one is its timing. Refused wherever the sentence would be false: no nudge
+> was ever sent, the debt is only partly paid, or it already went out
+> (clearing `last_level` both ends the ladder and closes the door, so it is
+> idempotent without another column). Covers AUTO-confirmed claims too — a
+> creditor who never even responded is the purest case. Runs in a SAVEPOINT
+> and never raises: a broken push service cannot fail somebody's settlement.
+> Push capped at 3s inline vs 10s in the sweep. In quiet hours it changes
+> channel to email rather than dropping the message or buzzing at 3am.
+> `last_nudged_at` is deliberately NOT reset on clearing — WS12's cooldown
+> must survive a debt going to zero and coming back.
+> (d) **Kill-switch telemetry completed.** WS12 shipped the numerator; the
+> DENOMINATOR cannot live in PostHog, because sends happen server-side and no
+> browser witnesses one. `GET /notifications/internal/nudge-metrics` (same
+> cron-secret guard) returns mute rate over people actually REACHED, sends by
+> level/channel, debts cleared after a nudge, and exhausted relationships.
+> `mute_rate` is **null, not 0.0**, before anyone is nudged — "nobody minds"
+> and "nobody has been asked yet" must not look the same on the number the
+> PRD would halt the product on. Reading guide: beta-launch.md §4.
+> (e) **Real scheduler numbers** (`backend/scripts/nudge_benchmark.py`,
+> re-runnable). LOCAL, not staging — staging still does not exist. Beta scale
+> (149 relationships): 102 ms dry / 230 ms writing. Stress (3,049): 2.9 s /
+> 6.0 s, well inside the cron's 180 s budget. ~2 ms per relationship,
+> dominated by an N+1 `nudge_state` lookup (WS13-M1, does not block beta).
+> **NFR7 (1k WebSockets) and NFR1 (200 ms) remain UNVALIDATED AND UNMET** —
+> there are no WebSockets. Said plainly in beta-launch.md.
+> (f) `beta-launch.md` (linked from README): pre-flight gates, the
+> expectations text to send with every invite, onboarding real groups through
+> the invite flow (NO seeding into production), the 30-minute weekly review,
+> and **kill criteria written down before the data arrives**.
+> Backend **355 passed / 0 skipped** (+18), `alembic check` clean; frontend
+> typecheck green, **149 passed** (+6), build green, **176.15 kB gz** (≤250);
+> e2e **15/15, green on 8 consecutive parallel runs**. 16 screenshots →
+> `_bmad-output/implementation-artifacts/ws13-screenshots/`.
+> Key learnings: (1) **The first screenshot run PASSED while photographing
+> stale pre-WS13 UI** — compose serves the BUILT frontend image on :5173 and
+> Playwright reuses it (`docker compose build frontend` first). The spec now
+> asserts each status line is visible and `body.scrollWidth <= 375`, so a
+> pixel dump can no longer lie about which build it saw (TEST-011).
+> (2) **`docker compose cp backend/app backend:/app/app` NESTS** into
+> `/app/app/app` when the target exists — every check afterwards runs stale
+> code and passes. Copy contents: `backend/app/.` (DOCKER-009). This cost the
+> most time in the session and produced two false green runs.
+> (3) WS12's `test_quiet_hours_defer_without_consuming_the_nudge` had a
+> hardcoded `2026-08-25` compared against relatively-backdated fixtures: green
+> the day it was written, red six days later, **testing nothing in between**
+> (TEST-010). Never mix a fixed `now` with a relative fixture.
+> (4) The WS12 notification journeys flaked ~1 run in 3 under `fullyParallel`
+> — three tests sharing one account, where the kill-switch test disables the
+> fieldset the quiet-hours test clicks. CI never saw it (`workers: 1`). Fixed
+> by serializing that describe (TEST-012) **and** by locking the preferences
+> row on write — the same race is a genuine lost update between two of a
+> user's own devices.
+>
+> **Next: LAUNCH THE PRIVATE BETA — this is now entirely OWNER ACTIONS, not
+> code.** Nothing is deployed, so there is no system to invite anyone to.
+> In order: deployment.md §0–§7 (Neon, Render, Vercel, domain, Google login,
+> backups), then §6.5 PostHog/Sentry keys, then §6.6 the nudge engine
+> (`NUDGE_CRON_SECRET` + `API_BASE_URL` as Actions secrets — nothing sends
+> without them, and **the cron only fires from `main`**, so WS13 must be
+> merged; a VAPID keypair; optionally SMTP, which also turns on magic-link
+> sign-in). Then beta-launch.md §1 → §6. Still open from earlier sessions:
+> PAT rotation, uptime monitor.**
 
 ---
 

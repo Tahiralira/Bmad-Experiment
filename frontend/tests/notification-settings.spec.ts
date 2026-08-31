@@ -12,6 +12,20 @@ import { randomTeamName, uniqueLabel } from "./utils/random"
  * sending side is covered by backend tests and a live push proof; what those
  * cannot cover is whether the settings are actually reachable.
  */
+// SERIAL, deliberately. These three journeys share one account (the
+// storage state from auth.setup) and all mutate the SAME account-level
+// preferences row — and the kill switch disables the fieldset the
+// quiet-hours journey clicks inside. Under `fullyParallel: true` they raced:
+// the kill-switch test would switch reminders off mid-flow, the quiet-hours
+// test's "Remove" button would go disabled, and it failed on a click
+// timeout about one run in three. CI never saw it (`workers: 1`), so it sat
+// green in WS12 while failing locally.
+//
+// Serial rather than a fresh account per test: these controls are ABOUT one
+// account's global settings, and giving each test its own user would make
+// the suite pass by removing the thing that made them interesting.
+test.describe.configure({ mode: "serial" })
+
 test.describe("notification settings", () => {
   test("a signed-in person can reach the reminder controls and turn them off", async ({
     page,

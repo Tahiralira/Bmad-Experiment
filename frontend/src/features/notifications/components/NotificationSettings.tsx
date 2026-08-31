@@ -45,6 +45,37 @@ function formatSnooze(until: string | null): string | null {
 }
 
 /**
+ * Where one balance stands with the agent, in the plainest words available
+ * (WS13).
+ *
+ * Someone about to press Mute deserves to know whether the agent is on its
+ * first gentle reminder or has already stopped on its own — a mute button
+ * pressed blind is how a product loses a user it had not yet annoyed. The
+ * order is deliberate: an explicit user choice (muted, snoozed) always
+ * outranks whatever the engine would otherwise be doing.
+ */
+function describeNudgeStatus(rel: {
+  muted: boolean
+  snoozed_until: string | null
+  last_level?: number | null
+  reminders_exhausted?: boolean
+}): string | null {
+  if (rel.muted) return "muted"
+
+  const snoozedUntil = formatSnooze(rel.snoozed_until)
+  if (snoozedUntil) return `snoozed until ${snoozedUntil}`
+
+  // Level 3 does not exist, so this is the end of the line rather than a
+  // pause. Said out loud, because an agent that stopped on purpose and one
+  // that is broken look identical from the outside.
+  if (rel.reminders_exhausted) return "no more reminders"
+
+  if (rel.last_level === 2) return "second reminder sent"
+  if (rel.last_level === 1) return "first reminder sent"
+  return null
+}
+
+/**
  * Notification settings (WS12). Three layers, coarsest first:
  *   1. the global kill switch,
  *   2. per-channel and quiet hours,
@@ -277,6 +308,7 @@ export function NotificationSettings() {
             <ul className="flex flex-col gap-2">
               {relationships.map((rel) => {
                 const snoozedUntil = formatSnooze(rel.snoozed_until)
+                const status = describeNudgeStatus(rel)
                 return (
                   <li
                     key={`${rel.group_id}-${rel.counterparty_user_id}`}
@@ -288,11 +320,7 @@ export function NotificationSettings() {
                       </p>
                       <p className="text-muted-foreground truncate text-sm">
                         {rel.group_name}
-                        {rel.muted
-                          ? " · muted"
-                          : snoozedUntil
-                            ? ` · snoozed until ${snoozedUntil}`
-                            : ""}
+                        {status ? ` · ${status}` : ""}
                       </p>
                     </div>
 

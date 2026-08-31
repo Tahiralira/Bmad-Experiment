@@ -45,13 +45,25 @@ the execution plan (`10-execution-plan.md`) first.
   `deployment-vps.md`)
 
 **Planned but NOT present, and now explicitly DESCOPED** (do not assume these
-exist): WebSockets, Redis Pub/Sub, Celery workers. WS12 shipped the nudge engine
-*without* them — Render's free plan has no background worker or cron job, so the
-scheduler is a GitHub Actions cron (`.github/workflows/nudge-sweep.yml`) calling
-`POST /notifications/internal/run-sweep`, and the engine is a plain idempotent
-`run_nudge_sweep()`. Rationale + revisit conditions: architecture.md
-"WS12 CORRECTION". NFR7 (1k concurrent WebSockets) is **unvalidated**, not met.
-The PWA service worker DOES exist (WS11), and carries web-push handlers (WS12).
+exist): WebSockets, Redis Pub/Sub, Celery workers. WS12–13 shipped the nudge
+engine *without* them — Render's free plan has no background worker or cron job,
+so the scheduler is a GitHub Actions cron (`.github/workflows/nudge-sweep.yml`)
+calling `POST /notifications/internal/run-sweep`, and the engine is a plain
+idempotent `run_nudge_sweep()`. Rationale + revisit conditions: architecture.md
+"WS12 CORRECTION". NFR7 (1k concurrent WebSockets) and NFR1 (200 ms real-time)
+are **unvalidated and unmet** — measured scheduler numbers and that admission
+live in `beta-launch.md`. The PWA service worker DOES exist (WS11), and carries
+web-push handlers (WS12).
+
+**Nudge ladder (WS13) — the product's core rule.** Progressive Urgency is
+Level 1 → Level 2 → **silence**. Level 3 (social pressure) is cut, so Level 2 is
+the top rung and the engine goes quiet after `NUDGE_LEVEL_2_MAX_REMINDERS`
+rather than repeating itself forever. Level 2 requires a Level 1 to have
+actually been sent — escalation follows the conversation, not the calendar. Two
+invariants to preserve when touching this code: nudges are per-relationship-
+per-group (enforced by `nudge_state`'s unique constraint, never by discipline),
+and Level 2 copy must never mention what *other* members have done, which would
+reintroduce the cut Level 3.
 
 ## 📐 Architectural Patterns
 
@@ -166,6 +178,9 @@ naming, or personal preferences unless they cause bugs or maintenance burden.
 | `PendingRollbackError` cascade in tests | Already handled by conftest's autouse rollback fixture |
 | jsdom: focus-trap "no tabbable node" | Handled via `tabbableOptions.displayCheck` in test mode |
 | File exists locally but missing in fresh clone/CI | Broad .gitignore pattern — audit with `git ls-files --others --ignored --exclude-standard` (GIT-002) |
+| `docker compose cp` ran but the container still has old code | It NESTS when the target dir exists — copy contents: `backend/app/.` not `backend/app` (DOCKER-009) |
+| Screenshot spec passes but the new UI isn't in the images | :5173 serves the BUILT frontend image and Playwright reuses it — `docker compose build frontend` first (TEST-011) |
+| Time-based test fails with no code change | A hardcoded `datetime(20XX,…)` compared against relatively-backdated fixtures (TEST-010) |
 | New test fails against clearly-correct app code | Container runs stale image — only `tests/` is volume-mounted; `docker compose build backend` (DOCKER-006) |
 
 **Full solutions:** `_bmad-output/implementation-artifacts/solution-patterns.yaml`
@@ -201,5 +216,7 @@ progress → check off in `10-execution-plan.md`.
 - [Session Context](./_bmad-output/session-context.md)
 
 ### Guides
+- [Beta Launch Runbook](./beta-launch.md) — pre-flight gates, weekly metric
+  review, kill criteria, measured scheduler numbers
 - [BMAD Usage Guide](./_bmad/bmm/docs/BMAD-USAGE-GUIDE.md)
 - [Tracking Setup Guide](./_bmad/bmm/docs/TRACKING-SETUP-GUIDE.md)

@@ -45,12 +45,20 @@ class NotificationStatus(str, PyEnum):
 
 class NudgeLevel(int, PyEnum):
     """
-    Progressive Urgency levels (PRD §FR11). Level 1 — a gentle, factual
-    reminder — is the only level WS12 ships. Level 2 (contextual nudge)
-    lands in WS13; Level 3 (social pressure) is cut from the product.
+    Progressive Urgency levels (PRD §FR11).
+
+    Level 1 (WS12) — a gentle, factual statement of the balance.
+    Level 2 (WS13) — the contextual nudge: the same debt, now told from the
+    creditor's side and with its age attached.
+    Level 3 — social pressure — is CUT from the product (02 Phase B, "defer
+    Level 3 entirely"), and is cut in the strong sense: the ladder has no
+    third rung, so Level 2 is the top. Because a top rung that repeated
+    forever would become the nagging ClearDues exists to remove, the engine
+    goes quiet after NUDGE_LEVEL_2_MAX_REMINDERS. Silence is the last rung.
     """
 
     LEVEL_1 = 1
+    LEVEL_2 = 2
 
 
 # The event envelope, adopted for real (03-technical-backend H1). The old
@@ -59,6 +67,21 @@ class NudgeLevel(int, PyEnum):
 # `domain.entity.action` convention as the WS10.6 analytics taxonomy, so one
 # vocabulary covers both. Redis Pub/Sub is descoped — see architecture.md.
 EVENT_NUDGE_LEVEL_1 = "nudge.reminder.level_1"
+EVENT_NUDGE_LEVEL_2 = "nudge.reminder.level_2"
+# The brand promise made visible (02 §7, wow moment #2): the person who was
+# OWED money is told their dues cleared — and that they never had to ask,
+# because the agent did the asking. Sent only where that sentence is true:
+# only if this engine actually nudged the relationship. See
+# `notify_debt_cleared`.
+EVENT_NUDGE_CLEARED = "nudge.debt.cleared"
+
+# Level → event name. Kept as a mapping rather than an f-string so an
+# unknown level fails loudly at the lookup instead of inventing an event
+# type the analytics taxonomy has never heard of.
+NUDGE_EVENT_BY_LEVEL: dict[int, str] = {
+    NudgeLevel.LEVEL_1.value: EVENT_NUDGE_LEVEL_1,
+    NudgeLevel.LEVEL_2.value: EVENT_NUDGE_LEVEL_2,
+}
 
 
 # === Tables ===
@@ -140,7 +163,17 @@ class NudgeState(SQLModel, table=True):
     )
 
     last_nudged_at: datetime | None = Field(default=None, sa_type=_AWARE_DATETIME)
+    # Where this relationship sits on the ladder RIGHT NOW. None means the
+    # ladder is not running: either it never started, or the debt cleared
+    # and the success notification already went out. That second meaning is
+    # what makes `notify_debt_cleared` idempotent without another column —
+    # it fires only while a ladder is active, and clearing `last_level` is
+    # what ends it.
     last_level: int | None = Field(default=None)
+    # How many Level 2 reminders this relationship has had. The cap
+    # (NUDGE_LEVEL_2_MAX_REMINDERS) is the ladder's end: with Level 3 cut,
+    # something has to stop the top rung repeating forever.
+    level_2_count: int = Field(default=0)
     # User-chosen deferral for this one relationship ("not about Sam, not
     # this week"). Distinct from `muted`, which has no end date.
     snoozed_until: datetime | None = Field(default=None, sa_type=_AWARE_DATETIME)
@@ -296,6 +329,16 @@ class NudgeRelationshipPublic(SQLModel):
     counterparty_name: str | None
     muted: bool
     snoozed_until: datetime | None
+    # Where the ladder stands, shown to the person being nudged. Someone
+    # deciding whether to mute deserves to know whether the agent is on its
+    # first gentle reminder or its last one — the alternative is a mute
+    # button pressed blind.
+    last_level: int | None = None
+    # True once the Level 2 cap is reached: the engine has gone quiet about
+    # this debt of its own accord. Saying so is the difference between an
+    # agent that stops and an agent that merely happens not to have sent
+    # anything today.
+    reminders_exhausted: bool = False
 
 
 class NudgeStateUpdate(SQLModel):
@@ -308,12 +351,66 @@ class NudgeStateUpdate(SQLModel):
 
 
 class NudgeSweepResult(SQLModel):
-    """What one sweep did — the cron endpoint's response body."""
+    """
+    What one sweep did — the cron endpoint's response body, and the only
+    view an operator gets of a system whose success looks like silence.
+    `nudges_by_level` is what makes Escalation Efficacy (PRD §Validation)
+    measurable at all: how much of the ladder people actually needed.
+    """
 
     relationships_examined: int
     nudges_sent: int
+    nudges_by_level: dict[str, int] = Field(default_factory=dict)
     suppressed_quiet_hours: int
     suppressed_snoozed: int
     suppressed_muted: int
     suppressed_cooldown: int
+    # Relationships the engine has deliberately stopped nudging: the Level 2
+    # cap is spent. Counted rather than silently skipped, so "the agent went
+    # quiet" is a number an operator can see rather than an absence.
+    suppressed_exhausted: int = 0
     deliveries: dict[str, int]
+
+
+class NudgeMetrics(SQLModel):
+    """
+    The server-side half of the PRD's kill-switch metric (analytics-spec §4,
+    "Mute rate").
+
+    PostHog holds the numerator — `nudge.notification.muted`, fired by the
+    browser when someone switches reminders off. It cannot hold the
+    denominator: nudges are DELIVERED server-side by the sweep, so no
+    browser ever witnesses a send, and a client-side proxy would flatter the
+    one metric the PRD relies on to STOP the product. These counts come
+    straight from the `notification` and `nudge_state` tables.
+
+    `mute_rate` is the number the stop signal is read off: muted people ÷
+    people who were actually reached. It is null when nobody has been
+    nudged yet — a rate over an empty denominator is not 0%, it is unknown,
+    and reporting it as 0% would read as "nobody minds" on day one.
+    """
+
+    window_days: int
+    # People who received at least one nudge that was actually SENT on some
+    # channel. Attempts that were skipped or failed are excluded: someone
+    # who was never reached cannot have been annoyed.
+    users_nudged: int
+    # Of those, how many have since silenced reminders — globally
+    # (nudges_enabled = false) or on any single relationship.
+    users_muted_global: int
+    users_muted_relationship: int
+    users_muted_any: int
+    mute_rate: float | None
+    # Volume, for context on the rate. A 50% mute rate over two people is
+    # noise; over two hundred it is the stop signal.
+    notifications_sent: int
+    sends_by_level: dict[str, int]
+    sends_by_channel: dict[str, int]
+    # Debts that cleared after the agent had nudged — the brand promise
+    # actually landing. The counterweight to mute rate: if this is rising
+    # faster than mutes, the nudging is working.
+    debts_cleared_after_nudge: int
+    # Relationships where the ladder ran out and the engine went quiet.
+    # Rising here means Level 2 is not converting and the escalation is
+    # being ignored rather than obeyed.
+    relationships_exhausted: int

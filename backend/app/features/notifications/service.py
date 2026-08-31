@@ -29,11 +29,14 @@ from app.features.expenses.models import (
 )
 from app.features.groups.models import ExpenseGroup, GroupSettings
 from app.features.notifications.models import (
-    EVENT_NUDGE_LEVEL_1,
+    EVENT_NUDGE_CLEARED,
+    NUDGE_EVENT_BY_LEVEL,
     Notification,
+    NotificationChannel,
     NotificationPreference,
     NotificationStatus,
     NudgeLevel,
+    NudgeMetrics,
     NudgeState,
     NudgeSweepResult,
 )
@@ -45,18 +48,28 @@ logger = logging.getLogger(__name__)
 
 
 def get_or_create_preferences(
-    session: Session, user_id: uuid.UUID
+    session: Session, user_id: uuid.UUID, *, for_update: bool = False
 ) -> NotificationPreference:
     """
     A user's preferences, created with defaults on first access. Absence of
     a row means "never touched the settings", not "opted out" — so the row
     is materialised rather than treated as a silent opt-out.
+
+    `for_update` takes a row lock (WS4/M8's discipline). Every write to this
+    table is a read-modify-write of ONE row, so two concurrent partial
+    updates from the same account — two tabs, a phone and a laptop — would
+    otherwise lose one another: whichever committed second would write back
+    the whole row including the field it never touched. Found in WS13 by
+    Playwright running three notification specs in parallel as one user,
+    where switching reminders off would silently revert. CI never saw it
+    (`workers: 1`), which is exactly why it survived WS12.
     """
-    prefs = session.exec(
-        select(NotificationPreference).where(
-            NotificationPreference.user_id == user_id
-        )
-    ).first()
+    statement = select(NotificationPreference).where(
+        NotificationPreference.user_id == user_id
+    )
+    if for_update:
+        statement = statement.with_for_update()
+    prefs = session.exec(statement).first()
     if prefs is None:
         prefs = NotificationPreference(user_id=user_id)
         session.add(prefs)
@@ -287,6 +300,82 @@ def get_or_create_nudge_state(
     return state
 
 
+# === The ladder ===
+
+
+def _next_level(state: NudgeState, age: timedelta) -> int | None:
+    """
+    Which rung this relationship is owed next, or None when the ladder is
+    spent and the engine should stay quiet.
+
+    Two rules define Progressive Urgency here:
+
+    1. **You always get the gentle one first.** Level 2 requires a Level 1
+       to have actually been sent, never merely that the debt is old enough.
+       A debt discovered at five days — the engine was off, the user had it
+       muted, a snooze just lapsed — still opens with Level 1. Escalation is
+       a property of the CONVERSATION, not of the calendar; the alternative
+       is someone's first ever word from the agent being its firmest.
+
+    2. **The ladder ends.** Level 3 is cut from the product, so Level 2 is
+       the top rung, and a top rung that repeats forever is the nagging
+       ClearDues exists to remove. After NUDGE_LEVEL_2_MAX_REMINDERS the
+       answer is None and the agent says nothing further about this debt.
+    """
+    if state.last_level is None:
+        return NudgeLevel.LEVEL_1.value
+
+    if state.last_level >= NudgeLevel.LEVEL_2.value:
+        if state.level_2_count >= settings.NUDGE_LEVEL_2_MAX_REMINDERS:
+            return None
+        return NudgeLevel.LEVEL_2.value
+
+    # Had Level 1. Old enough for the contextual nudge?
+    if age >= timedelta(hours=settings.NUDGE_LEVEL_2_AFTER_HOURS):
+        return NudgeLevel.LEVEL_2.value
+    return NudgeLevel.LEVEL_1.value
+
+
+def _cooldown_for(last_level: int | None) -> timedelta:
+    """
+    How long to wait after a nudge before the next one may go out.
+
+    This is the FREQUENCY half of Progressive Urgency: once a relationship
+    is at Level 2 the gap narrows, so an older debt is heard from more
+    often. The tone escalates and the cadence escalates with it — a firmer
+    message sent at the same leisurely interval would not be an escalation.
+    """
+    if last_level is not None and last_level >= NudgeLevel.LEVEL_2.value:
+        return timedelta(hours=settings.NUDGE_LEVEL_2_COOLDOWN_HOURS)
+    return timedelta(hours=settings.NUDGE_COOLDOWN_HOURS)
+
+
+def is_exhausted(state: NudgeState) -> bool:
+    """Whether the engine has deliberately stopped nudging this relationship."""
+    return (
+        state.last_level is not None
+        and state.last_level >= NudgeLevel.LEVEL_2.value
+        and state.level_2_count >= settings.NUDGE_LEVEL_2_MAX_REMINDERS
+    )
+
+
+def _days_ago(then: datetime, now: datetime) -> str:
+    """
+    Debt age in whole days, phrased for a lock screen.
+
+    Rounded DOWN, never up: the number appears in a message whose whole
+    claim is that it is telling you something true, and "6 days" about a
+    five-and-a-half-day-old debt is the small dishonesty that makes the
+    rest of the sentence worth less.
+    """
+    days = max((now - then).days, 0)
+    if days <= 0:
+        return "today"
+    if days == 1:
+        return "yesterday"
+    return f"{days} days ago"
+
+
 # === Copy ===
 
 
@@ -306,6 +395,57 @@ def render_level_1(rel: DebtRelationship) -> tuple[str, str]:
     body = (
         f"That's your balance with {who} in {rel.group_name}. "
         "Open ClearDues to settle up whenever suits you."
+    )
+    return title, body
+
+
+def render_level_2(rel: DebtRelationship, now: datetime) -> tuple[str, str]:
+    """
+    The Level 2 message: the same debt, told from the CREDITOR's side.
+
+    The context is deliberately narrow — what the person owed money did
+    (they covered it) and how long they have been waiting. That is the
+    escalation the PRD's Journey 2 describes: it reframes the balance from
+    an admin task into someone else's real money, which is what makes it
+    feel helpful rather than demanding.
+
+    What it deliberately does NOT say is what anyone ELSE in the group has
+    done. "Three of four have paid" would be more persuasive and would be
+    Level 3 — social pressure — which is cut from the product (02 Phase B).
+    The line between the two rungs is exactly this: Level 2 tells you about
+    the person you owe; Level 3 would tell you about your standing among
+    your friends. Only one of those is the agent's business.
+    """
+    who = rel.creditor_name or "someone in the group"
+    amount = f"{rel.amount:.2f} {rel.currency}"
+    when = _days_ago(rel.oldest_confirmed_at, now)
+    title = f"{who} is still owed {amount}"
+    body = (
+        f"{who} covered this {when} in {rel.group_name} and is still out of "
+        "pocket. Settling takes a tap."
+    )
+    return title, body
+
+
+def render_cleared(
+    *, counterparty_name: str | None, group_name: str, amount: Decimal, currency: str
+) -> tuple[str, str]:
+    """
+    The "cleared without asking" message (02 §7, wow moment #2) — the only
+    notification in the product that is purely good news.
+
+    It is addressed to the CREDITOR, and its second sentence is the entire
+    brand promise: they got their money back and never had to be the person
+    who brings it up. That sentence is only allowed to be said where it is
+    true, which is why `notify_debt_cleared` refuses to send it unless this
+    engine really did the asking.
+    """
+    who = counterparty_name or "Someone in the group"
+    money = f"{amount:.2f} {currency}"
+    title = f"{who} settled up — {money}"
+    body = (
+        f"Your balance with {who} in {group_name} is clear. "
+        "You never had to ask."
     )
     return title, body
 
@@ -338,15 +478,16 @@ def run_nudge_sweep(
 
     now = now or datetime.now(timezone.utc)
     threshold = timedelta(hours=settings.NUDGE_LEVEL_1_AFTER_HOURS)
-    cooldown = timedelta(hours=settings.NUDGE_COOLDOWN_HOURS)
 
     result = NudgeSweepResult(
         relationships_examined=0,
         nudges_sent=0,
+        nudges_by_level={},
         suppressed_quiet_hours=0,
         suppressed_snoozed=0,
         suppressed_muted=0,
         suppressed_cooldown=0,
+        suppressed_exhausted=0,
         deliveries={},
     )
 
@@ -383,7 +524,15 @@ def run_nudge_sweep(
         if state.snoozed_until and _as_aware(state.snoozed_until) > now:
             result.suppressed_snoozed += 1
             continue
-        if state.last_nudged_at and now - _as_aware(state.last_nudged_at) < cooldown:
+        # Checked before the cooldown because exhaustion is PERMANENT: a
+        # relationship the engine has finished with should report as
+        # exhausted every sweep, not spend a day looking merely cooled-down.
+        if is_exhausted(state):
+            result.suppressed_exhausted += 1
+            continue
+        if state.last_nudged_at and now - _as_aware(
+            state.last_nudged_at
+        ) < _cooldown_for(state.last_level):
             result.suppressed_cooldown += 1
             continue
         # Quiet hours are checked LAST of the suppressors: they defer a
@@ -393,9 +542,20 @@ def run_nudge_sweep(
             result.suppressed_quiet_hours += 1
             continue
 
-        title, body = render_level_1(rel)
+        level = _next_level(state, now - rel.oldest_confirmed_at)
+        if level is None:  # pragma: no cover - is_exhausted caught this above
+            result.suppressed_exhausted += 1
+            continue
+
+        if level >= NudgeLevel.LEVEL_2.value:
+            title, body = render_level_2(rel, now)
+        else:
+            title, body = render_level_1(rel)
+
         if dry_run:
             result.nudges_sent += 1
+            key = f"level_{level}"
+            result.nudges_by_level[key] = result.nudges_by_level.get(key, 0) + 1
             continue
 
         outcomes = deliver(
@@ -413,8 +573,8 @@ def run_nudge_sweep(
                     user_id=rel.debtor_id,
                     group_id=rel.group_id,
                     counterparty_user_id=rel.creditor_id,
-                    event_type=EVENT_NUDGE_LEVEL_1,
-                    level=NudgeLevel.LEVEL_1.value,
+                    event_type=NUDGE_EVENT_BY_LEVEL[level],
+                    level=level,
                     channel=outcome.channel,
                     status=outcome.status,
                     amount=rel.amount,
@@ -432,13 +592,325 @@ def run_nudge_sweep(
         # confirmed delivered. If every channel failed, retrying on the next
         # sweep would mean re-attempting a broken channel every few minutes;
         # the failure is recorded and the relationship waits its turn.
+        #
+        # The LADDER advances on the same rule, for the same reason: a rung
+        # is spent by being climbed. Tying it to delivery success instead
+        # would let a user with a dead push endpoint and no email accumulate
+        # an unbounded backlog of undeliverable Level 2s.
         state.last_nudged_at = now
-        state.last_level = NudgeLevel.LEVEL_1.value
+        state.last_level = level
+        if level >= NudgeLevel.LEVEL_2.value:
+            state.level_2_count += 1
         state.updated_at = now
         session.add(state)
+
+        key = f"level_{level}"
+        result.nudges_by_level[key] = result.nudges_by_level.get(key, 0) + 1
 
         if any(o.status == NotificationStatus.SENT for o in outcomes):
             result.nudges_sent += 1
 
     session.flush()
     return result
+
+
+# === "Cleared without asking" (WS13 — 02 §7, wow moment #2) ===
+
+
+def notify_debt_cleared(
+    session: Session,
+    *,
+    group_id: uuid.UUID,
+    debtor_id: uuid.UUID,
+    creditor_id: uuid.UUID,
+    amount: Decimal,
+    currency: str,
+    now: datetime | None = None,
+) -> bool:
+    """
+    Tell the CREDITOR their balance cleared — and that they never had to ask.
+
+    Fires INLINE from settlement confirmation rather than from the sweep,
+    because this is the one notification whose value is in its timing: an
+    hour-late "you've been paid" is a receipt, and the point of this one is
+    the moment. Delivery cost is kept off the critical path by the
+    guarantees below, not by deferring it.
+
+    Three rules make the sentence honest:
+
+    1. **Only if the agent actually asked.** `last_level is None` means no
+       ladder is running for this relationship, so nobody was nudged and
+       "you never had to ask" would be a lie — the creditor may well have
+       asked in person. Returns False and says nothing.
+    2. **Only if the debt is really gone.** A partial settlement leaves a
+       balance; recomputing beats trusting the caller's claim amount.
+    3. **Only once.** Clearing `last_level` both ends the ladder and closes
+       this door, so a second confirmation in the same breath (two claims,
+       an auto-confirm racing a manual one) finds nothing to announce.
+
+    Never raises: the caller is in the middle of settling a debt, and a
+    failed notification must not fail a settlement. Everything runs inside a
+    SAVEPOINT, so a database error here rolls back the notification alone
+    and leaves the settlement's own writes intact.
+
+    Callers own the transaction (ARCH-001) — this flushes, never commits.
+    """
+    try:
+        with session.begin_nested():
+            return _notify_debt_cleared_inner(
+                session,
+                group_id=group_id,
+                debtor_id=debtor_id,
+                creditor_id=creditor_id,
+                amount=amount,
+                currency=currency,
+                now=now,
+            )
+    except Exception as exc:
+        logger.warning(
+            "Cleared-debt notification failed for group %s (%s → %s): %s",
+            group_id,
+            debtor_id,
+            creditor_id,
+            exc,
+        )
+        return False
+
+
+def _notify_debt_cleared_inner(
+    session: Session,
+    *,
+    group_id: uuid.UUID,
+    debtor_id: uuid.UUID,
+    creditor_id: uuid.UUID,
+    amount: Decimal,
+    currency: str,
+    now: datetime | None,
+) -> bool:
+    from app.features.notifications.delivery import (
+        PUSH_TIMEOUT_INLINE_SECONDS,
+        deliver,
+    )
+
+    now = now or datetime.now(timezone.utc)
+
+    state = session.exec(
+        select(NudgeState).where(
+            NudgeState.user_id == debtor_id,
+            NudgeState.group_id == group_id,
+            NudgeState.counterparty_user_id == creditor_id,
+        )
+    ).first()
+    # Rule 1 and rule 3, in one condition.
+    if state is None or state.last_level is None:
+        return False
+
+    # Rule 2: still owing means this was a partial payment, not a clearing.
+    still_owing = any(
+        rel.debtor_id == debtor_id and rel.creditor_id == creditor_id
+        for rel in find_debt_relationships(session, group_id=group_id)
+    )
+    if still_owing:
+        return False
+
+    # The ladder is over either way — the debt is gone. Reset it BEFORE the
+    # delivery decisions below, so a creditor who has switched reminders off
+    # doesn't leave a stale ladder that would resume mid-escalation on the
+    # relationship's next debt.
+    #
+    # `last_nudged_at` is deliberately NOT cleared: WS12's cooldown has to
+    # survive a debt going to zero and coming back, or a new expense between
+    # the same two people could be nudged the moment it lands.
+    state.last_level = None
+    state.level_2_count = 0
+    state.updated_at = now
+    session.add(state)
+
+    prefs = get_or_create_preferences(session, creditor_id)
+    if not prefs.nudges_enabled:
+        # They asked for silence. Good news is still news.
+        session.flush()
+        return False
+
+    group = session.get(ExpenseGroup, group_id)
+    debtor = session.get(User, debtor_id)
+    title, body = render_cleared(
+        counterparty_name=_display_name(debtor),
+        group_name=group.name if group else "your group",
+        amount=amount,
+        currency=currency,
+    )
+
+    # Quiet hours can't DEFER here the way they do in the sweep — there is no
+    # later pass to pick this up — so instead of dropping the message or
+    # overriding the preference, it changes channel. Email arrives without
+    # buzzing anyone at 3am, and is waiting in the morning.
+    quiet = is_within_quiet_hours(prefs, now)
+
+    outcomes = deliver(
+        session,
+        user_id=creditor_id,
+        prefs=prefs,
+        title=title,
+        body=body,
+        group_id=group_id,
+        suppress_push=quiet,
+        # This runs while someone waits for their settlement to confirm.
+        push_timeout=PUSH_TIMEOUT_INLINE_SECONDS,
+    )
+
+    for outcome in outcomes:
+        session.add(
+            Notification(
+                user_id=creditor_id,
+                group_id=group_id,
+                counterparty_user_id=debtor_id,
+                event_type=EVENT_NUDGE_CLEARED,
+                # Level 0: this is not a rung on the urgency ladder. Storing
+                # it as Level 1 would quietly inflate Escalation Efficacy
+                # with notifications that never nudged anyone.
+                level=0,
+                channel=outcome.channel,
+                status=outcome.status,
+                amount=amount,
+                currency=currency,
+                title=title,
+                body=body,
+                detail=outcome.detail
+                or ("quiet hours — email only" if quiet else None),
+                sent_at=now,
+            )
+        )
+
+    session.flush()
+    return any(o.status == NotificationStatus.SENT for o in outcomes)
+
+
+# === Kill-switch telemetry (WS13 — analytics-spec §4 "Mute rate") ===
+
+# Event types that represent the agent nudging someone. `EVENT_NUDGE_CLEARED`
+# is deliberately not among them: being told you were paid is not a nudge,
+# and counting it as one would dilute the very rate the PRD uses to decide
+# whether to stop the product.
+_REMINDER_EVENTS = tuple(NUDGE_EVENT_BY_LEVEL.values())
+
+
+def compute_nudge_metrics(
+    session: Session, *, window_days: int = 30, now: datetime | None = None
+) -> NudgeMetrics:
+    """
+    The kill-switch numbers, straight from the database.
+
+    PostHog cannot compute the mute RATE on its own: it sees the browser
+    firing `nudge.notification.muted` but never sees a send, because sends
+    happen server-side in the sweep. analytics-spec §4 spells out the
+    consequence — the denominator has to come from the API database, and
+    substituting a client-side proxy "would flatter the metric the PRD
+    relies on to stop the product". This function is that denominator,
+    published so the weekly review is a page load rather than a psql
+    session against production.
+    """
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=window_days)
+
+    sent_in_window = [
+        sa.and_(
+            Notification.status == NotificationStatus.SENT,
+            Notification.sent_at >= cutoff,
+        )
+    ]
+
+    nudged_user_ids = set(
+        session.exec(
+            select(Notification.user_id)
+            .where(
+                Notification.event_type.in_(_REMINDER_EVENTS),
+                *sent_in_window,
+            )
+            .distinct()
+        ).all()
+    )
+
+    # Muted counts are restricted to people who were actually REACHED. The
+    # metric is "share of nudged people who switch reminders off": someone
+    # who muted before ever hearing from the agent is not evidence about
+    # the agent, and including them would move the stop signal for reasons
+    # that have nothing to do with nudging.
+    muted_global: set[uuid.UUID] = set()
+    muted_relationship: set[uuid.UUID] = set()
+    if nudged_user_ids:
+        muted_global = set(
+            session.exec(
+                select(NotificationPreference.user_id).where(
+                    NotificationPreference.user_id.in_(nudged_user_ids),
+                    NotificationPreference.nudges_enabled == False,  # noqa: E712
+                )
+            ).all()
+        )
+        muted_relationship = set(
+            session.exec(
+                select(NudgeState.user_id)
+                .where(
+                    NudgeState.user_id.in_(nudged_user_ids),
+                    NudgeState.muted == True,  # noqa: E712
+                )
+                .distinct()
+            ).all()
+        )
+
+    muted_any = muted_global | muted_relationship
+
+    level_rows = session.exec(
+        select(Notification.level, sa.func.count())
+        .where(Notification.event_type.in_(_REMINDER_EVENTS), *sent_in_window)
+        .group_by(Notification.level)
+    ).all()
+    channel_rows = session.exec(
+        select(Notification.channel, sa.func.count())
+        .where(Notification.event_type.in_(_REMINDER_EVENTS), *sent_in_window)
+        .group_by(Notification.channel)
+    ).all()
+
+    sends_by_level = {f"level_{level}": count for level, count in level_rows}
+    sends_by_channel = {
+        (channel.value if isinstance(channel, NotificationChannel) else str(channel)): count
+        for channel, count in channel_rows
+    }
+    notifications_sent = sum(sends_by_level.values())
+
+    cleared = session.exec(
+        select(sa.func.count())
+        .select_from(Notification)
+        .where(Notification.event_type == EVENT_NUDGE_CLEARED, *sent_in_window)
+    ).one()
+
+    exhausted = session.exec(
+        select(sa.func.count())
+        .select_from(NudgeState)
+        .where(
+            NudgeState.last_level >= NudgeLevel.LEVEL_2.value,
+            NudgeState.level_2_count >= settings.NUDGE_LEVEL_2_MAX_REMINDERS,
+        )
+    ).one()
+
+    return NudgeMetrics(
+        window_days=window_days,
+        users_nudged=len(nudged_user_ids),
+        users_muted_global=len(muted_global),
+        users_muted_relationship=len(muted_relationship),
+        users_muted_any=len(muted_any),
+        # An unknown rate is reported as null, never as 0.0. Over an empty
+        # denominator "0% mute rate" reads as "nobody minds" when it
+        # actually means "nobody has been asked yet" — and this is the
+        # number the PRD would stop the product on.
+        mute_rate=(
+            round(len(muted_any) / len(nudged_user_ids), 4)
+            if nudged_user_ids
+            else None
+        ),
+        notifications_sent=notifications_sent,
+        sends_by_level=sends_by_level,
+        sends_by_channel=sends_by_channel,
+        debts_cleared_after_nudge=int(cleared),
+        relationships_exhausted=int(exhausted),
+    )

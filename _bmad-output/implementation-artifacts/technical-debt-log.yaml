@@ -12,8 +12,8 @@
 metadata:
   version: "1.0"
   created_at: "2026-01-12"
-  last_review: "WS11 blocker reconciliation (S7-M4), 2026-08-25"
-  total_items: 39  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM + 3 Epic 4 + 6 Epic 5
+  last_review: "WS13 nudge Level 2 + beta prep, 2026-08-31"
+  total_items: 42  # 25 code review + 3 retrospective HIGH + 2 retrospective MEDIUM + 3 Epic 4 + 6 Epic 5 + 3 WS13
   status_legend:
     open: "Not yet addressed"
     in_progress: "Currently being worked on"
@@ -602,3 +602,64 @@ epic_5:
         description: "S6-L2 remainder: ruff hooks declare `language: unsupported` (invalid pre-commit language — the hook set errors if anyone installs it). The docker-compose-v1 scripts half of S6-L2 was fixed in WS9 (build/deploy/build-push deleted); test-local.sh still calls v1 docker-compose and `down -v`."
         suggested_fix: "Fix or delete .pre-commit-config.yaml and test-local.sh with the WS11 docs/template cleanup"
         effort: "small"
+
+  ws13_nudge_level_2:
+    title: "WS13 - Nudge Engine: Level 2 + Beta Prep"
+    reviewed: true
+    review_date: "2026-08-31"
+    items:
+      - id: "WS13-M1"
+        type: "performance"
+        severity: "MEDIUM"
+        status: "open"
+        file: "backend/app/features/notifications/service.py (run_nudge_sweep)"
+        description: >-
+          The sweep issues one get_or_create_nudge_state SELECT per eligible
+          relationship - an N+1 that the single find_debt_relationships query
+          deliberately avoids. MEASURED, not suspected: 3,049 relationships
+          take 2.9s dry / 6.0s writing, versus 85ms for the discovery query
+          over the same data (backend/scripts/nudge_benchmark.py). Does NOT
+          block the private beta - at beta scale (149 relationships) the whole
+          sweep is 102ms, and the cron allows 180s.
+        suggested_fix: >-
+          Bulk-load every NudgeState for the sweep's user set in one query
+          before the loop (the same shape find_debt_relationships already uses
+          for groups/users), and create only the missing rows. Preferences are
+          already cached this way; the state rows were not.
+        effort: "small"
+        revisit_when: "Sweeps exceed ~30s, or the beta grows past a few hundred relationships"
+
+      - id: "WS13-L1"
+        type: "test-hygiene"
+        severity: "LOW"
+        status: "open"
+        file: "frontend/tests/notification-settings.spec.ts"
+        description: >-
+          The notification journeys are pinned to serial mode because they
+          share one account and mutate its global preferences (TEST-012). This
+          is correct for what they test, but it means the file cannot benefit
+          from parallelism as the suite grows.
+        suggested_fix: >-
+          If these journeys get slow, give the kill-switch test its own
+          registered user while leaving the quiet-hours and per-relationship
+          tests on the shared account - the kill switch is the only one whose
+          blast radius is account-wide.
+        effort: "small"
+
+      - id: "WS13-L2"
+        type: "coverage"
+        severity: "LOW"
+        status: "open"
+        file: "backend/app/features/notifications/service.py (notify_debt_cleared)"
+        description: >-
+          The cleared-debt notification is delivered inline from settlement
+          confirmation, so its push attempt sits on a user's request path
+          (capped at 3s per endpoint via PUSH_TIMEOUT_INLINE_SECONDS). A
+          creditor with several dead push endpoints could add a few seconds to
+          one settle-confirm. Bounded and rare - it happens once per cleared
+          relationship - but it is real latency on a write path.
+        suggested_fix: >-
+          Move delivery to a FastAPI BackgroundTask (needs its own Session), or
+          revisit if/when a real worker exists. Do not move it to the sweep:
+          the value of this message is its timing.
+        effort: "medium"

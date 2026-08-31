@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AiParsingParseExpenseData, AiParsingParseExpenseResponse, AuthRequestMagicLinkData, AuthRequestMagicLinkResponse, AuthVerifyMagicLinkData, AuthVerifyMagicLinkResponse, AuthRequestLoginMagicLinkData, AuthRequestLoginMagicLinkResponse, AuthVerifyLoginMagicLinkData, AuthVerifyLoginMagicLinkResponse, AuthLogoutResponse, AuthOauthLoginData, AuthOauthLoginResponse, AuthOauthCallbackData, AuthOauthCallbackResponse, AuthExchangeLoginCodeData, AuthExchangeLoginCodeResponse, ExpensesCreateExpenseData, ExpensesCreateExpenseResponse, ExpensesEditExpenseData, ExpensesEditExpenseResponse, ExpensesGetExpenseData, ExpensesGetExpenseResponse, ExpensesUpdateExpenseSplitData, ExpensesUpdateExpenseSplitResponse, ExpensesConfirmExpenseSplitEndpointData, ExpensesConfirmExpenseSplitEndpointResponse, ExpensesRejectExpenseSplitEndpointData, ExpensesRejectExpenseSplitEndpointResponse, ExpensesGetPendingConfirmationsResponse, ExpensesGetPendingSettlementsResponse, ExpensesGetPendingClaimsForOwnerData, ExpensesGetPendingClaimsForOwnerResponse, ExpensesGetExpenseAuditLogData, ExpensesGetExpenseAuditLogResponse, ExpensesSettleExpenseEndpointData, ExpensesSettleExpenseEndpointResponse, ExpensesConfirmSettlementClaimEndpointData, ExpensesConfirmSettlementClaimEndpointResponse, ExpensesRejectSettlementClaimEndpointData, ExpensesRejectSettlementClaimEndpointResponse, ExpensesCreateAggregateSettlementEndpointData, ExpensesCreateAggregateSettlementEndpointResponse, ExpensesListAggregateSettlementClaimsData, ExpensesListAggregateSettlementClaimsResponse, ExpensesGetExpenseSplitsData, ExpensesGetExpenseSplitsResponse, GroupsListUserGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupDetailData, GroupsGetGroupDetailResponse, GroupsListGroupExpensesData, GroupsListGroupExpensesResponse, GroupsGetPairwiseBalancesData, GroupsGetPairwiseBalancesResponse, GroupsGetGroupSettingsData, GroupsGetGroupSettingsResponse, GroupsUpdateGroupSettingsData, GroupsUpdateGroupSettingsResponse, GroupsListGroupMembersData, GroupsListGroupMembersResponse, GroupsGetMemberPaymentMethodsData, GroupsGetMemberPaymentMethodsResponse, GroupsCreateInviteData, GroupsCreateInviteResponse, GroupsListInvitesData, GroupsListInvitesResponse, GroupsRevokeInviteData, GroupsRevokeInviteResponse, GroupsPreviewInviteData, GroupsPreviewInviteResponse, GroupsAcceptInviteData, GroupsAcceptInviteResponse, GroupsGetGroupAuditLogData, GroupsGetGroupAuditLogResponse, NotificationsGetMyPreferencesResponse, NotificationsUpdateMyPreferencesData, NotificationsUpdateMyPreferencesResponse, NotificationsGetVapidPublicKeyResponse, NotificationsRegisterPushSubscriptionData, NotificationsRegisterPushSubscriptionResponse, NotificationsDeletePushSubscriptionData, NotificationsDeletePushSubscriptionResponse, NotificationsListNudgeRelationshipsResponse, NotificationsUpdateNudgeRelationshipData, NotificationsUpdateNudgeRelationshipResponse, NotificationsRunSweepData, NotificationsRunSweepResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersSetMyApiKeyData, UsersSetMyApiKeyResponse, UsersDeleteMyApiKeyResponse, UsersListMyPaymentMethodsResponse, UsersAddMyPaymentMethodData, UsersAddMyPaymentMethodResponse, UsersUpdateMyPaymentMethodData, UsersUpdateMyPaymentMethodResponse, UsersDeleteMyPaymentMethodData, UsersDeleteMyPaymentMethodResponse, UsersGetDashboardResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
+import type { AiParsingParseExpenseData, AiParsingParseExpenseResponse, AuthRequestMagicLinkData, AuthRequestMagicLinkResponse, AuthVerifyMagicLinkData, AuthVerifyMagicLinkResponse, AuthRequestLoginMagicLinkData, AuthRequestLoginMagicLinkResponse, AuthVerifyLoginMagicLinkData, AuthVerifyLoginMagicLinkResponse, AuthLogoutResponse, AuthOauthLoginData, AuthOauthLoginResponse, AuthOauthCallbackData, AuthOauthCallbackResponse, AuthExchangeLoginCodeData, AuthExchangeLoginCodeResponse, ExpensesCreateExpenseData, ExpensesCreateExpenseResponse, ExpensesEditExpenseData, ExpensesEditExpenseResponse, ExpensesGetExpenseData, ExpensesGetExpenseResponse, ExpensesUpdateExpenseSplitData, ExpensesUpdateExpenseSplitResponse, ExpensesConfirmExpenseSplitEndpointData, ExpensesConfirmExpenseSplitEndpointResponse, ExpensesRejectExpenseSplitEndpointData, ExpensesRejectExpenseSplitEndpointResponse, ExpensesGetPendingConfirmationsResponse, ExpensesGetPendingSettlementsResponse, ExpensesGetPendingClaimsForOwnerData, ExpensesGetPendingClaimsForOwnerResponse, ExpensesGetExpenseAuditLogData, ExpensesGetExpenseAuditLogResponse, ExpensesSettleExpenseEndpointData, ExpensesSettleExpenseEndpointResponse, ExpensesConfirmSettlementClaimEndpointData, ExpensesConfirmSettlementClaimEndpointResponse, ExpensesRejectSettlementClaimEndpointData, ExpensesRejectSettlementClaimEndpointResponse, ExpensesCreateAggregateSettlementEndpointData, ExpensesCreateAggregateSettlementEndpointResponse, ExpensesListAggregateSettlementClaimsData, ExpensesListAggregateSettlementClaimsResponse, ExpensesGetExpenseSplitsData, ExpensesGetExpenseSplitsResponse, GroupsListUserGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupDetailData, GroupsGetGroupDetailResponse, GroupsListGroupExpensesData, GroupsListGroupExpensesResponse, GroupsGetPairwiseBalancesData, GroupsGetPairwiseBalancesResponse, GroupsGetGroupSettingsData, GroupsGetGroupSettingsResponse, GroupsUpdateGroupSettingsData, GroupsUpdateGroupSettingsResponse, GroupsListGroupMembersData, GroupsListGroupMembersResponse, GroupsGetMemberPaymentMethodsData, GroupsGetMemberPaymentMethodsResponse, GroupsCreateInviteData, GroupsCreateInviteResponse, GroupsListInvitesData, GroupsListInvitesResponse, GroupsRevokeInviteData, GroupsRevokeInviteResponse, GroupsPreviewInviteData, GroupsPreviewInviteResponse, GroupsAcceptInviteData, GroupsAcceptInviteResponse, GroupsGetGroupAuditLogData, GroupsGetGroupAuditLogResponse, NotificationsGetMyPreferencesResponse, NotificationsUpdateMyPreferencesData, NotificationsUpdateMyPreferencesResponse, NotificationsGetVapidPublicKeyResponse, NotificationsRegisterPushSubscriptionData, NotificationsRegisterPushSubscriptionResponse, NotificationsDeletePushSubscriptionData, NotificationsDeletePushSubscriptionResponse, NotificationsListNudgeRelationshipsResponse, NotificationsUpdateNudgeRelationshipData, NotificationsUpdateNudgeRelationshipResponse, NotificationsRunSweepData, NotificationsRunSweepResponse, NotificationsGetNudgeMetricsData, NotificationsGetNudgeMetricsResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersSetMyApiKeyData, UsersSetMyApiKeyResponse, UsersDeleteMyApiKeyResponse, UsersListMyPaymentMethodsResponse, UsersAddMyPaymentMethodData, UsersAddMyPaymentMethodResponse, UsersUpdateMyPaymentMethodData, UsersUpdateMyPaymentMethodResponse, UsersDeleteMyPaymentMethodData, UsersDeleteMyPaymentMethodResponse, UsersGetDashboardResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
 
 export class AiParsingService {
     /**
@@ -1203,10 +1203,7 @@ export class NotificationsService {
      * ordinary function — swapping in Celery beat later changes the caller,
      * not this code.
      *
-     * Auth is a shared secret in `X-Nudge-Secret`, compared in constant time.
-     * When `NUDGE_CRON_SECRET` is unset the route 404s: an unconfigured
-     * deployment exposes no sweep endpoint at all, rather than one guarded by
-     * an empty string.
+     * Auth is a shared secret in `X-Nudge-Secret` (see `_require_cron_secret`).
      * @param data The data for the request.
      * @param data.dryRun
      * @param data.xNudgeSecret
@@ -1222,6 +1219,50 @@ export class NotificationsService {
             },
             query: {
                 dry_run: data.dryRun
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Nudge Metrics
+     * The server-side half of the PRD's kill-switch metric — mute rate and the
+     * volume behind it (analytics-spec §4).
+     *
+     * PostHog holds the numerator (`nudge.notification.muted`, fired by the
+     * browser) but structurally cannot hold the denominator: nudges are sent
+     * server-side by the sweep, so no browser ever witnesses one. Without this
+     * endpoint the weekly beta review means opening a psql session against the
+     * production database — which is exactly how a stop signal ends up not
+     * being read. The metric the PRD would halt the product on has to be
+     * cheap to look at.
+     *
+     * Guarded by the SAME shared secret as the sweep rather than by
+     * superuser auth: it reports on people who are not the caller, so it
+     * belongs to the operator running the cron, not to any logged-in user.
+     * Read-only — no session state is touched, so nothing is committed.
+     *
+     * `window_days` bounds the send/mute counts (default 30). Mute state
+     * itself is current, not historical: the question the PRD asks is "are
+     * people switching this off", and someone who muted last month and hasn't
+     * come back still counts as switched off.
+     * @param data The data for the request.
+     * @param data.windowDays
+     * @param data.xNudgeSecret
+     * @returns NudgeMetrics Successful Response
+     * @throws ApiError
+     */
+    public static getNudgeMetrics(data: NotificationsGetNudgeMetricsData = {}): CancelablePromise<NotificationsGetNudgeMetricsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/notifications/internal/nudge-metrics',
+            headers: {
+                'x-nudge-secret': data.xNudgeSecret
+            },
+            query: {
+                window_days: data.windowDays
             },
             errors: {
                 422: 'Validation Error'

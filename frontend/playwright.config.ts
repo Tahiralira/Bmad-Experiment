@@ -71,9 +71,10 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      // The visual-proof spec lives in its own project below — it captures
-      // pixels and asserts nothing, so it has no business in the CI journeys.
-      testIgnore: /ws12-screenshots\.spec\.ts/,
+      // The visual-proof specs live in their own project below — they
+      // capture pixels and assert nothing, so they have no business in the
+      // CI journeys.
+      testIgnore: /ws1[23]-screenshots\.spec\.ts/,
     },
 
     /**
@@ -83,7 +84,7 @@ export default defineConfig({
      */
     {
       name: 'visual',
-      testMatch: /ws12-screenshots\.spec\.ts/,
+      testMatch: /ws1[23]-screenshots\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',

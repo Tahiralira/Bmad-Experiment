@@ -165,7 +165,10 @@ development_status:
   # Epic 6: Agentic Notifications & Nudges (5 stories)
   # WS12 (2026-08-25) delivered the epic's core against the EXECUTION PLAN, not
   # story-by-story. Statuses below are reconciled to what actually shipped.
-  epic-6: in-progress
+  # WS13 (2026-08-31) closed the remaining buildable story (6-3) and added
+  # 6-7. Everything left in this epic is descoped or deferred with reason, so
+  # the epic is done: no live BLOCKER (DoD v2 #4).
+  epic-6: done
   # Descoped-with-reason, not built: Render's free plan has no background worker
   # and no cron job, so Celery+Redis+beat would be a scheduler production cannot
   # run. The substrate shipped as an idempotent run_nudge_sweep() triggered by a
@@ -176,11 +179,28 @@ development_status:
   # per-expense as the story's AC assumed. Enforced by nudge_state's unique
   # constraint. 24h threshold as specified.
   6-2-schedule-level-1-notifications-initial-reminder: done
-  6-3-schedule-level-2-notifications-contextual-nudge: backlog  # WS13
+  # Shipped in WS13, RE-SCOPED the same way 6-2 was: per-relationship, not
+  # per-expense. Two further deviations from the story AC, both deliberate:
+  # (a) Level 2 requires a Level 1 to have actually been SENT, not merely a
+  #     3-day-old debt — escalation follows the conversation, so a debt the
+  #     engine has never mentioned still opens gently at Level 1;
+  # (b) the ladder ENDS. With Level 3 cut (02 Phase B), the engine goes quiet
+  #     after NUDGE_LEVEL_2_MAX_REMINDERS rather than repeating its firmest
+  #     message forever. Silence is the last rung.
+  # The story's example copy ("Alex settled the dinner bill") is realised as
+  # the creditor's position plus debt age; nothing about other members'
+  # behaviour, which would be the cut Level 3 by another name.
+  6-3-schedule-level-2-notifications-contextual-nudge: done
   # Shipped with a wider scope than the story: snooze (1/3/7d) AND mute, both
   # per relationship, plus quiet hours and a global kill switch.
   6-4-snooze-notification: done
   6-5-settlement-cycle-configuration: deferred  # 02 Phase B: premium, later
+  # NEW in WS13, never a numbered story — added by 02 §7 as wow moment #2 and
+  # carried on the execution plan: the creditor is told their dues cleared and
+  # that they never had to ask. Sent inline from settlement confirmation, and
+  # only where that sentence is true (a nudge really went out, the debt is
+  # really gone, and only once).
+  6-7-cleared-without-asking-notification: done
   epic-6-retrospective: optional
 
   # Epic 7: Offline Capability & Sync (5 stories)

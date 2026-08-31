@@ -15,6 +15,7 @@ from app.features.notifications.delivery import push_available
 from app.features.notifications.models import (
     NotificationPreferencePublic,
     NotificationPreferenceUpdate,
+    NudgeMetrics,
     NudgeRelationshipPublic,
     NudgeState,
     NudgeStateUpdate,
@@ -69,7 +70,11 @@ def update_my_preferences(
     alone; `clear_quiet_hours` is the explicit way to remove the window,
     since a null hour otherwise means "unchanged".
     """
-    prefs = service.get_or_create_preferences(session, current_user.id)
+    # Locked: this is a read-modify-write of one row, and two settings
+    # changes racing from the same account must not lose each other.
+    prefs = service.get_or_create_preferences(
+        session, current_user.id, for_update=True
+    )
 
     for field in ("nudges_enabled", "push_enabled", "email_enabled", "timezone"):
         value = getattr(body, field)
@@ -236,6 +241,10 @@ def list_nudge_relationships(
                 counterparty_name=rel.creditor_name,
                 muted=bool(state and state.muted),
                 snoozed_until=state.snoozed_until if state else None,
+                last_level=state.last_level if state else None,
+                reminders_exhausted=(
+                    service.is_exhausted(state) if state else False
+                ),
             )
         )
     out.sort(key=lambda r: (r.group_name, r.counterparty_name or ""))
@@ -319,10 +328,29 @@ def update_nudge_relationship(
         else None,
         muted=state.muted,
         snoozed_until=state.snoozed_until,
+        last_level=state.last_level,
+        reminders_exhausted=service.is_exhausted(state),
     )
 
 
-# === Scheduler entry point ===
+# === Internal (scheduler + operator) endpoints ===
+
+
+def _require_cron_secret(x_nudge_secret: str | None) -> None:
+    """
+    Guard for the endpoints no browser calls: the sweep trigger and the
+    kill-switch metrics.
+
+    When `NUDGE_CRON_SECRET` is unset the route 404s rather than 403s — an
+    unconfigured deployment exposes no internal surface at all, rather than
+    one guarded by an empty string. The comparison is constant-time.
+    """
+    if not settings.NUDGE_CRON_SECRET:
+        raise HTTPException(status_code=404, detail="Not Found")
+    if not x_nudge_secret or not secrets.compare_digest(
+        x_nudge_secret, settings.NUDGE_CRON_SECRET
+    ):
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 
 @router.post("/internal/run-sweep", response_model=NudgeSweepResult)
@@ -341,17 +369,9 @@ def run_sweep(
     ordinary function — swapping in Celery beat later changes the caller,
     not this code.
 
-    Auth is a shared secret in `X-Nudge-Secret`, compared in constant time.
-    When `NUDGE_CRON_SECRET` is unset the route 404s: an unconfigured
-    deployment exposes no sweep endpoint at all, rather than one guarded by
-    an empty string.
+    Auth is a shared secret in `X-Nudge-Secret` (see `_require_cron_secret`).
     """
-    if not settings.NUDGE_CRON_SECRET:
-        raise HTTPException(status_code=404, detail="Not Found")
-    if not x_nudge_secret or not secrets.compare_digest(
-        x_nudge_secret, settings.NUDGE_CRON_SECRET
-    ):
-        raise HTTPException(status_code=403, detail="Forbidden")
+    _require_cron_secret(x_nudge_secret)
 
     result = service.run_nudge_sweep(session, dry_run=dry_run)
     # The router owns the commit (ARCH-001): notification rows and the
@@ -360,3 +380,40 @@ def run_sweep(
     # (which would re-nudge on the next run).
     session.commit()
     return result
+
+
+@router.get("/internal/nudge-metrics", response_model=NudgeMetrics)
+def get_nudge_metrics(
+    *,
+    session: SessionDep,
+    x_nudge_secret: str | None = Header(default=None),
+    window_days: int = 30,
+) -> NudgeMetrics:
+    """
+    The server-side half of the PRD's kill-switch metric — mute rate and the
+    volume behind it (analytics-spec §4).
+
+    PostHog holds the numerator (`nudge.notification.muted`, fired by the
+    browser) but structurally cannot hold the denominator: nudges are sent
+    server-side by the sweep, so no browser ever witnesses one. Without this
+    endpoint the weekly beta review means opening a psql session against the
+    production database — which is exactly how a stop signal ends up not
+    being read. The metric the PRD would halt the product on has to be
+    cheap to look at.
+
+    Guarded by the SAME shared secret as the sweep rather than by
+    superuser auth: it reports on people who are not the caller, so it
+    belongs to the operator running the cron, not to any logged-in user.
+    Read-only — no session state is touched, so nothing is committed.
+
+    `window_days` bounds the send/mute counts (default 30). Mute state
+    itself is current, not historical: the question the PRD asks is "are
+    people switching this off", and someone who muted last month and hasn't
+    come back still counts as switched off.
+    """
+    _require_cron_secret(x_nudge_secret)
+    if not 1 <= window_days <= 365:
+        raise HTTPException(
+            status_code=422, detail="window_days must be between 1 and 365."
+        )
+    return service.compute_nudge_metrics(session, window_days=window_days)

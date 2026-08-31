@@ -1314,6 +1314,85 @@ export const NotificationPreferenceUpdateSchema = {
 is optional — a partial update leaves the rest untouched.`
 } as const;
 
+export const NudgeMetricsSchema = {
+    properties: {
+        window_days: {
+            type: 'integer',
+            title: 'Window Days'
+        },
+        users_nudged: {
+            type: 'integer',
+            title: 'Users Nudged'
+        },
+        users_muted_global: {
+            type: 'integer',
+            title: 'Users Muted Global'
+        },
+        users_muted_relationship: {
+            type: 'integer',
+            title: 'Users Muted Relationship'
+        },
+        users_muted_any: {
+            type: 'integer',
+            title: 'Users Muted Any'
+        },
+        mute_rate: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Mute Rate'
+        },
+        notifications_sent: {
+            type: 'integer',
+            title: 'Notifications Sent'
+        },
+        sends_by_level: {
+            additionalProperties: {
+                type: 'integer'
+            },
+            type: 'object',
+            title: 'Sends By Level'
+        },
+        sends_by_channel: {
+            additionalProperties: {
+                type: 'integer'
+            },
+            type: 'object',
+            title: 'Sends By Channel'
+        },
+        debts_cleared_after_nudge: {
+            type: 'integer',
+            title: 'Debts Cleared After Nudge'
+        },
+        relationships_exhausted: {
+            type: 'integer',
+            title: 'Relationships Exhausted'
+        }
+    },
+    type: 'object',
+    required: ['window_days', 'users_nudged', 'users_muted_global', 'users_muted_relationship', 'users_muted_any', 'mute_rate', 'notifications_sent', 'sends_by_level', 'sends_by_channel', 'debts_cleared_after_nudge', 'relationships_exhausted'],
+    title: 'NudgeMetrics',
+    description: `The server-side half of the PRD's kill-switch metric (analytics-spec §4,
+"Mute rate").
+
+PostHog holds the numerator — \`nudge.notification.muted\`, fired by the
+browser when someone switches reminders off. It cannot hold the
+denominator: nudges are DELIVERED server-side by the sweep, so no
+browser ever witnesses a send, and a client-side proxy would flatter the
+one metric the PRD relies on to STOP the product. These counts come
+straight from the \`notification\` and \`nudge_state\` tables.
+
+\`mute_rate\` is the number the stop signal is read off: muted people ÷
+people who were actually reached. It is null when nobody has been
+nudged yet — a rate over an empty denominator is not 0%, it is unknown,
+and reporting it as 0% would read as "nobody minds" on day one.`
+} as const;
+
 export const NudgeRelationshipPublicSchema = {
     properties: {
         group_id: {
@@ -1356,6 +1435,22 @@ export const NudgeRelationshipPublicSchema = {
                 }
             ],
             title: 'Snoozed Until'
+        },
+        last_level: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Level'
+        },
+        reminders_exhausted: {
+            type: 'boolean',
+            title: 'Reminders Exhausted',
+            default: false
         }
     },
     type: 'object',
@@ -1406,6 +1501,13 @@ export const NudgeSweepResultSchema = {
             type: 'integer',
             title: 'Nudges Sent'
         },
+        nudges_by_level: {
+            additionalProperties: {
+                type: 'integer'
+            },
+            type: 'object',
+            title: 'Nudges By Level'
+        },
         suppressed_quiet_hours: {
             type: 'integer',
             title: 'Suppressed Quiet Hours'
@@ -1422,6 +1524,11 @@ export const NudgeSweepResultSchema = {
             type: 'integer',
             title: 'Suppressed Cooldown'
         },
+        suppressed_exhausted: {
+            type: 'integer',
+            title: 'Suppressed Exhausted',
+            default: 0
+        },
         deliveries: {
             additionalProperties: {
                 type: 'integer'
@@ -1433,7 +1540,10 @@ export const NudgeSweepResultSchema = {
     type: 'object',
     required: ['relationships_examined', 'nudges_sent', 'suppressed_quiet_hours', 'suppressed_snoozed', 'suppressed_muted', 'suppressed_cooldown', 'deliveries'],
     title: 'NudgeSweepResult',
-    description: "What one sweep did — the cron endpoint's response body."
+    description: `What one sweep did — the cron endpoint's response body, and the only
+view an operator gets of a system whose success looks like silence.
+\`nudges_by_level\` is what makes Escalation Efficacy (PRD §Validation)
+measurable at all: how much of the ladder people actually needed.`
 } as const;
 
 export const PairwiseBalanceItemSchema = {

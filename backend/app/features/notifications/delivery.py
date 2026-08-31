@@ -39,6 +39,17 @@ class DeliveryOutcome:
     detail: str | None = None
 
 
+# How long to wait on ONE push endpoint. The sweep is a background job with
+# nobody watching, so it can be patient.
+PUSH_TIMEOUT_SECONDS = 10.0
+# The budget when delivery happens inside a request the user is waiting on —
+# WS13's "cleared without asking" fires from settlement confirmation. A push
+# service that hasn't answered in three seconds is not about to make the
+# moment better, and the notification is recorded as FAILED rather than
+# holding up the settlement that caused it.
+PUSH_TIMEOUT_INLINE_SECONDS = 3.0
+
+
 def push_available() -> bool:
     """Whether this deployment can send web push at all."""
     return bool(settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY)
@@ -52,6 +63,8 @@ def deliver(
     title: str,
     body: str,
     group_id: uuid.UUID,
+    suppress_push: bool = False,
+    push_timeout: float = PUSH_TIMEOUT_SECONDS,
 ) -> list[DeliveryOutcome]:
     """
     Deliver one notification across the recipient's enabled channels.
@@ -61,13 +74,36 @@ def deliver(
     nagging the product promises not to do. Email still fires when push is
     unavailable, unsubscribed, denied, or failed — which is also the iOS
     story, where push needs an installed PWA.
+
+    `suppress_push` skips the buzzing channel for THIS message only, without
+    touching the stored preference. WS13's "cleared without asking" uses it
+    during quiet hours: that message can't be deferred to a later sweep the
+    way a nudge can, so instead of dropping it or overriding the user's
+    preference it changes channel and lands in the morning's inbox.
+
+    `push_timeout` is per endpoint. The sweep can afford to wait; anything
+    delivering from inside a user's own request cannot, and passes a
+    smaller number (see PUSH_TIMEOUT_INLINE_SECONDS).
     """
     outcomes: list[DeliveryOutcome] = []
 
     pushed = False
-    if prefs.push_enabled:
+    if suppress_push:
+        outcomes.append(
+            DeliveryOutcome(
+                NotificationChannel.PUSH,
+                NotificationStatus.SKIPPED,
+                "quiet hours",
+            )
+        )
+    elif prefs.push_enabled:
         push_outcome = _deliver_push(
-            session, user_id=user_id, title=title, body=body, group_id=group_id
+            session,
+            user_id=user_id,
+            title=title,
+            body=body,
+            group_id=group_id,
+            timeout=push_timeout,
         )
         outcomes.append(push_outcome)
         pushed = push_outcome.status == NotificationStatus.SENT
@@ -135,6 +171,7 @@ def _deliver_push(
     title: str,
     body: str,
     group_id: uuid.UUID,
+    timeout: float = PUSH_TIMEOUT_SECONDS,
 ) -> DeliveryOutcome:
     if not push_available():
         return DeliveryOutcome(
@@ -190,7 +227,7 @@ def _deliver_push(
                 data=payload,
                 vapid_private_key=_vapid_private_key(),
                 vapid_claims={"sub": settings.VAPID_SUBJECT},
-                timeout=10,
+                timeout=timeout,
             )
             sub.last_used_at = datetime.now(timezone.utc)
             session.add(sub)

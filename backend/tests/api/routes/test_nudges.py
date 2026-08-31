@@ -397,7 +397,15 @@ def test_quiet_hours_defer_without_consuming_the_nudge(
     )
     _age_expenses(db, group["id"], hours=48)
 
-    now = datetime(2026, 8, 25, 23, 30, tzinfo=timezone.utc)  # inside 22→08
+    # Anchored to TODAY, not to a hardcoded date. `_age_expenses` backdates
+    # from the real clock, so a fixed `now` silently drifts out from under
+    # the aged data: written on 2026-08-25 this read as a 48h-old debt, and
+    # by 2026-08-31 the same line described a debt confirmed four days in
+    # the injected future, which the sweep skipped as too young — the test
+    # went green-to-red on a calendar page, testing nothing in between.
+    now = datetime.now(timezone.utc).replace(
+        hour=23, minute=30, second=0, microsecond=0
+    )  # inside 22→08
     result = nudge_service.run_nudge_sweep(
         db, now=now, group_id=uuid.UUID(group["id"])
     )
@@ -415,7 +423,7 @@ def test_quiet_hours_defer_without_consuming_the_nudge(
     assert state.last_nudged_at is None
 
     # Same debt, mid-morning: it goes out.
-    later = datetime(2026, 8, 26, 10, 0, tzinfo=timezone.utc)
+    later = (now + timedelta(days=1)).replace(hour=10, minute=0)
     nudge_service.run_nudge_sweep(db, now=later, group_id=uuid.UUID(group["id"]))
     db.commit()
     assert len(_notifications_for(db, member_id)) >= 1

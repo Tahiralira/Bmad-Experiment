@@ -7,12 +7,14 @@
 # GOAL: Save tokens by not re-debugging known issues
 #
 # Created: 2026-01-12
-# Last Updated: 2026-08-25 (WS11: FE-011 SW vs Browser pane; TEST-007 shared-account
-#               e2e isolation; TEST-008 e2e vs the auth rate limit)
+# Last Updated: 2026-08-31 (WS13: DOCKER-009 cp nesting silently keeps stale code;
+#               TEST-010 hardcoded now vs relative fixtures; TEST-011 Playwright
+#               reuses the BUILT frontend image; TEST-012 fullyParallel e2e tests
+#               fighting over one shared account)
 
 metadata:
   version: "1.0"
-  total_patterns: 40
+  total_patterns: 44
   categories:
     - docker
     - database
@@ -941,6 +943,96 @@ git:
     stories_encountered: ["WS12"]
     tokens_saved_estimate: "~700 per occurrence"
 
+  - id: "DOCKER-009"
+    title: "docker compose cp NESTS instead of overwriting when the target directory exists"
+    symptoms:
+      - "Code changes have no effect in the container even though cp reported Copied"
+      - "alembic check says 'No new upgrade operations detected' for a model field you just added"
+      - "A new migration file is invisible to `alembic heads`"
+    root_cause: |
+      `docker compose cp backend/app backend:/app/app` behaves like `cp -r`:
+      when /app/app already exists it creates /app/app/**app**, leaving the
+      real source untouched. Every subsequent check then runs against stale
+      code and passes, which is worse than failing.
+    solution: |
+      Always copy the CONTENTS with a trailing /. :
+        docker compose cp backend/app/. backend:/app/app
+        docker compose cp backend/tests/. backend:/app/tests
+      To clean up an existing nesting:
+        docker compose exec -u root backend rm -rf /app/app/app
+    prevention: |
+      After any cp meant to update code, prove it landed before trusting a
+      green result — e.g. `docker compose exec backend ls -d /app/app/app`
+      (should not exist), or grep the container for a string you just added.
+      A gate that passes against stale code is the expensive failure here.
+    stories_encountered: ["WS13"]
+    tokens_saved_estimate: "~1200 per occurrence"
+
+  - id: "TEST-010"
+    title: "A hardcoded `now` tested against relatively-backdated data rots into a false pass"
+    symptoms:
+      - "A time-sensitive test passes for days, then fails with no code change"
+      - "A sweep reports relationships_examined > 0 but every suppressor counter is 0"
+    root_cause: |
+      Helpers backdate fixtures from the REAL clock (`datetime.now() -
+      timedelta(hours=48)`) while the test injects a FIXED instant
+      (`datetime(2026, 8, 25, ...)`). On the day it is written the two agree.
+      As the calendar moves, the injected `now` drifts into the past relative
+      to the backdated row, the record reads as negative-age, and the code
+      under test skips it before reaching the branch being asserted.
+    solution: |
+      Anchor injected time to the same clock the fixtures use, then shift only
+      the part that matters:
+        now = datetime.now(timezone.utc).replace(hour=23, minute=30, ...)
+        later = (now + timedelta(days=1)).replace(hour=10, minute=0)
+      Pure functions of an hour (e.g. is_within_quiet_hours) can keep a fixed
+      date — they never touch backdated rows.
+    prevention: "Grep for `datetime(20` in tests whenever a time-based test starts failing without a code change; and never mix a fixed `now` with a relative fixture"
+    stories_encountered: ["WS13"]
+    tokens_saved_estimate: "~900 per occurrence"
+
+  - id: "TEST-011"
+    title: "Playwright reuses the BUILT frontend container, so visual proof photographs stale UI"
+    symptoms:
+      - "A screenshot spec passes and writes files, but the new UI is absent from every image"
+      - "Screenshots of different states come out byte-identical in size"
+    root_cause: |
+      The compose `frontend` service publishes 5173 -> container port 80: it
+      serves the built production image, not a dev server. Playwright's
+      `webServer` has `reuseExistingServer: true`, so it attaches to that
+      container and never runs `npm run dev`. Frontend source changes are
+      invisible until the image is rebuilt.
+    solution: |
+      docker compose build frontend && docker compose up -d frontend
+      then re-run: npx playwright test --project=visual
+    prevention: |
+      Make pixel specs assert something falsifiable — that the new text is
+      visible, and that document.body.scrollWidth <= viewport width. A spec
+      that only captures images cannot tell you it captured the wrong build.
+    stories_encountered: ["WS13"]
+    tokens_saved_estimate: "~1000 per occurrence"
+
+  - id: "TEST-012"
+    title: "fullyParallel e2e tests sharing one account fight over global settings"
+    symptoms:
+      - "One journey fails roughly 1 run in 3, passes in isolation, and is always green in CI"
+      - "locator.click timeout on a control that is enabled when you look at it"
+    root_cause: |
+      `fullyParallel: true` runs tests from the SAME file concurrently, and
+      they all share auth.setup's single storageState. Any test that changes
+      an account-level setting changes it underneath its siblings — WS12's
+      kill-switch test disables the fieldset the quiet-hours test is clicking.
+      CI sets `workers: 1`, so CI never reproduces it.
+    solution: |
+      For a describe whose tests are ABOUT one account's shared settings:
+        test.describe.configure({ mode: "serial" })
+      Separately, lock the row on the server for read-modify-write updates
+      (`select(...).with_for_update()`) — the same race is a real lost update
+      between two of a user's devices, not only a test artifact.
+    prevention: "Before giving each test its own user, ask whether the shared resource IS the subject; if so serialize, because isolating it would delete the coverage"
+    stories_encountered: ["WS13"]
+    tokens_saved_estimate: "~1100 per occurrence"
+
 # =============================================================================
 # QUICK REFERENCE (Most Common Issues)
 # =============================================================================
@@ -969,6 +1061,22 @@ quick_reference:
   - trigger: "File changes not visible in Docker"
     pattern_id: "DOCKER-003"
     quick_fix: "docker compose cp local/path container:/path"
+
+  - trigger: "cp reported Copied but the container still runs old code"
+    pattern_id: "DOCKER-009"
+    quick_fix: "Copy CONTENTS: docker compose cp backend/app/. backend:/app/app (a bare dir nests into /app/app/app)"
+
+  - trigger: "Time-based test starts failing with no code change"
+    pattern_id: "TEST-010"
+    quick_fix: "A hardcoded datetime(20XX,...) is being compared to relatively-backdated fixtures — anchor now to datetime.now()"
+
+  - trigger: "Screenshot spec passes but the new UI is missing from the images"
+    pattern_id: "TEST-011"
+    quick_fix: "docker compose build frontend — :5173 serves the BUILT image, and Playwright reuses it"
+
+  - trigger: "One e2e journey flakes ~1 in 3 locally but is green in CI"
+    pattern_id: "TEST-012"
+    quick_fix: "fullyParallel + shared account; add test.describe.configure({ mode: 'serial' })"
 
   - trigger: "React is declared but its value is never read"
     pattern_id: "FE-003"

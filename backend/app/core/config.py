@@ -136,7 +136,7 @@ class Settings(BaseSettings):
     # hold the SSE connection open indefinitely (B-H8).
     AI_PARSE_TIMEOUT_SECONDS: int = 30
 
-    # === Nudge engine (WS12 — Progressive Urgency, Level 1) ===
+    # === Nudge engine (WS12 Level 1; WS13 Level 2 — Progressive Urgency) ===
     # Hours a debt must sit unsettled before its FIRST gentle reminder.
     # Epic 6.2 says 24h: long enough that the reminder is never the second
     # thing you see after agreeing to a split.
@@ -145,6 +145,22 @@ class Settings(BaseSettings):
     # ages continuously, so without a floor the sweep would re-nudge on
     # every run — this, not the sweep interval, is what makes the cadence.
     NUDGE_COOLDOWN_HOURS: int = 72
+    # Hours before a debt earns the Level 2 CONTEXTUAL nudge. Epic 6.3 and
+    # the PRD's Journey 2 both say day 3, so 72h.
+    NUDGE_LEVEL_2_AFTER_HOURS: int = 72
+    # Level 2's own cooldown. Shorter than Level 1's 72h because that IS
+    # the "frequency progression" half of Progressive Urgency — an older
+    # debt is heard from more often. Kept at 48h rather than daily: the
+    # escalation is meant to be felt, not to become the nagging the product
+    # exists to remove.
+    NUDGE_LEVEL_2_COOLDOWN_HOURS: int = 48
+    # After this many Level 2 reminders about one relationship the engine
+    # goes QUIET on it. There is no Level 3 (social pressure is cut), so
+    # without a stop the ladder's top rung would repeat forever and the
+    # agent would become the nag. Silence is the honest end of the ladder;
+    # the debt stays visible in-app, and any new expense in the
+    # relationship starts the ladder over.
+    NUDGE_LEVEL_2_MAX_REMINDERS: int = 4
     # Debts below this are not worth a notification in any currency. The
     # amount is compared raw, not FX-converted: a "who owes whom" app that
     # guesses at exchange rates to decide whether to interrupt someone has

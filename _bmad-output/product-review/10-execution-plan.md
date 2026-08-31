@@ -1162,21 +1162,104 @@ this file breaks that merge into runnable units.
       session. §6.6a's dry-run is the owner's one-click equivalent.
       Status: DONE
 
-- [ ] **WS13 — Nudge Engine: Level 2 + Beta Launch** (≈1 week)
+- [x] **WS13 — Nudge Engine: Level 2 + Beta Launch** (≈1 week) — **CODE DONE**
+      2026-08-31; **BETA NOT LAUNCHED** (owner action, see the last task)
       Goal: progressive urgency ships; beta goes live.
       Depends on: WS12; all Phase 2 sessions done.
+      Branch: `ws13/nudge-level-2`.
       Tasks:
-      - [ ] Level 2 escalation (frequency/tone progression per the social contract);
+      - [x] Level 2 escalation (frequency/tone progression per the social contract);
             Level 3 remains cut
-      - [ ] "Cleared without asking" success notification (the brand promise made
+            → **tone**: Level 2 retells the same debt from the CREDITOR's side
+            plus its age ("… covered this 4 days ago and is still out of
+            pocket"). It deliberately says nothing about what other members
+            have done — that is Level 3 by another name, and a test
+            (`test_level_2_never_mentions_anyone_else`) guards the copy, not
+            just the behaviour. **frequency**: the cooldown narrows from 72h
+            to 48h once a relationship reaches Level 2.
+            Two decisions beyond the story AC: (a) Level 2 requires a Level 1
+            to have actually been SENT — a five-day-old debt the engine has
+            never mentioned still opens gently, because escalation is a
+            property of the conversation, not the calendar; (b) **the ladder
+            ends** — with Level 3 cut there is no rung above Level 2, so the
+            engine goes quiet after `NUDGE_LEVEL_2_MAX_REMINDERS` (4) rather
+            than repeating its firmest message forever, and says so in
+            Settings ("no more reminders"). New column
+            `nudge_state.level_2_count`, migration `d4e5f6a7b8c9`.
+      - [x] "Cleared without asking" success notification (the brand promise made
             visible)
-      - [ ] Mute/block-rate telemetry wired to the PRD kill-switch dashboard
-      - [ ] WS load/scheduler sanity check on staging (NFR honesty — declare real
-            numbers, not aspirations)
-      - [ ] Beta checklist: seed 5–10 real groups, weekly metric review cadence
+            → sent to the CREDITOR, **inline from settlement confirmation**
+            (owner decision) rather than from the sweep, because the value of
+            this one is its timing. Refused wherever the sentence would be
+            false: no nudge was ever sent (the creditor may have asked in
+            person), the debt is only partly paid, or it already went out.
+            Covers auto-confirmed settlements too — a creditor who never even
+            responded is the purest case. Runs in a SAVEPOINT and never
+            raises: a broken push service cannot fail somebody's settlement
+            (`test_a_broken_notification_cannot_break_a_settlement`). Push is
+            capped at 3s inline vs 10s in the sweep. During quiet hours it
+            changes channel to email rather than dropping the message or
+            buzzing someone at 3am.
+      - [x] Mute/block-rate telemetry wired to the PRD kill-switch dashboard
+            → the numerator shipped in WS12 (`nudge.notification.muted`). The
+            missing half was the DENOMINATOR, which PostHog structurally
+            cannot hold: sends happen server-side, so no browser ever
+            witnesses one. `GET /notifications/internal/nudge-metrics` (same
+            cron-secret guard as the sweep) returns mute rate over people
+            actually REACHED, plus sends by level/channel, debts cleared after
+            a nudge, and relationships the ladder exhausted. `mute_rate` is
+            **null, not 0.0**, before anyone has been nudged — "nobody minds"
+            and "nobody has been asked yet" must not look identical on the one
+            number the PRD would halt the product on.
+      - [x] ~~WS load/scheduler sanity check on staging~~ (NFR honesty — declare real
+            numbers, not aspirations) — **measured LOCALLY; staging does not
+            exist** (WS9.5 owner actions still outstanding, same as in WS12).
+            `backend/scripts/nudge_benchmark.py`, re-runnable. Beta scale (149
+            relationships): sweep **102 ms** dry / **230 ms** writing. Stress
+            (3,049): **2.9 s** dry / **6.0 s** writing — comfortably inside the
+            cron's 180 s budget. Linear at ~2 ms/relationship, dominated by one
+            `nudge_state` lookup per relationship (an N+1; logged as debt, does
+            not block the beta). "WS" in the original task meant WebSockets:
+            **NFR7 (1k concurrent WebSockets) and NFR1 (200 ms real-time) are
+            UNVALIDATED AND UNMET** — there are no WebSockets, descoped in WS12.
+            Stated plainly in beta-launch.md rather than left as an aspiration.
+      - [x] Beta checklist: seed 5–10 real groups, weekly metric review cadence
             (activation, settlement velocity, mute rate), feedback channel
-      - [ ] **→ LAUNCH PRIVATE BETA**
-      Status: pending
+            → **`beta-launch.md`** (linked from README): pre-flight gates, the
+            expectations text to send with every invite, how to onboard real
+            groups through the product's own invite flow (**no seeding rows
+            into production**), the 30-minute weekly review with a mute-rate
+            reading table, feedback-channel choice, and **kill criteria
+            written down before the data arrives** (>25% mute rate sustained
+            over two reviews = stop and rethink, do not tune the copy and
+            carry on).
+      - [ ] **→ LAUNCH PRIVATE BETA** — **BLOCKED, owner action.** Nothing is
+            deployed: WS9.5's Neon/Render/Vercel/domain/Google-login steps have
+            never been performed, so there is no system to invite anyone to.
+            deployment.md §0–§7 first, then beta-launch.md §1.
+      Verification: backend **355 passed / 0 skipped** (+18), `alembic check`
+      clean (migration `d4e5f6a7b8c9`); frontend typecheck green, **149
+      passed** (+6), build green, main chunk **176.15 kB gz** (≤250);
+      e2e **15/15 Playwright journeys, green on 8 consecutive parallel runs**.
+      Visual proof (DoD v2 #2) → `_bmad-output/implementation-artifacts/
+      ws13-screenshots/` — 16 shots, both themes × 375/1280, of all four
+      ladder states.
+      **Found by running it — three things no gate would have caught:**
+      (a) the first screenshot run PASSED while photographing **stale pre-WS13
+      UI** — compose serves the *built* frontend image on :5173 and Playwright
+      reuses it, so the spec now asserts each status line is visible and that
+      `document.body.scrollWidth <= 375`, turning a pixel dump into a real
+      guard; (b) WS12's `test_quiet_hours_defer_without_consuming_the_nudge`
+      had a hardcoded `2026-08-25` tested against relatively-backdated data —
+      green on the day it was written, red six days later, testing nothing in
+      between (now anchored to today); (c) the WS12 notification journeys
+      flaked ~1 run in 3 under `fullyParallel` — three tests sharing one
+      account, where the kill-switch test disables the fieldset the
+      quiet-hours test is clicking. CI never saw it (`workers: 1`). Fixed by
+      making that describe serial, and separately by locking the preferences
+      row on write (`with_for_update`) — a genuine lost update where two
+      devices changing different settings would clobber each other.
+      Status: CODE DONE; beta launch pending the owner's deploy
 
 ### PHASE 4 — Post-Beta (sequence by beta data; do not pre-build)
 

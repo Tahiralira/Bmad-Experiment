@@ -1244,6 +1244,14 @@ def _confirm_per_expense_claim(
     _settle_expense_after_covered_splits(session, expense)
     session.flush()
 
+    _announce_if_debt_cleared(
+        session,
+        group_id=expense.group_id,
+        debtor_id=split.user_id,
+        creditor_id=expense.payer_id,
+        amount=claim.amount,
+    )
+
 
 def _get_aggregate_covered_rows(
     session: Session, claim_id: uuid.UUID, *, lock: bool = False
@@ -1325,6 +1333,55 @@ def _confirm_aggregate_claim(
         _settle_expense_after_covered_splits(session, expense)
 
     session.flush()
+
+    if claim.group_id and claim.counterparty_user_id:
+        _announce_if_debt_cleared(
+            session,
+            group_id=claim.group_id,
+            debtor_id=claim.claimant_user_id,
+            creditor_id=claim.counterparty_user_id,
+            amount=claim.amount,
+        )
+
+
+def _announce_if_debt_cleared(
+    session: Session,
+    *,
+    group_id: uuid.UUID,
+    debtor_id: uuid.UUID,
+    creditor_id: uuid.UUID,
+    amount: Decimal,
+) -> None:
+    """
+    Tell the creditor their dues cleared, if the nudge engine had been doing
+    the asking on their behalf (WS13 — 02 §7, wow moment #2).
+
+    Placed on the two `_confirm_*_claim` helpers rather than on
+    `confirm_settlement_claim`, so it covers AUTO-confirmation as well as the
+    manual kind. That is not an edge case worth skipping — a claim that
+    auto-confirms is one whose creditor never even had to respond, which is
+    the purest form of the sentence this notification gets to say.
+
+    Cost on the request path is bounded: a cleared debt happens once per
+    relationship, delivery is capped at PUSH_TIMEOUT_INLINE_SECONDS per
+    endpoint, and `notify_debt_cleared` runs in a SAVEPOINT and never raises
+    — a broken push service cannot fail somebody's settlement.
+
+    Imported inside the function: `notifications.service` imports this
+    module's models, so a module-level import here would close the cycle.
+    """
+    from app.features.groups.service import get_group_currency
+    from app.features.notifications.service import notify_debt_cleared
+
+    currency = get_group_currency(session, group_id)
+    notify_debt_cleared(
+        session,
+        group_id=group_id,
+        debtor_id=debtor_id,
+        creditor_id=creditor_id,
+        amount=amount,
+        currency=currency,
+    )
 
 
 def confirm_settlement_claim(

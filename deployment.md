@@ -305,12 +305,28 @@ No redeploy of code is needed — the delivery path is already there and
 switches on when the values appear. This is also what finally turns on
 magic-link sign-in (§5's deferred item).
 
+### d. Reading the kill switch (WS13)
+
+The same `NUDGE_CRON_SECRET` also opens a read-only metrics endpoint. It
+exists because the PRD's stop signal — mute rate — cannot be computed in
+PostHog: the browser fires `nudge.notification.muted` (the numerator), but
+sends happen server-side in the sweep, so no browser ever witnesses one.
+
+```bash
+curl -s -H "X-Nudge-Secret: $NUDGE_CRON_SECRET"   "https://api.cleardues.site/api/v1/notifications/internal/nudge-metrics?window_days=7" | jq
+```
+
+`mute_rate` is muted people ÷ people actually **reached**, and is `null`
+rather than `0.0` before anyone has been nudged — "nobody minds" and "nobody
+has been asked yet" must not look the same on the one number you would halt
+the product on. How to read the rest of it: [beta-launch.md §4](./beta-launch.md).
+
 ### Turning it all off
 
-Unset `NUDGE_CRON_SECRET` on Render. The endpoint 404s immediately and the
-scheduler workflow becomes a no-op that logs a warning. Nothing is deleted
-and no user preference changes — flipping it back on resumes exactly where
-it left off.
+Unset `NUDGE_CRON_SECRET` on Render. The endpoint 404s immediately, the
+scheduler workflow becomes a no-op that logs a warning, and the metrics
+endpoint 404s with it. Nothing is deleted and no user preference changes —
+flipping it back on resumes exactly where it left off.
 
 ## §7 Verify the whole thing
 
@@ -329,6 +345,14 @@ it left off.
       `relationships_examined`. Then, with push configured (§6.6b), grant
       notification permission on a real device, leave a balance for a day,
       and confirm exactly ONE reminder arrives — not one per expense.
+- [ ] WS13 escalation proof: leave that same balance unsettled for three more
+      days. The SECOND reminder must read differently from the first (it is
+      written from the creditor's side — "… covered this 4 days ago and is
+      still out of pocket"). Then settle it: the creditor gets a "settled up
+      — you never had to ask" notification, and only if a nudge really went
+      out first.
+- [ ] WS13 metrics proof (§6.6d): the curl returns JSON with `mute_rate`
+      (`null` until someone has been reached) and `sends_by_level`.
 - [ ] Free uptime monitor (uptimerobot.com) pinging the health-check URL and
       `https://cleardues.site` — the monitor, not you, should be the first to
       know it's down. (Bonus: pinging keeps the Render instance warm.)
