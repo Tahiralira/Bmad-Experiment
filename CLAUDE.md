@@ -182,6 +182,7 @@ naming, or personal preferences unless they cause bugs or maintenance burden.
 | Screenshot spec passes but the new UI isn't in the images | :5173 serves the BUILT frontend image and Playwright reuses it — `docker compose build frontend` first (TEST-011) |
 | Time-based test fails with no code change | A hardcoded `datetime(20XX,…)` compared against relatively-backdated fixtures (TEST-010) |
 | New test fails against clearly-correct app code | Container runs stale image — only `tests/` is volume-mounted; `docker compose build backend` (DOCKER-006) |
+| Scheduled workflow green but nothing happened | Secrets unset → graceful exit 0; read the run's step summary, never trust the checkmark (OPS-001) |
 
 **Full solutions:** `_bmad-output/implementation-artifacts/solution-patterns.yaml`
 

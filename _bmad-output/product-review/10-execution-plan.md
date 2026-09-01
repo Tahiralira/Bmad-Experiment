@@ -1157,9 +1157,11 @@ this file breaks that merge into runnable units.
       e2e: **15/15 Playwright journeys** (the WS11 twelve, unchanged, plus 3
       new notification-settings journeys proving the controls are reachable
       and the off switch persists) — green on two consecutive full runs.
-      Not on staging: the deploy is still unperformed (WS9.5 owner actions
-      outstanding), so "on staging" could not be satisfied by anyone this
-      session. §6.6a's dry-run is the owner's one-click equivalent.
+      Not on staging: this session believed the deploy was unperformed
+      [CORRECTION 2026-09-01: the stack had in fact been live since
+      2026-08-05 — deployment.md "Status" table — running this session's
+      code via auto-deploy; the note was stale, though nothing was verified
+      against it]. §6.6a's dry-run is the owner's one-click equivalent.
       Status: DONE
 
 - [x] **WS13 — Nudge Engine: Level 2 + Beta Launch** (≈1 week) — **CODE DONE**
@@ -1212,8 +1214,10 @@ this file breaks that merge into runnable units.
             and "nobody has been asked yet" must not look identical on the one
             number the PRD would halt the product on.
       - [x] ~~WS load/scheduler sanity check on staging~~ (NFR honesty — declare real
-            numbers, not aspirations) — **measured LOCALLY; staging does not
-            exist** (WS9.5 owner actions still outstanding, same as in WS12).
+            numbers, not aspirations) — **measured LOCALLY** [CORRECTION
+            2026-09-01: "staging does not exist" was stale — prod was live
+            since 2026-08-05; the benchmark still never ran against it, so
+            the numbers stand as a local floor].
             `backend/scripts/nudge_benchmark.py`, re-runnable. Beta scale (149
             relationships): sweep **102 ms** dry / **230 ms** writing. Stress
             (3,049): **2.9 s** dry / **6.0 s** writing — comfortably inside the
@@ -1233,10 +1237,17 @@ this file breaks that merge into runnable units.
             written down before the data arrives** (>25% mute rate sustained
             over two reviews = stop and rethink, do not tune the copy and
             carry on).
-      - [ ] **→ LAUNCH PRIVATE BETA** — **BLOCKED, owner action.** Nothing is
-            deployed: WS9.5's Neon/Render/Vercel/domain/Google-login steps have
-            never been performed, so there is no system to invite anyone to.
-            deployment.md §0–§7 first, then beta-launch.md §1.
+      - [ ] **→ LAUNCH PRIVATE BETA** — **owner action.** [CORRECTED
+            2026-09-01: this task originally claimed nothing was deployed;
+            in fact deployment.md §0–§7 were done 2026-08-05 and the live
+            API auto-deploys from `main`, so it already runs WS13 code.]
+            Remaining before invites: deployment.md §6.5 (PostHog/Sentry
+            keys) + §6.6 (nudge config — sweep secrets, VAPID keypair,
+            SMTP; ALL currently unset, so the hourly sweep cron runs green
+            as a no-op and push is off), verify `GEMINI_API_KEY` on Render,
+            then beta-launch.md §1 → §6 (its cron gate now requires a
+            non-empty sweep report in the run's step summary, not just a
+            green run).
       Verification: backend **355 passed / 0 skipped** (+18), `alembic check`
       clean (migration `d4e5f6a7b8c9`); frontend typecheck green, **149
       passed** (+6), build green, main chunk **176.15 kB gz** (≤250);
@@ -1259,7 +1270,9 @@ this file breaks that merge into runnable units.
       making that describe serial, and separately by locking the preferences
       row on write (`with_for_update`) — a genuine lost update where two
       devices changing different settings would clobber each other.
-      Status: CODE DONE; beta launch pending the owner's deploy
+      Status: CODE DONE; beta launch pending owner CONFIG (§6.5/§6.6 +
+      GEMINI_API_KEY check) and invites — the deploy itself is already live
+      (corrected 2026-09-01)
 
 ### PHASE 4 — Post-Beta (sequence by beta data; do not pre-build)
 

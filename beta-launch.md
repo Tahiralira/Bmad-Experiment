@@ -1,14 +1,21 @@
 # Private Beta Runbook (WS13)
 
-**Status: NOT LAUNCHED.** Every gate below is either done in code or waiting
-on an owner action; nothing here has been performed against a live system,
-because as of 2026-08-31 **nothing is deployed** — the WS9.5 owner actions
-(Neon, Render, Vercel, domain, Google login) are still outstanding. This
-file is the checklist that turns a deployed app into a running beta, plus
-the honest numbers behind the claims it makes.
+**Status: NOT LAUNCHED — but the stack IS deployed.** Corrected 2026-09-01:
+this file previously said "nothing is deployed"; that was stale. Production
+(Neon + Render + Vercel + cleardues.site + Google login) has been live since
+2026-08-05 — see deployment.md "Status — what is already live" — and
+auto-deploys from `main`, so the live API runs WS13 code. What is still OFF
+is everything §1 gates on: observability keys (§6.5) and the entire nudge
+engine (§6.6) — the live API returns `{"key": null}` for the VAPID public
+key, SMTP is unset, and the sweep cron's GitHub secrets are empty, so the
+hourly "green" sweep runs are no-ops. This file is the checklist that turns
+the deployed app into a running beta, plus the honest numbers behind the
+claims it makes.
 
-Written for one person doing this alone in an evening. It assumes
-[deployment.md](./deployment.md) §0–§7 are complete.
+Written for one person doing this alone in an evening. deployment.md §0–§7
+are complete except §6.5/§6.6 (and verify `GEMINI_API_KEY` is actually set
+on Render — §2 said to leave it blank at first, and blank means AI parse
+returns 503 to real users).
 
 ---
 
@@ -31,11 +38,17 @@ produce more of the same finding, later.
 
 - [ ] deployment.md §7 fully green, including the **§6.6a dry-run sweep** and
       a real device receiving exactly ONE reminder for a multi-expense debt.
-- [ ] `NUDGE_CRON_SECRET` set on Render **and** in GitHub Actions secrets,
-      and the "Nudge sweep" workflow has run green from `main` at least once
-      on its own schedule (not just via Run workflow). Scheduled workflows
-      only fire from the default branch — if WS13 is still on a branch, the
-      cron is not running.
+- [ ] `NUDGE_CRON_SECRET` set on Render **and** in GitHub Actions secrets
+      (together with `API_BASE_URL`), and the "Nudge sweep" workflow has run
+      from `main` at least once on its own schedule (not just via Run
+      workflow) **with a non-empty JSON sweep report in the run's step
+      summary**. A green checkmark alone proves nothing: with the secrets
+      unset the workflow prints "nothing to do" and exits 0 — verified
+      2026-09-01, every scheduled run to date has been exactly this no-op.
+      Open the run, read the "Nudge sweep" summary block, and confirm it
+      shows real counts (even `{"nudges_sent": 0, ...}` with suppressor
+      detail counts as a report; a missing block does not). Scheduled
+      workflows only fire from the default branch.
 - [ ] VAPID keypair configured (§6.6b). Without it push is off, every nudge
       falls back to email, and the headline feature is being tested in its
       degraded mode.
@@ -171,10 +184,12 @@ re-runnable at any time:
 docker compose exec backend python scripts/nudge_benchmark.py --groups 200 --members 6
 ```
 
-**Environment: local Docker Postgres on a developer laptop, 2026-08-31.
-NOT staging** — there is no staging, so this is the most honest measurement
-available, and it is a floor rather than a promise. Neon's free tier and
-Render's shared CPU will both be slower.
+**Environment: local Docker Postgres on a developer laptop, 2026-08-31 —
+NOT the deployed stack.** (This section originally said "there is no
+staging"; corrected 2026-09-01 — production was in fact live when this was
+measured, but the benchmark was never run against it, so the numbers stand
+as a local floor rather than a promise. Neon's free tier and Render's
+shared CPU will both be slower.)
 
 Every seeded user has both delivery channels switched off, so these are the
 **engine's** costs — query, netting, suppressor checks, writes — with no

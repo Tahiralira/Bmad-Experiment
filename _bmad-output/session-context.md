@@ -1,11 +1,27 @@
 # Session Context - ClearDues Project
 
-**Last Updated:** 2026-08-31 (WS13 code done — Nudge Engine: Level 2 + beta
-prep. Progressive Urgency is complete and FINITE: Level 1 → Level 2 → silence,
-because Level 3 is cut and a repeating top rung is just nagging. The
+**Last Updated:** 2026-09-01 (deploy-state correction, see the DEPLOY STATE
+block below. Prior update 2026-08-31: WS13 code done — Nudge Engine: Level 2
++ beta prep. Progressive Urgency is complete and FINITE: Level 1 → Level 2 →
+silence, because Level 3 is cut and a repeating top rung is just nagging. The
 "cleared without asking" notification ships, the PRD's kill-switch metric is
 finally computable, and the scheduler has measured numbers instead of
-aspirations. **The beta itself is NOT launched — nothing is deployed.**)
+aspirations. **The beta itself is NOT launched** — but the stack IS deployed;
+the earlier "nothing is deployed" claim here was stale.)
+
+> **DEPLOY STATE (verified 2026-09-01):** production is LIVE and has been
+> since **2026-08-05** — Neon + Render (`api.cleardues.site`, health-check
+> 200) + Vercel (`cleardues.site`) + Google login, auto-deploying from
+> `main`, so the live API runs WS13 code (its OpenAPI lists the nudge
+> endpoints). deployment.md "Status — what is already live" is the
+> authoritative table. The WS12/WS13 notes below saying "nothing is
+> deployed" / "staging does not exist" were stale when written; they are
+> annotated in place, not rewritten. What remains OFF in production:
+> §6.5 observability keys (PostHog/Sentry), §6.6 nudge config (VAPID
+> public key is `null` on the live API, SMTP unset, and the sweep cron's
+> `API_BASE_URL`/`NUDGE_CRON_SECRET` GitHub secrets are EMPTY — every
+> hourly "green" sweep run so far has been a no-op that exits 0), and
+> `GEMINI_API_KEY` on Render is unverified (blank = AI parse 503s).
 
 > **REPO LAYOUT (WS9.6, 2026-07-16):** the `cleardues/` wrapper folder is GONE —
 > `backend/`, `frontend/`, compose files, and deployment docs live at the repo
@@ -610,7 +626,9 @@ both post-beta.
 > and "nobody has been asked yet" must not look the same on the number the
 > PRD would halt the product on. Reading guide: beta-launch.md §4.
 > (e) **Real scheduler numbers** (`backend/scripts/nudge_benchmark.py`,
-> re-runnable). LOCAL, not staging — staging still does not exist. Beta scale
+> re-runnable). LOCAL — not run against the deployed stack [correction
+> 2026-09-01: prod WAS live despite this note's original "staging does not
+> exist" claim; the benchmark still never ran against it]. Beta scale
 > (149 relationships): 102 ms dry / 230 ms writing. Stress (3,049): 2.9 s /
 > 6.0 s, well inside the cron's 180 s budget. ~2 ms per relationship,
 > dominated by an N+1 `nudge_state` lookup (WS13-M1, does not block beta).
@@ -644,15 +662,19 @@ both post-beta.
 > row on write — the same race is a genuine lost update between two of a
 > user's own devices.
 >
-> **Next: LAUNCH THE PRIVATE BETA — this is now entirely OWNER ACTIONS, not
-> code.** Nothing is deployed, so there is no system to invite anyone to.
-> In order: deployment.md §0–§7 (Neon, Render, Vercel, domain, Google login,
-> backups), then §6.5 PostHog/Sentry keys, then §6.6 the nudge engine
-> (`NUDGE_CRON_SECRET` + `API_BASE_URL` as Actions secrets — nothing sends
-> without them, and **the cron only fires from `main`**, so WS13 must be
-> merged; a VAPID keypair; optionally SMTP, which also turns on magic-link
-> sign-in). Then beta-launch.md §1 → §6. Still open from earlier sessions:
-> PAT rotation, uptime monitor.**
+> **Next: LAUNCH THE PRIVATE BETA — entirely OWNER ACTIONS, not code.**
+> [CORRECTED 2026-09-01: this block originally opened with "Nothing is
+> deployed, so there is no system to invite anyone to" — false; deployment.md
+> §0–§7 were done 2026-08-05 and WS13 is merged and auto-deployed.] What
+> actually remains, in order: §6.5 PostHog/Sentry keys; §6.6 the nudge engine
+> (`NUDGE_CRON_SECRET` + `API_BASE_URL` as Actions secrets — the hourly sweep
+> currently runs GREEN as a NO-OP without them, so a green run proves
+> nothing; a VAPID keypair — currently `null` on the live API; SMTP, which
+> also turns on magic-link sign-in); verify `GEMINI_API_KEY` is set on Render
+> (blank = AI parse 503s for real users); then beta-launch.md §1 → §6 —
+> whose cron gate now requires a non-empty sweep report in the run's step
+> summary, not just a green checkmark. Still open from earlier sessions:
+> PAT rotation, uptime monitor, one restore rehearsed against Neon.**
 
 ---
 

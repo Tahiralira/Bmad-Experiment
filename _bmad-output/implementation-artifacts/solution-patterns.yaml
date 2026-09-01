@@ -14,7 +14,7 @@
 
 metadata:
   version: "1.0"
-  total_patterns: 44
+  total_patterns: 45
   categories:
     - docker
     - database
@@ -1033,6 +1033,29 @@ git:
     stories_encountered: ["WS13"]
     tokens_saved_estimate: "~1100 per occurrence"
 
+  - id: "OPS-001"
+    title: "Scheduled workflow shows green while doing nothing (secrets unset)"
+    symptoms:
+      - "A cron workflow (nudge sweep, backup) has a long streak of green runs, but the thing it triggers never happens"
+      - "A launch-checklist gate phrased as 'the workflow ran green' is satisfied while the feature is inert"
+    root_cause: |
+      Workflows that guard against missing config by exiting 0 ("nothing to
+      do") make the unconfigured state indistinguishable from success in the
+      Actions run list. nudge-sweep.yml did exactly this: with
+      API_BASE_URL/NUDGE_CRON_SECRET unset it printed a ::notice and exited
+      0, producing weeks of green no-op runs (found 2026-09-01) — and
+      beta-launch.md's §1 gate ("workflow has run green from main") was
+      satisfiable by them.
+    solution: |
+      Verify by the run's OUTPUT, not its checkmark: open the run and read
+      the step summary — the sweep cats the API's JSON response
+      (nudges_sent, deliveries) into $GITHUB_STEP_SUMMARY, and a no-op run
+      has no such block. beta-launch.md §1 now requires a non-empty sweep
+      report in the summary.
+    prevention: "Any checklist gate on a scheduled workflow must name an artifact of real work (summary JSON, uploaded artifact, side effect), never just a green run; graceful-degradation exits make green ambiguous by design"
+    stories_encountered: ["WS13"]
+    tokens_saved_estimate: "~800 per occurrence"
+
 # =============================================================================
 # QUICK REFERENCE (Most Common Issues)
 # =============================================================================
@@ -1081,6 +1104,10 @@ quick_reference:
   - trigger: "React is declared but its value is never read"
     pattern_id: "FE-003"
     quick_fix: "Remove unused 'import * as React from \"react\"' - only import specific hooks"
+
+  - trigger: "Scheduled workflow is green but the thing it triggers never happens"
+    pattern_id: "OPS-001"
+    quick_fix: "Secrets unset → graceful exit 0; read the run's step summary for real output, never trust the checkmark"
 
 # =============================================================================
 # HOW TO ADD NEW PATTERNS
