@@ -181,8 +181,14 @@ def test_partial_payment_is_not_a_clearing(client: TestClient, db: Session) -> N
     _confirmed_expense(
         client, owner_h, [owner_h, member_h], group["id"], amount="60.00"
     )
-    _age_expenses(db, group["id"], hours=settings.NUDGE_LEVEL_1_AFTER_HOURS + 1)
-    _sweep(db, group["id"], now=_noon_today())
+    # Age the debt against the sweep's clock (t0), not the wall clock — the
+    # sweep runs at noon, and backdating from real-now drops the debt under
+    # the 24h threshold after ~13:00 UTC, so no Level 1 fires (TEST-010).
+    t0 = _noon_today()
+    _age_expenses(
+        db, group["id"], hours=settings.NUDGE_LEVEL_1_AFTER_HOURS + 1, now=t0
+    )
+    _sweep(db, group["id"], now=t0)
 
     # Settle only the first expense — the second one's half is still owed.
     splits = client.get(

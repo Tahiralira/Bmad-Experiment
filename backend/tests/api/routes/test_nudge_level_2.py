@@ -118,9 +118,13 @@ def _climb_to_level_2(client: TestClient, db: Session, amount: str = "80.00"):
     """
     group, owner_h, member_h, owner_id, member_id = _two_member_group(client, db)
     _confirmed_expense(client, owner_h, [owner_h, member_h], group["id"], amount=amount)
-    _age_expenses(db, group["id"], hours=LEVEL_1_AGE + 1)
 
     t0 = _noon_today()
+    # Age the debt against the SWEEP's clock (t0), not the wall clock. The
+    # sweep runs at noon; backdating from real-now instead left the debt only
+    # ~(LEVEL_1_AGE + 1 - hours_past_noon) old at t0, so after ~13:00 UTC it
+    # slipped under the 24h Level-1 threshold and no nudge fired (TEST-010).
+    _age_expenses(db, group["id"], hours=LEVEL_1_AGE + 1, now=t0)
     first = _sweep(db, group["id"], now=t0)
     assert first.nudges_by_level == {"level_1": 1}
 
