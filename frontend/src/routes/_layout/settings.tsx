@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
+import { LogOut } from "lucide-react"
 
 import DeleteAccount from "@/components/UserSettings/DeleteAccount"
 import UserInformation from "@/components/UserSettings/UserInformation"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { NotificationSettings } from "@/features/notifications"
 import { PaymentMethodsManager } from "@/features/payments"
@@ -35,7 +37,7 @@ export const Route = createFileRoute("/_layout/settings")({
 })
 
 function UserSettings() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, logout } = useAuth()
   const finalTabs = tabsConfig
 
   if (!currentUser) {
@@ -44,11 +46,17 @@ function UserSettings() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-title font-semibold tracking-tight">User Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-title font-semibold tracking-tight">User Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your account settings and preferences
+          </p>
+        </div>
+        <Button variant="outline" onClick={logout} className="gap-2">
+          <LogOut aria-hidden="true" />
+          Log out
+        </Button>
       </div>
 
       <Tabs defaultValue="my-profile">

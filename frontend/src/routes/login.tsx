@@ -133,6 +133,12 @@ function Login() {
           onSubmit={form.handleSubmit(onSubmit)}
           className="flex flex-col gap-6"
         >
+          <img
+            src="/just-phones.PNG"
+            alt=""
+            aria-hidden="true"
+            className="mx-auto w-full max-w-[240px]"
+          />
           <div className="flex flex-col items-center gap-2 text-center">
             <h1 className="text-title font-semibold">Login to your account</h1>
             <p className="text-muted-foreground">
