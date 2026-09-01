@@ -120,13 +120,23 @@ def _two_member_group(
     return group, owner_headers, member_headers, owner_id, member_id
 
 
-def _age_expenses(db: Session, group_id: str, hours: int) -> None:
+def _age_expenses(
+    db: Session, group_id: str, hours: int, *, now: datetime | None = None
+) -> None:
     """
     Backdate a group's confirmed expenses so the debt is old enough to nudge.
     Faster and more honest than sleeping, and it exercises the same
     `confirmed_at`-based age arithmetic the engine uses in production.
+
+    `now` anchors the backdating to the clock the sweep will run at. When a
+    test hands the sweep an injected `now` (e.g. a noon-snapped start), it
+    MUST pass that same instant here — otherwise the debt is aged off the wall
+    clock while the sweep reads the injected one, and the gap between them
+    silently eats the age margin (TEST-010). Defaults to real now, which is
+    correct only when the sweep also runs at real now.
     """
-    past = datetime.now(timezone.utc) - timedelta(hours=hours)
+    ref = now if now is not None else datetime.now(timezone.utc)
+    past = ref - timedelta(hours=hours)
     expenses = db.exec(
         select(Expense).where(Expense.group_id == uuid.UUID(group_id))
     ).all()
