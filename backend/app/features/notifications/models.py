@@ -74,6 +74,12 @@ EVENT_NUDGE_LEVEL_2 = "nudge.reminder.level_2"
 # only if this engine actually nudged the relationship. See
 # `notify_debt_cleared`.
 EVENT_NUDGE_CLEARED = "nudge.debt.cleared"
+# A member has just been assigned a share of a newly-split expense and needs
+# to confirm it (audit finding F8 — before this, participants only found out
+# by opening /pending). Not a rung on the urgency ladder: it fires once, at
+# split time, carries no level, and is the FIRST thing the participant hears
+# about the debt. See `notify_split_assigned`.
+EVENT_EXPENSE_SPLIT_ASSIGNED = "expense.split.assigned"
 
 # Level → event name. Kept as a mapping rather than an f-string so an
 # unknown level fails loudly at the lookup instead of inventing an event

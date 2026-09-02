@@ -155,15 +155,16 @@ export function SmartInputModal({
     }
   }
 
-  // Handle confirm action from editable preview
-  const handleConfirm = async (editedData: ExpenseCreate): Promise<string> => {
+  // Handle confirm action from editable preview. The expense and its split
+  // are created in ONE atomic call (audit F9), so the success toast below is
+  // truthful — there is no separate split step that could still fail.
+  const handleConfirm = async (editedData: ExpenseCreate): Promise<void> => {
     if (!effectiveGroupId) {
       throw new Error("Group ID is required")
     }
 
     try {
-      // Create expense and capture the result
-      const expense = await createExpenseMutation.mutateAsync(editedData)
+      await createExpenseMutation.mutateAsync(editedData)
 
       // WS10.6: the PRD's Trust Score is the AI edit rate (<10%) — compare
       // what the AI parsed against what the user actually confirmed.
@@ -182,8 +183,7 @@ export function SmartInputModal({
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
       queryClient.invalidateQueries({ queryKey: ["groups", effectiveGroupId] })
 
-      // Show success toast (split success toast is shown separately in EditableExpensePreview)
-      toast.success("Expense added successfully!")
+      toast.success("Expense added and split — participants can confirm now.")
 
       // Close modal
       onOpenChange(false)
@@ -192,14 +192,11 @@ export function SmartInputModal({
       setParsedData(null)
       setPreviewStatus("placeholder")
       setInputText("")
-
-      // Return the expense ID so EditableExpensePreview can call the split API
-      return expense.id
     } catch (error) {
-      // Show error toast
+      // Show error toast; keep the modal open so the user can retry.
       toast.error("Failed to add expense. Please try again.")
       console.error("Failed to create expense:", error)
-      throw error // Re-throw to allow EditableExpensePreview to handle it
+      throw error // Re-throw so EditableExpensePreview keeps the form open
     }
   }
 

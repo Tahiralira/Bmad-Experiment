@@ -141,11 +141,15 @@ export function useCreateExpense() {
   return useMutation<Expense, Error, ExpenseCreate>({
     mutationFn: createExpense,
     onSuccess: () => {
-      // Invalidate dashboard to refresh balances (future: when expenses affect balance)
+      // A create-with-split now moves an expense straight into confirmation,
+      // so refresh every surface a split touches — not just the ledger.
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
-      // Invalidate any expense lists for this group
       queryClient.invalidateQueries({ queryKey: ["expenses"] })
-      // Invalidate audit logs (creation creates audit entries)
+      queryClient.invalidateQueries({ queryKey: ["pending-confirmations"] })
+      queryClient.invalidateQueries({ queryKey: ["group-balances"] })
+      queryClient.invalidateQueries({ queryKey: ["pairwise-balances"] })
+      queryClient.invalidateQueries({ queryKey: ["groups"] })
+      // Invalidate audit logs (creation + split create audit entries)
       queryClient.invalidateQueries({ queryKey: ["audit-log"] })
       queryClient.invalidateQueries({ queryKey: ["group-audit-log"] })
     },

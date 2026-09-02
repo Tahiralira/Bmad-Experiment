@@ -23,6 +23,12 @@ export interface ExpenseCreate {
   amount: number
   description: string
   payer_id?: string // Defaults to current user if not provided
+  /**
+   * Optional split applied atomically with creation (audit F9). Same
+   * discriminated union the PUT /expenses/{id}/split endpoint accepts. Omit
+   * to create a bare draft (legacy behaviour).
+   */
+  split?: EqualSplitRequest | UnequalSplitRequest | PercentageSplitRequest
 }
 
 export interface ExpenseUpdate {

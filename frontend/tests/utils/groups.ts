@@ -1,6 +1,5 @@
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test"
 
-import { applyEqualSplit, groupIdFromUrl, latestExpense } from "./api"
 import { registerAndSignIn } from "./auth"
 import { randomEmail } from "./random"
 
@@ -163,10 +162,9 @@ export async function createConfirmedExpense(
   },
 ): Promise<void> {
   await ownerPage.goto(groupUrl)
+  // The manual form splits the expense as it creates it, so both members can
+  // confirm their share straight away.
   await addExpenseManually(ownerPage, { groupName, amount, description })
-
-  const expense = await latestExpense(ownerPage, groupIdFromUrl(groupUrl))
-  await applyEqualSplit(ownerPage, expense.id)
 
   for (const person of [memberPage, ownerPage]) {
     await person.goto("/pending")

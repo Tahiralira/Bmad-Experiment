@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { applyEqualSplit, groupIdFromUrl, latestExpense } from "./utils/api"
+import { groupIdFromUrl, latestExpense } from "./utils/api"
 import {
   actOnPending,
   addExpenseManually,
@@ -12,11 +12,12 @@ import { randomTeamName, uniqueLabel } from "./utils/random"
  * The core ledger action: money goes in, the other person confirms it, and
  * both sides agree on the balance.
  *
- * Note the split step runs over the API — the manual form cannot produce a
- * splittable expense today. `applyEqualSplit` documents why.
+ * The manual form creates the split as part of creating the expense
+ * (audit F1/F3), so a fresh manual expense already lands in confirmation —
+ * the journeys now drive the whole flow through the UI.
  */
 test.describe("expense confirmation", () => {
-  test("the manual form creates an expense on the group ledger", async ({
+  test("the manual form creates a split expense on the group ledger", async ({
     page,
     browser,
   }) => {
@@ -41,10 +42,10 @@ test.describe("expense confirmation", () => {
       await expect(expenses.getByText(description)).toBeVisible()
       await expect(expenses.getByText("$84.00")).toBeVisible()
 
-      // Current behaviour: no split, so it stays a draft. When the manual
-      // form learns to split, this assertion should be the thing that fails.
+      // The manual form now splits the expense as it creates it (audit F1/F3),
+      // so it lands in confirmation rather than as a bare draft.
       const expense = await latestExpense(page, groupIdFromUrl(groupUrl))
-      expect(expense.status).toBe("draft")
+      expect(expense.status).toBe("pending_confirmation")
     } finally {
       await memberContext.close()
     }
@@ -67,10 +68,8 @@ test.describe("expense confirmation", () => {
         description,
       })
 
-      const expense = await latestExpense(page, groupIdFromUrl(groupUrl))
-      await applyEqualSplit(page, expense.id)
-
-      // The other member is now asked to confirm their share. It leaves the
+      // The manual form already split the expense on create, so the other
+      // member is now asked to confirm their share. It leaves the
       // pending queue once confirmed.
       await memberPage.goto("/pending")
       await actOnPending(memberPage, description, "Confirm")
@@ -112,9 +111,8 @@ test.describe("expense confirmation", () => {
         description,
       })
 
-      const expense = await latestExpense(page, groupIdFromUrl(groupUrl))
-      await applyEqualSplit(page, expense.id)
-
+      // The manual form split the $500 as it was created, so the member has
+      // a share on /pending to reject.
       await memberPage.goto("/pending")
       await actOnPending(memberPage, description, "Reject")
     } finally {
