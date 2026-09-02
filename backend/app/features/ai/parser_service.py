@@ -27,7 +27,19 @@ from app.features.auth.models import User
 from app.features.groups.models import GroupSettings
 
 # Constants
-MODEL = "gemini-3-flash"
+# Must be a model ID the live Gemini API actually SERVES for generateContent —
+# and models.list is NOT proof: it lists models that 404 on generateContent for
+# newer keys (gemini-2.5-flash-lite is "no longer available to new users"). The
+# tests mock the client, so a wrong/dead ID here passes CI and only fails on the
+# first real call in prod (which is how "gemini-3-flash" — never a real ID —
+# shipped and broke parsing). Verified 2026-09-02 with a real generateContent
+# POST: gemini-3.5-flash-lite works (current flash-lite tier); gemini-2.5-flash
+# also works if the non-lite tier is wanted. Re-verify with a real POST, NOT
+# models.list, before changing:
+#   curl -H "x-goog-api-key: $KEY" -X POST -H "Content-Type: application/json" \
+#     -d '{"contents":[{"parts":[{"text":"hi"}]}]}' \
+#     https://generativelanguage.googleapis.com/v1beta/models/<ID>:generateContent
+MODEL = "gemini-3.5-flash-lite"
 
 # Personality system prompts for commentary generation.
 # Capped at "funny" (UX-H5) — no roast mode; the mediator never attacks.
@@ -48,6 +60,19 @@ Extract expense information from the following text. Return ONLY valid JSON in t
 
 Text: {text}
 """
+
+# JSON Schema the model must conform to (Interactions API structured output via
+# response_format). Enforced server-side so the parse can't come back as prose
+# or malformed JSON; _extract_json still handles the rare code-fence wrapper.
+EXPENSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "amount": {"type": "number"},
+        "description": {"type": "string"},
+        "confidence": {"type": "number"},
+    },
+    "required": ["amount", "description", "confidence"],
+}
 
 
 class AIParseError(Exception):
@@ -183,19 +208,23 @@ async def parse_expense_text(text: str, client: genai.Client) -> dict:
     Raises AIParseError (user-safe message) when the model output is not
     usable: unparseable JSON, invalid amount, or confidence below 0.7.
     """
-    response = await client.aio.models.generate_content(
+    # Interactions API (google-genai >= 2.3; generateContent is legacy as of
+    # 2026-06). response_format enforces the JSON shape server-side — verified
+    # 2026-09-02 that the array form {type,mime_type,schema} is the one the API
+    # accepts (an object, or type="json_schema", is rejected 400). store=False
+    # keeps the user's expense text off Google's servers; _extract_json remains
+    # the net for the rare ```json code-fence wrapper.
+    interaction = await client.aio.interactions.create(
         model=MODEL,
-        contents=[
-            {
-                "role": "user",
-                "parts": [{"text": PARSING_PROMPT_TEMPLATE.format(text=text)}],
-            }
+        input=PARSING_PROMPT_TEMPLATE.format(text=text),
+        response_format=[
+            {"type": "text", "mime_type": "application/json", "schema": EXPENSE_SCHEMA}
         ],
-        config={"response_mime_type": "application/json"},
+        store=False,
     )
 
     try:
-        parsed = _extract_json(response.text or "")
+        parsed = _extract_json(interaction.output_text or "")
     except json.JSONDecodeError:
         raise AIParseError(
             "I couldn't understand that expense. Please try rephrasing it."
@@ -246,13 +275,14 @@ async def generate_commentary(
     Personality: {personality.value}
     """
 
-    response = await client.aio.models.generate_content(
+    interaction = await client.aio.interactions.create(
         model=MODEL,
-        contents=commentary_prompt,
-        config={"system_instruction": PERSONALITY_PROMPTS[personality.value]},
+        input=commentary_prompt,
+        system_instruction=PERSONALITY_PROMPTS[personality.value],
+        store=False,
     )
 
-    commentary = (response.text or "").strip()
+    commentary = (interaction.output_text or "").strip()
     if not commentary:
         commentary = (
             f"Got it — {parsed_data['description']} for {parsed_data['amount']}."

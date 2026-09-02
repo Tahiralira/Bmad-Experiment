@@ -13,6 +13,8 @@ happened):
   arrive as `{"type": "error", "error": "..."}` events: model timeout,
   unusable model output, low confidence.
 """
+import logging
+
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -28,6 +30,8 @@ from app.features.ai.models import (
     ParseStreamEvent,
 )
 from app.features.groups.service import is_group_member
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -163,6 +167,7 @@ async def parse_expense(
             event = ParseStreamEvent(type="error", error=e.message)
             yield f"data: {event.model_dump_json()}\n\n"
         except (TimeoutError, httpx.TimeoutException):
+            logger.warning("AI parse timed out")
             event = ParseStreamEvent(
                 type="error",
                 error="The AI took too long to respond. Please try again.",
@@ -170,7 +175,9 @@ async def parse_expense(
             yield f"data: {event.model_dump_json()}\n\n"
         except Exception:
             # No str(e) to the client — model/library errors can leak
-            # internals (S5-M2 pattern).
+            # internals (S5-M2 pattern) — but DO log it server-side, or a bad
+            # model ID / key / SDK error is invisible (esp. with Sentry off).
+            logger.exception("AI parse failed with an unexpected error")
             event = ParseStreamEvent(
                 type="error",
                 error="An unexpected error occurred. Please try again.",
