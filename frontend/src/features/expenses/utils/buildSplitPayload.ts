@@ -3,18 +3,21 @@ import type {
   EqualSplitRequest,
   UnequalSplitRequest,
   PercentageSplitRequest,
+  SharesSplitRequest,
 } from "../types"
 
 export type SplitPayload =
   | EqualSplitRequest
   | UnequalSplitRequest
   | PercentageSplitRequest
+  | SharesSplitRequest
 
 interface BuildSplitPayloadArgs {
   splitType: SplitType
   excludedMembers: Set<string>
   customAmounts: Map<string, number>
   percentages: Map<string, number>
+  shares: Map<string, number>
 }
 
 /**
@@ -34,6 +37,7 @@ export function buildSplitPayload({
   excludedMembers,
   customAmounts,
   percentages,
+  shares,
 }: BuildSplitPayloadArgs): SplitPayload {
   const excluded_user_ids = Array.from(excludedMembers)
 
@@ -61,7 +65,17 @@ export function buildSplitPayload({
     }
   }
 
-  // "shares" is not implemented (its picker card is disabled). Guard rather
-  // than silently send a body the backend can't parse.
+  if (splitType === "shares") {
+    return {
+      type: "shares",
+      splits: Array.from(shares.entries())
+        .filter(([userId]) => !excludedMembers.has(userId))
+        .map(([user_id, shareCount]) => ({ user_id, shares: shareCount })),
+      excluded_user_ids,
+    }
+  }
+
+  // Guard against any unhandled split type rather than sending a body the
+  // backend can't parse.
   throw new Error(`Split type "${splitType}" is not supported yet`)
 }

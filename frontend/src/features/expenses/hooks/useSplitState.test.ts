@@ -131,4 +131,48 @@ describe("useSplitState", () => {
       "All included members must have an amount specified"
     )
   })
+
+  // Audit F13: weighted shares split
+  it("calculates a weighted shares split (2:1:1)", () => {
+    const { result } = renderHook(() =>
+      useSplitState({ totalAmount: 100, members: mockMembers, payerId: "1" })
+    )
+
+    act(() => {
+      result.current.setSplitType("shares")
+    })
+    act(() => {
+      result.current.setShare("1", 2)
+      result.current.setShare("2", 1)
+      result.current.setShare("3", 1)
+    })
+
+    // 2:1:1 of 100 → 50 / 25 / 25; the shares sum to the total
+    expect(result.current.splitAmounts.get("1")).toBe(50)
+    expect(result.current.splitAmounts.get("2")).toBe(25)
+    expect(result.current.splitAmounts.get("3")).toBe(25)
+    expect(result.current.isValid).toBe(true)
+    const sum = [...result.current.splitAmounts.values()].reduce((a, b) => a + b, 0)
+    expect(Math.round(sum * 100) / 100).toBe(100)
+  })
+
+  it("invalidates a shares split when an included member has no shares", () => {
+    const { result } = renderHook(() =>
+      useSplitState({ totalAmount: 100, members: mockMembers, payerId: "1" })
+    )
+
+    act(() => {
+      result.current.setSplitType("shares")
+    })
+    act(() => {
+      // Only two of three included members get shares.
+      result.current.setShare("1", 1)
+      result.current.setShare("2", 1)
+    })
+
+    expect(result.current.isValid).toBe(false)
+    expect(result.current.validationError).toBe(
+      "All included members must have a share count"
+    )
+  })
 })

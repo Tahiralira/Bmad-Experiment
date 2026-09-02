@@ -104,6 +104,83 @@ def _parse_request(group_id: str, text: str = "Paid 60 for lunch") -> dict:
 # =============================================================================
 
 
+class TestResolveSplitHint:
+    """resolve_split_hint maps AI-extracted names to a split suggestion (F7).
+
+    It only ever pre-fills the editor, so it stays conservative: unambiguous
+    matches only, and never a suggestion leaving fewer than 2 participants.
+    """
+
+    @staticmethod
+    def _members():
+        import uuid
+
+        return [
+            (uuid.UUID(int=1), "Alice Smith"),
+            (uuid.UUID(int=2), "Bob Jones"),
+            (uuid.UUID(int=3), "Tom Brown"),
+        ]
+
+    def test_excluded_first_name_resolves_to_exclusion(self):
+        members = self._members()
+        result = parser_service.resolve_split_hint(
+            excluded_names=["Tom"], included_names=[], members=members
+        )
+        assert result == {"type": "equal", "excluded_user_ids": [members[2][0]]}
+
+    def test_included_names_become_the_exclusion_complement(self):
+        members = self._members()
+        result = parser_service.resolve_split_hint(
+            excluded_names=[], included_names=["Alice", "Bob"], members=members
+        )
+        # Only Alice & Bob split it → Tom is excluded
+        assert result["excluded_user_ids"] == [members[2][0]]
+
+    def test_no_names_returns_none(self):
+        assert (
+            parser_service.resolve_split_hint(
+                excluded_names=[], included_names=[], members=self._members()
+            )
+            is None
+        )
+
+    def test_unmatched_name_is_dropped(self):
+        assert (
+            parser_service.resolve_split_hint(
+                excluded_names=["Zebediah"], included_names=[], members=self._members()
+            )
+            is None
+        )
+
+    def test_ambiguous_first_name_is_dropped(self):
+        import uuid
+
+        members = [
+            (uuid.UUID(int=1), "Sam Adams"),
+            (uuid.UUID(int=2), "Sam Beckett"),
+            (uuid.UUID(int=3), "Tom Brown"),
+        ]
+        # "Sam" hits two members → ambiguous → dropped → nothing resolved
+        assert (
+            parser_service.resolve_split_hint(
+                excluded_names=["Sam"], included_names=[], members=members
+            )
+            is None
+        )
+
+    def test_never_leaves_fewer_than_two(self):
+        import uuid
+
+        members = [(uuid.UUID(int=1), "Alice"), (uuid.UUID(int=2), "Bob")]
+        # Excluding Bob would leave only Alice — discard the suggestion
+        assert (
+            parser_service.resolve_split_hint(
+                excluded_names=["Bob"], included_names=[], members=members
+            )
+            is None
+        )
+
+
 class TestParserService:
     def test_parse_expense_success(self):
         client = _mock_gemini_client()

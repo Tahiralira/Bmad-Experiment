@@ -32,6 +32,7 @@ from app.features.expenses.models import (
     SettlementClaimPublic,
     SettlementClaimSplit,
     SettlementClaimStatus,
+    SharesSplitRequest,
     SplitStatus,
     UnequalSplitRequest,
 )
@@ -434,6 +435,84 @@ def calculate_percentage_split(
     return calculated_splits
 
 
+def calculate_shares_split(
+    total_amount: Decimal,
+    splits: list[dict],
+    member_ids: list[uuid.UUID] | None = None,
+    excluded_user_ids: list[uuid.UUID] | None = None,
+) -> list[dict]:
+    """
+    Validate shares and calculate weighted split amounts.
+
+    Each included member owes total * their_shares / total_shares; the last
+    member absorbs the rounding remainder (mirrors the percentage split), so
+    the amounts always sum exactly to the total.
+
+    Args:
+        total_amount: Total expense amount
+        splits: List of {user_id, shares} specified by user
+        member_ids: All group member IDs (unused; kept for signature parity)
+        excluded_user_ids: Members to exclude from split (optional)
+
+    Returns:
+        List of {user_id, amount_owed} calculated
+
+    Raises:
+        ValueError: fewer than 2 members after exclusion, or non-positive total shares
+
+    Examples:
+        >>> calculate_shares_split(
+        ...     Decimal("90.00"),
+        ...     [{"user_id": id1, "shares": 2}, {"user_id": id2, "shares": 1}]
+        ... )
+        [{'user_id': id1, 'amount_owed': Decimal('60.00')}, {'user_id': id2, 'amount_owed': Decimal('30.00')}]
+    """
+    excluded_set = set(excluded_user_ids) if excluded_user_ids else set()
+
+    included_splits = [
+        s for s in splits
+        if uuid.UUID(str(s["user_id"])) not in excluded_set
+    ]
+
+    if len(included_splits) < 2:
+        raise ValueError(
+            f"At least 2 members must be included in the split. "
+            f"Currently have {len(included_splits)} member(s)."
+        )
+
+    total_shares = sum(int(s["shares"]) for s in included_splits)
+    if total_shares <= 0:
+        raise ValueError("Total shares must be greater than zero")
+
+    calculated_splits = []
+    remaining_amount = total_amount
+
+    for i, split_item in enumerate(included_splits):
+        user_id_val = split_item["user_id"]
+        if isinstance(user_id_val, uuid.UUID):
+            user_id = user_id_val
+        else:
+            user_id = uuid.UUID(str(user_id_val))
+
+        shares = int(split_item["shares"])
+
+        if i == len(included_splits) - 1:
+            # Last member gets the remainder (avoids rounding drift)
+            amount_owed = remaining_amount
+        else:
+            amount_owed = (
+                total_amount * Decimal(shares) / Decimal(total_shares)
+            ).quantize(Decimal("0.01"))
+            remaining_amount -= amount_owed
+
+        calculated_splits.append({
+            "user_id": user_id,
+            "amount_owed": amount_owed,
+        })
+
+    return calculated_splits
+
+
 def apply_split(
     session: Session,
     expense: Expense,
@@ -487,8 +566,15 @@ def apply_split(
                 member_ids=member_ids,
                 excluded_user_ids=req.excluded_user_ids,
             )
-        else:
+        elif isinstance(req, PercentageSplitRequest):
             splits_data = calculate_percentage_split(
+                total_amount=expense.amount,
+                splits=raw_splits,
+                member_ids=member_ids,
+                excluded_user_ids=req.excluded_user_ids,
+            )
+        else:
+            splits_data = calculate_shares_split(
                 total_amount=expense.amount,
                 splits=raw_splits,
                 member_ids=member_ids,

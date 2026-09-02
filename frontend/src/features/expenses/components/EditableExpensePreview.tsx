@@ -93,6 +93,9 @@ export function EditableExpensePreview({
     members,
     payerId: editedData.payer_id,
     currency,
+    // Pre-fill from the AI's participant suggestion (audit F7). The chips show
+    // it and the user confirms/adjusts before saving.
+    initialExcludedMembers: parsedData.split?.excluded_user_ids,
   })
 
   // Local submit state: Confirm bundles create + split, so the button shows
@@ -115,6 +118,7 @@ export function EditableExpensePreview({
         excludedMembers: split.excludedMembers,
         customAmounts: split.customAmounts,
         percentages: split.percentages,
+        shares: split.shares,
       }),
     }
 

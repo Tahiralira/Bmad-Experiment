@@ -27,9 +27,13 @@ from app.features.ai.models import (
     AIPersonality,
     ExpenseParseRequest,
     ExpenseParseResponse,
+    ExpenseParseSplit,
     ParseStreamEvent,
 )
-from app.features.groups.service import is_group_member
+from app.features.groups.service import (
+    get_group_members_with_user_data,
+    is_group_member,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +131,24 @@ async def parse_expense(
     # (expired) ORM user there would raise mid-stream.
     payer_id = current_user.id
 
+    # Audit F7 — group roster for participant parsing, snapshotted for the same
+    # reason. Sandbox parses (no group) carry no roster and skip participant
+    # inference entirely.
+    member_names = []
+    members_for_resolve = []
+    author_name = current_user.full_name or (
+        current_user.email.split("@")[0] if current_user.email else "me"
+    )
+    if expense_in.group_id is not None:
+        for m in get_group_members_with_user_data(session, expense_in.group_id):
+            display = m.full_name or (m.email.split("@")[0] if m.email else "")
+            if not display:
+                continue
+            members_for_resolve.append((m.user_id, display))
+            member_names.append(display)
+            if m.user_id == current_user.id:
+                author_name = display
+
     # The one commit for this request (ARCH-001): persists the reserved quota
     # unit and any default settings row. It must happen here — once streaming
     # starts there is no router "after" to commit in.
@@ -137,7 +159,10 @@ async def parse_expense(
     async def event_generator():
         try:
             parsed = await parser_service.parse_expense_text(
-                text=expense_in.text, client=client
+                text=expense_in.text,
+                client=client,
+                member_names=member_names or None,
+                author_name=author_name,
             )
 
             commentary = await parser_service.generate_commentary(
@@ -151,12 +176,26 @@ async def parse_expense(
                 event = ParseStreamEvent(type="commentary", data={"text": chunk})
                 yield f"data: {event.model_dump_json()}\n\n"
 
+            # Audit F7 — resolve the AI's participant names to a split
+            # suggestion (grouped parses only; None → the editor defaults to
+            # everyone). Always user-confirmed, so a bad guess is harmless.
+            split_suggestion = None
+            if members_for_resolve:
+                resolved_split = parser_service.resolve_split_hint(
+                    excluded_names=parsed.get("excluded_names", []),
+                    included_names=parsed.get("included_names", []),
+                    members=members_for_resolve,
+                )
+                if resolved_split:
+                    split_suggestion = ExpenseParseSplit(**resolved_split)
+
             parsed_response = ExpenseParseResponse(
                 amount=parsed["amount"],
                 description=parsed["description"],
                 payer_id=payer_id,
                 confidence_score=parsed["confidence"],
                 commentary=commentary,
+                split=split_suggestion,
             )
             event = ParseStreamEvent(
                 type="complete", data=parsed_response.model_dump(mode="json")

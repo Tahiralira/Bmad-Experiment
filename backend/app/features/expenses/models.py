@@ -144,11 +144,36 @@ class PercentageSplitRequest(SQLModel):
     excluded_user_ids: list[uuid.UUID] = []
 
 
+class SharesSplitItem(SQLModel):
+    """Individual split item for a shares (weighted) split request."""
+
+    user_id: uuid.UUID
+    shares: int = Field(ge=1)
+
+
+class SharesSplitRequest(SQLModel):
+    """Request schema for creating a shares (weighted) split.
+
+    Each member is assigned a positive integer number of shares and owes that
+    fraction of the total (2 shares owes twice 1 share). The last member
+    absorbs the rounding remainder, so the amounts always sum to the total.
+    """
+
+    type: Literal["shares"] = "shares"
+    splits: list[SharesSplitItem] = Field(min_length=1)
+    excluded_user_ids: list[uuid.UUID] = []
+
+
 # Discriminated union (WS5/B-H6): FastAPI validates the body against the
-# matching schema and documents all three shapes in OpenAPI — no more raw
+# matching schema and documents all four shapes in OpenAPI — no more raw
 # `dict` body with hand-rolled validation (malformed UUIDs used to 500).
 SplitRequest = Annotated[
-    Union[EqualSplitRequest, UnequalSplitRequest, PercentageSplitRequest],
+    Union[
+        EqualSplitRequest,
+        UnequalSplitRequest,
+        PercentageSplitRequest,
+        SharesSplitRequest,
+    ],
     PydanticField(discriminator="type"),
 ]
 

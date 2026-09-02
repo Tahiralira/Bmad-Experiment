@@ -28,7 +28,11 @@ export interface ExpenseCreate {
    * discriminated union the PUT /expenses/{id}/split endpoint accepts. Omit
    * to create a bare draft (legacy behaviour).
    */
-  split?: EqualSplitRequest | UnequalSplitRequest | PercentageSplitRequest
+  split?:
+    | EqualSplitRequest
+    | UnequalSplitRequest
+    | PercentageSplitRequest
+    | SharesSplitRequest
 }
 
 export interface ExpenseUpdate {
@@ -77,6 +81,12 @@ export interface ExpenseParseResponse {
   confidence_score: number
   /** AI personality commentary */
   commentary: string
+  /**
+   * Split suggestion resolved from the natural-language input (audit F7).
+   * null/absent means the text didn't say who to split with — the editor
+   * defaults to everyone. Only ever a pre-fill; the user confirms it.
+   */
+  split?: { type: string; excluded_user_ids: string[] } | null
 }
 
 /**
@@ -126,8 +136,6 @@ export const SPLIT_TYPE_OPTIONS: SplitTypeOption[] = [
     type: "shares",
     label: "Shares",
     icon: "squares-3-by-3",
-    disabled: true,
-    disabledReason: "Coming in Story 3.8",
   },
 ]
 
@@ -166,6 +174,18 @@ export interface PercentageSplitItem {
 export interface PercentageSplitRequest {
   type: "percentage"
   splits: PercentageSplitItem[]
+  excluded_user_ids: string[]
+}
+
+export interface SharesSplitItem {
+  user_id: string
+  /** Positive integer weight; the amount is split proportionally. */
+  shares: number
+}
+
+export interface SharesSplitRequest {
+  type: "shares"
+  splits: SharesSplitItem[]
   excluded_user_ids: string[]
 }
 

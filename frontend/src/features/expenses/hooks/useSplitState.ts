@@ -14,6 +14,11 @@ interface UseSplitStateProps {
   payerId?: string
   /** ISO-4217 currency for the validation message (WS10.1) */
   currency?: string
+  /**
+   * Member ids to seed as excluded on mount — used to pre-fill the split from
+   * an AI participant suggestion (audit F7). Applied once, on first render.
+   */
+  initialExcludedMembers?: string[]
 }
 
 export interface UseSplitStateReturn {
@@ -36,6 +41,10 @@ export interface UseSplitStateReturn {
   percentages: Map<string, number>
   /** Set percentage for a member (percentage split) */
   setPercentage: (memberId: string, percentage: number) => void
+  /** Shares for shares split (user_id -> integer weight) */
+  shares: Map<string, number>
+  /** Set share count for a member (shares split) */
+  setShare: (memberId: string, shares: number) => void
   /** Total percentage (for percentage split validation) */
   totalPercentage: number
   /** Calculated split amounts (user_id -> amount) */
@@ -91,13 +100,18 @@ export function useSplitState({
   initialType = "equal",
   payerId,
   currency = DEFAULT_CURRENCY,
+  initialExcludedMembers,
 }: UseSplitStateProps): UseSplitStateReturn {
   const [splitType, setSplitType] = useState<SplitType>(initialType)
-  const [excludedMembers, setExcludedMembers] = useState<Set<string>>(new Set())
+  const [excludedMembers, setExcludedMembers] = useState<Set<string>>(
+    () => new Set(initialExcludedMembers ?? []),
+  )
   const [customAmounts, setCustomAmounts] = useState<Map<string, number>>(new Map())
   const [percentages, setPercentages] = useState<Map<string, number>>(new Map())
+  const [shares, setShares] = useState<Map<string, number>>(new Map())
 
-  // Enhanced setSplitType that clears state when switching away from unequal/percentage split
+  // Enhanced setSplitType that clears state when switching away from a
+  // per-member split type
   const handleSetSplitType = useCallback((newType: SplitType) => {
     setSplitType((prevType) => {
       // If switching from unequal to anything else, clear custom amounts
@@ -107,6 +121,10 @@ export function useSplitState({
       // If switching from percentage to anything else, clear percentages
       if (prevType === "percentage" && newType !== "percentage") {
         setPercentages(new Map())
+      }
+      // If switching from shares to anything else, clear shares
+      if (prevType === "shares" && newType !== "shares") {
+        setShares(new Map())
       }
       return newType
     })
@@ -205,9 +223,39 @@ export function useSplitState({
       return amounts
     }
 
-    // Other split types will be implemented in future stories
+    if (splitType === "shares") {
+      // Weighted split: each member owes total * their_shares / total_shares,
+      // id-sorted so the last member deterministically absorbs the remainder
+      // (mirrors the percentage branch).
+      const shareEntries = members
+        .map((m) => m.user_id || m.id)
+        .filter((id) => !excludedMembers.has(id) && (shares.get(id) ?? 0) > 0)
+        .sort((a, b) => a.localeCompare(b))
+        .map((id) => [id, shares.get(id) as number] as const)
+
+      const totalShares = shareEntries.reduce((sum, [, s]) => sum + s, 0)
+      if (totalShares <= 0) {
+        return new Map<string, number>()
+      }
+
+      const amounts = new Map<string, number>()
+      let runningTotal = 0
+      shareEntries.forEach(([memberId, s], index) => {
+        let amount: number
+        if (index === shareEntries.length - 1) {
+          amount = Math.round((totalAmount - runningTotal) * 100) / 100
+        } else {
+          amount = Math.round(((totalAmount * s) / totalShares) * 100) / 100
+          runningTotal += amount
+        }
+        amounts.set(memberId, amount)
+      })
+      return amounts
+    }
+
+    // Fallback for any unhandled split type
     return new Map<string, number>()
-  }, [splitType, totalAmount, members, excludedMembers, payerId, customAmounts, percentages])
+  }, [splitType, totalAmount, members, excludedMembers, payerId, customAmounts, percentages, shares])
 
   // Calculate remaining amount for unequal split (only counts included members)
   const remainingAmount = useMemo(() => {
@@ -259,6 +307,19 @@ export function useSplitState({
       const newMap = new Map(prev)
       if (percentage >= 0 && percentage <= 100) {
         newMap.set(memberId, percentage)
+      } else {
+        newMap.delete(memberId)
+      }
+      return newMap
+    })
+  }, [])
+
+  // Set share count for a member (shares split). Shares are positive integers.
+  const setShare = useCallback((memberId: string, shareCount: number) => {
+    setShares((prev) => {
+      const newMap = new Map(prev)
+      if (shareCount > 0) {
+        newMap.set(memberId, Math.floor(shareCount))
       } else {
         newMap.delete(memberId)
       }
@@ -346,13 +407,40 @@ export function useSplitState({
       }
     }
 
+    // Additional validation for shares split (Story 3.8 / audit F13)
+    if (splitType === "shares") {
+      const includedIds = members
+        .map((m) => m.user_id || m.id)
+        .filter((id) => !excludedMembers.has(id))
+
+      // Every included member needs a share count
+      const missingShares = includedIds.some((id) => !shares.has(id))
+      if (missingShares) {
+        return {
+          isValid: false,
+          validationError: "All included members must have a share count",
+        }
+      }
+
+      const totalShares = includedIds.reduce(
+        (sum, id) => sum + (shares.get(id) ?? 0),
+        0,
+      )
+      if (totalShares <= 0) {
+        return {
+          isValid: false,
+          validationError: "Total shares must be greater than zero",
+        }
+      }
+    }
+
     return {
       isValid: true,
       validationError: null,
     }
     // Map/Set identities (not .size) — the S4-M2 check depends on WHICH
     // members have amounts, and state setters always produce new instances
-  }, [members, excludedMembers, splitType, customAmounts, remainingAmount, totalAmount, percentages, totalPercentage, currency])
+  }, [members, excludedMembers, splitType, customAmounts, remainingAmount, totalAmount, percentages, totalPercentage, shares, currency])
 
   return {
     splitType,
@@ -364,6 +452,8 @@ export function useSplitState({
     setCustomAmount,
     percentages,
     setPercentage,
+    shares,
+    setShare,
     totalPercentage,
     splitAmounts,
     remainingAmount,

@@ -69,6 +69,7 @@ export function ExpenseForm({ groupId, onSuccess, onCancel }: ExpenseFormProps) 
         excludedMembers: split.excludedMembers,
         customAmounts: split.customAmounts,
         percentages: split.percentages,
+        shares: split.shares,
       }),
     }
 

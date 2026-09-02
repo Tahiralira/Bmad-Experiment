@@ -55,8 +55,19 @@ Extract expense information from the following text. Return ONLY valid JSON in t
 {{
     "amount": <decimal number>,
     "description": <cleaned description string>,
-    "confidence": <float 0.0-1.0>
+    "confidence": <float 0.0-1.0>,
+    "split": {{
+        "excluded_names": [<member names explicitly left OUT — e.g. "split with everyone except Tom" -> ["Tom"]>],
+        "included_names": [<the ONLY members to include — e.g. "split between me and Sarah" -> ["{author_name}", "Sarah"]>]
+    }}
 }}
+
+Group members: {member_names}
+The person entering this expense is "{author_name}" — resolve "me"/"I"/"myself" to that name.
+Rules for "split":
+- Use ONLY names from the Group members list above.
+- Leave BOTH lists empty when the text does not say who to split with (the default is everyone).
+- Never put a name in both lists. Use "included_names" for "between X and Y"; use "excluded_names" for "everyone except Z".
 
 Text: {text}
 """
@@ -70,6 +81,16 @@ EXPENSE_SCHEMA = {
         "amount": {"type": "number"},
         "description": {"type": "string"},
         "confidence": {"type": "number"},
+        # Audit F7 — who to split with, by name. Optional: absent/empty means
+        # "everyone" (the default). The server resolves these names against the
+        # group roster; a wrong guess only pre-fills the editor.
+        "split": {
+            "type": "object",
+            "properties": {
+                "excluded_names": {"type": "array", "items": {"type": "string"}},
+                "included_names": {"type": "array", "items": {"type": "string"}},
+            },
+        },
     },
     "required": ["amount", "description", "confidence"],
 }
@@ -201,13 +222,30 @@ def _extract_json(raw: str) -> dict:
     return parsed
 
 
-async def parse_expense_text(text: str, client: genai.Client) -> dict:
+async def parse_expense_text(
+    text: str,
+    client: genai.Client,
+    *,
+    member_names: list[str] | None = None,
+    author_name: str | None = None,
+) -> dict:
     """
-    Extract {amount, description, confidence} from natural language.
+    Extract {amount, description, confidence} plus raw split-participant hints
+    (excluded_names / included_names — audit F7) from natural language.
+
+    `member_names` is the group roster shown to the model so it can identify
+    who to split with ("everyone except Tom"); `author_name` lets it resolve
+    "me"/"I". Both are omitted for a sandbox parse (no group), in which case no
+    participant hints are extracted.
 
     Raises AIParseError (user-safe message) when the model output is not
     usable: unparseable JSON, invalid amount, or confidence below 0.7.
     """
+    prompt = PARSING_PROMPT_TEMPLATE.format(
+        text=text,
+        member_names=", ".join(member_names) if member_names else "unknown",
+        author_name=author_name or "me",
+    )
     # Interactions API (google-genai >= 2.3; generateContent is legacy as of
     # 2026-06). response_format enforces the JSON shape server-side — verified
     # 2026-09-02 that the array form {type,mime_type,schema} is the one the API
@@ -216,7 +254,7 @@ async def parse_expense_text(text: str, client: genai.Client) -> dict:
     # the net for the rare ```json code-fence wrapper.
     interaction = await client.aio.interactions.create(
         model=MODEL,
-        input=PARSING_PROMPT_TEMPLATE.format(text=text),
+        input=prompt,
         response_format=[
             {"type": "text", "mime_type": "application/json", "schema": EXPENSE_SCHEMA}
         ],
@@ -246,10 +284,93 @@ async def parse_expense_text(text: str, client: genai.Client) -> dict:
             "Try including the amount and a brief description."
         )
 
+    # Audit F7 — raw split-participant names (resolved to member ids by the
+    # router). Tolerate a missing/malformed split object: default is everyone.
+    split_raw = parsed.get("split")
+    if not isinstance(split_raw, dict):
+        split_raw = {}
+    excluded_names = [
+        n for n in (split_raw.get("excluded_names") or []) if isinstance(n, str)
+    ]
+    included_names = [
+        n for n in (split_raw.get("included_names") or []) if isinstance(n, str)
+    ]
+
     return {
         "amount": amount,
         "description": str(parsed["description"]).strip(),
         "confidence": float(parsed["confidence"]),
+        "excluded_names": excluded_names,
+        "included_names": included_names,
+    }
+
+
+def resolve_split_hint(
+    *,
+    excluded_names: list[str],
+    included_names: list[str],
+    members: list[tuple[uuid.UUID, str]],
+) -> dict | None:
+    """
+    Resolve AI-extracted participant names to a split suggestion (audit F7).
+
+    `members` is a list of (user_id, display_name). Returns
+    {"type": "equal", "excluded_user_ids": [...]} or None when there is
+    nothing to suggest.
+
+    Deliberately conservative — the result only ever PRE-FILLS the split
+    editor, which the user always confirms:
+    - only UNAMBIGUOUS name matches are used (a name that hits two members, or
+      none, is dropped);
+    - a match is an exact display-name or an exact first-name match;
+    - a suggestion that would leave fewer than 2 participants is discarded so
+      the AI can never quietly narrow a split to nobody.
+    """
+    def match(name: str) -> list[uuid.UUID]:
+        n = name.strip().lower()
+        if not n:
+            return []
+        hits: list[uuid.UUID] = []
+        for uid, display in members:
+            d = (display or "").strip().lower()
+            if not d:
+                continue
+            tokens = d.split()
+            if d == n or (tokens and tokens[0] == n):
+                hits.append(uid)
+        return hits
+
+    def resolve_unique(names: list[str]) -> set[uuid.UUID]:
+        ids: set[uuid.UUID] = set()
+        for name in names:
+            hits = match(name)
+            if len(hits) == 1:  # unambiguous only
+                ids.add(hits[0])
+        return ids
+
+    member_ids = {uid for uid, _ in members}
+    if not member_ids:
+        return None
+
+    if included_names:
+        included = resolve_unique(included_names)
+        if not included:
+            return None
+        excluded = member_ids - included
+    elif excluded_names:
+        excluded = resolve_unique(excluded_names)
+        if not excluded:
+            return None
+    else:
+        return None
+
+    # Never suggest a split with fewer than 2 participants.
+    if len(member_ids) - len(excluded) < 2:
+        return None
+
+    return {
+        "type": "equal",
+        "excluded_user_ids": sorted(excluded, key=str),
     }
 
 

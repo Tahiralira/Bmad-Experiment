@@ -5,6 +5,7 @@ import { MemberChips } from "./MemberChips"
 import { SplitAmountsDisplay } from "./SplitAmountsDisplay"
 import { UnequalSplitInputs } from "./UnequalSplitInputs"
 import { PercentageSplitInputs } from "./PercentageSplitInputs"
+import { SharesSplitInputs } from "./SharesSplitInputs"
 import type { UseSplitStateReturn } from "../hooks/useSplitState"
 import type { GroupMember } from "../types"
 
@@ -40,6 +41,8 @@ export function SplitFields({ members, totalAmount, split }: SplitFieldsProps) {
     setCustomAmount,
     percentages,
     setPercentage,
+    shares,
+    setShare,
     splitAmounts,
     validationError,
   } = split
@@ -71,6 +74,14 @@ export function SplitFields({ members, totalAmount, split }: SplitFieldsProps) {
     }
   }, [splitType, percentages.size, members.length, members, setPercentage])
 
+  // Pre-populate shares when switching to shares (audit F13): 1 share each,
+  // i.e. an even split the user can then reweight.
+  useEffect(() => {
+    if (splitType === "shares" && shares.size === 0 && members.length > 0) {
+      members.forEach((member) => setShare(member.user_id || member.id, 1))
+    }
+  }, [splitType, shares.size, members.length, members, setShare])
+
   return (
     <div className="flex flex-col gap-3">
       <SplitPicker selectedType={splitType} onSelectType={setSplitType} />
@@ -92,6 +103,16 @@ export function SplitFields({ members, totalAmount, split }: SplitFieldsProps) {
           percentages={percentages}
           totalAmount={totalAmount}
           onPercentageChange={setPercentage}
+        />
+      )}
+
+      {splitType === "shares" && (
+        <SharesSplitInputs
+          members={members}
+          excludedMembers={excludedMembers}
+          shares={shares}
+          totalAmount={totalAmount}
+          onShareChange={setShare}
         />
       )}
 

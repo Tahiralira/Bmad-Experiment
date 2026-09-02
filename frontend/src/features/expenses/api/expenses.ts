@@ -13,6 +13,7 @@ import type {
   EqualSplitRequest,
   UnequalSplitRequest,
   PercentageSplitRequest,
+  SharesSplitRequest,
   ExpenseSplitResponse,
   ExpenseSplit,
   ExpenseSplitsResponse,
@@ -158,7 +159,11 @@ export function useCreateExpense() {
 
 async function updateExpenseSplit(
   expenseId: string,
-  data: EqualSplitRequest | UnequalSplitRequest | PercentageSplitRequest
+  data:
+    | EqualSplitRequest
+    | UnequalSplitRequest
+    | PercentageSplitRequest
+    | SharesSplitRequest
 ): Promise<ExpenseSplitResponse> {
   return __request(OpenAPI, {
     method: "PUT",
@@ -178,7 +183,7 @@ export function useUpdateExpenseSplit() {
   return useMutation<
     ExpenseSplitResponse,
     Error,
-    { expenseId: string; data: EqualSplitRequest | UnequalSplitRequest | PercentageSplitRequest }
+    { expenseId: string; data: EqualSplitRequest | UnequalSplitRequest | PercentageSplitRequest | SharesSplitRequest }
   >({
     mutationFn: ({ expenseId, data }) => updateExpenseSplit(expenseId, data),
     onSuccess: () => {
