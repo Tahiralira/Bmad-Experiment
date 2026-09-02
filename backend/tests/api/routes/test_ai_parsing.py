@@ -78,10 +78,11 @@ def _create_group_row(db: Session) -> uuid.UUID:
 def _mock_gemini_client(
     parse_json: str = PARSE_JSON, commentary: str = COMMENTARY
 ) -> Mock:
-    """A genai.Client double: first aio call parses, second is commentary."""
+    """A genai.Client double: first interactions.create parses, second is
+    commentary. The Interactions API exposes the result as .output_text."""
     client = Mock()
-    client.aio.models.generate_content = AsyncMock(
-        side_effect=[Mock(text=parse_json), Mock(text=commentary)]
+    client.aio.interactions.create = AsyncMock(
+        side_effect=[Mock(output_text=parse_json), Mock(output_text=commentary)]
     )
     return client
 
@@ -112,6 +113,23 @@ class TestParserService:
         assert str(parsed["amount"]) == "60.0"
         assert parsed["description"] == "Lunch"
         assert parsed["confidence"] == 0.95
+
+    def test_parse_requests_structured_json_schema(self):
+        # Interactions API structured output: the parse must pass the expense
+        # JSON schema via response_format, and must not persist the prompt.
+        client = _mock_gemini_client()
+        asyncio.run(
+            parser_service.parse_expense_text(text="Paid 60 for lunch", client=client)
+        )
+        kwargs = client.aio.interactions.create.call_args.kwargs
+        assert kwargs["response_format"] == [
+            {
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": parser_service.EXPENSE_SCHEMA,
+            }
+        ]
+        assert kwargs["store"] is False
 
     def test_parse_tolerates_json_code_fence(self):
         client = _mock_gemini_client(parse_json=f"```json\n{PARSE_JSON}\n```")
@@ -162,15 +180,15 @@ class TestParserService:
             )
         )
         assert commentary == COMMENTARY
-        config = client.aio.models.generate_content.call_args.kwargs["config"]
+        kwargs = client.aio.interactions.create.call_args.kwargs
         assert (
-            config["system_instruction"]
+            kwargs["system_instruction"]
             == parser_service.PERSONALITY_PROMPTS["funny"]
         )
 
     def test_commentary_falls_back_when_model_returns_nothing(self):
         client = Mock()
-        client.aio.models.generate_content = AsyncMock(return_value=Mock(text=""))
+        client.aio.interactions.create = AsyncMock(return_value=Mock(output_text=""))
         commentary = asyncio.run(
             parser_service.generate_commentary(
                 original_text="Paid 60 for lunch",
@@ -512,7 +530,7 @@ class TestParserRouter:
         group = _create_group(client, headers, "Timeout Group")
 
         slow_client = Mock()
-        slow_client.aio.models.generate_content = AsyncMock(
+        slow_client.aio.interactions.create = AsyncMock(
             side_effect=httpx.ReadTimeout("upstream too slow")
         )
         with patch(
@@ -537,7 +555,7 @@ class TestParserRouter:
         group = _create_group(client, headers, "Crash Group")
 
         broken_client = Mock()
-        broken_client.aio.models.generate_content = AsyncMock(
+        broken_client.aio.interactions.create = AsyncMock(
             side_effect=RuntimeError("secret internal detail")
         )
         with patch(
