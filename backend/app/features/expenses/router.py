@@ -11,7 +11,7 @@ from app.features.expenses.models import (
     AggregateSettleUpRequest,
     AuditLogsPublic,
     Expense,
-    ExpenseCreate,
+    ExpenseCreateWithSplit,
     ExpensePublic,
     ExpenseSplitPublic,
     ExpenseSplitResponse,
@@ -67,14 +67,20 @@ def create_expense(
     *,
     session: SessionDep,
     current_user: CurrentUser,
-    expense_in: ExpenseCreate,
+    expense_in: ExpenseCreateWithSplit,
 ) -> ExpensePublic:
     """
-    Create a new expense in a group.
+    Create a new expense in a group, optionally splitting it in one step.
 
     The current user must be a member of the group.
     If payer_id is not provided, defaults to the current user.
-    New expenses start with status 'draft'.
+
+    When `split` is provided (the same discriminated union as
+    PUT /{id}/split), the expense is created AND split in a single
+    transaction (audit finding F9): the expense goes straight to
+    'pending_confirmation' and no split-less DRAFT can be orphaned by a
+    failed second call. When `split` is omitted the expense is created as a
+    bare 'draft', exactly as before.
     """
     # Verify group exists
     group = session.get(ExpenseGroup, expense_in.group_id)
@@ -100,6 +106,18 @@ def create_expense(
             )
 
     expense = expense_service.create_expense(session, expense_in, current_user.id)
+
+    # Atomic split (audit F9): same transaction as the creation, so a domain
+    # failure (non-member, sums that don't match, duplicate member) rolls the
+    # whole thing back — nothing is committed and no orphan DRAFT survives.
+    if expense_in.split is not None:
+        try:
+            expense_service.apply_split(
+                session, expense, expense_in.split, current_user.id
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     response = ExpensePublic.model_validate(expense)
     session.commit()
     return response

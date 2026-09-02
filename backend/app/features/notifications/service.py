@@ -29,6 +29,7 @@ from app.features.expenses.models import (
 )
 from app.features.groups.models import ExpenseGroup, GroupSettings
 from app.features.notifications.models import (
+    EVENT_EXPENSE_SPLIT_ASSIGNED,
     EVENT_NUDGE_CLEARED,
     NUDGE_EVENT_BY_LEVEL,
     Notification,
@@ -450,6 +451,32 @@ def render_cleared(
     return title, body
 
 
+def render_split_assigned(
+    *,
+    payer_name: str | None,
+    group_name: str,
+    description: str,
+    amount: Decimal,
+    currency: str,
+) -> tuple[str, str]:
+    """
+    The "you're in a new split" message (audit finding F8).
+
+    First contact about a debt, so it is factual and actionable, not urgent:
+    it names who paid, what for, and the exact share to confirm. Like Level 1
+    it is deliberately un-personality-flavoured — an unsolicited notification
+    is the wrong place to be funny.
+    """
+    who = payer_name or "Someone"
+    money = f"{amount:.2f} {currency}"
+    title = f"{who} added an expense — your share is {money}"
+    body = (
+        f"“{description}” in {group_name}. "
+        f"Open ClearDues to confirm your {money} share."
+    )
+    return title, body
+
+
 # === Sweep ===
 
 
@@ -784,6 +811,150 @@ def _notify_debt_cleared_inner(
 
     session.flush()
     return any(o.status == NotificationStatus.SENT for o in outcomes)
+
+
+# === "You're in a new split" (audit finding F8) ===
+
+
+def notify_split_assigned(
+    session: Session,
+    *,
+    expense_id: uuid.UUID,
+    group_id: uuid.UUID,
+    payer_id: uuid.UUID,
+    currency: str,
+    now: datetime | None = None,
+) -> int:
+    """
+    Tell every non-payer participant of a freshly-assigned split that they
+    have a share to confirm.
+
+    Fires from `apply_split` — so both the atomic create-with-split path and a
+    later re-split notify. The payer is skipped (they don't owe themselves),
+    and so is anyone whose split is no longer PENDING (a re-split of a partly
+    resolved expense must not re-alert someone who has already acted — which
+    also means the split author, whose own share `apply_split` auto-confirms,
+    never gets pinged about their own expense).
+
+    Never raises: this runs on the request path while someone waits for their
+    expense to save, and a broken push service must not fail an expense
+    split. The whole body runs inside a SAVEPOINT, so a database error here
+    rolls back the notifications alone and leaves the split intact.
+
+    Callers own the transaction (ARCH-001) — this flushes, never commits.
+
+    Returns the number of participants reached on at least one channel.
+    """
+    try:
+        with session.begin_nested():
+            return _notify_split_assigned_inner(
+                session,
+                expense_id=expense_id,
+                group_id=group_id,
+                payer_id=payer_id,
+                currency=currency,
+                now=now,
+            )
+    except Exception as exc:
+        logger.warning(
+            "Split-assigned notification failed for expense %s: %s",
+            expense_id,
+            exc,
+        )
+        return 0
+
+
+def _notify_split_assigned_inner(
+    session: Session,
+    *,
+    expense_id: uuid.UUID,
+    group_id: uuid.UUID,
+    payer_id: uuid.UUID,
+    currency: str,
+    now: datetime | None,
+) -> int:
+    from app.features.notifications.delivery import (
+        PUSH_TIMEOUT_INLINE_SECONDS,
+        deliver,
+    )
+
+    now = now or datetime.now(timezone.utc)
+
+    expense = session.get(Expense, expense_id)
+    if expense is None:
+        return 0
+
+    splits = session.exec(
+        select(ExpenseSplit).where(ExpenseSplit.expense_id == expense_id)
+    ).all()
+
+    group = session.get(ExpenseGroup, group_id)
+    group_name = group.name if group else "your group"
+    payer = session.get(User, payer_id)
+    payer_name = _display_name(payer)
+
+    reached = 0
+    for split in splits:
+        if split.user_id == payer_id:
+            continue
+        if split.status != SplitStatus.PENDING:
+            continue
+
+        prefs = get_or_create_preferences(session, split.user_id)
+        if not prefs.nudges_enabled:
+            # They asked for silence — but they can still find the expense in
+            # /pending. No channel is attempted, so nothing is recorded.
+            continue
+
+        title, body = render_split_assigned(
+            payer_name=payer_name,
+            group_name=group_name,
+            description=expense.description,
+            amount=split.amount_owed,
+            currency=currency,
+        )
+        # Quiet hours can't DEFER here (no later pass, unlike the sweep) — so
+        # they change channel: email now, no 3am buzz.
+        quiet = is_within_quiet_hours(prefs, now)
+
+        outcomes = deliver(
+            session,
+            user_id=split.user_id,
+            prefs=prefs,
+            title=title,
+            body=body,
+            group_id=group_id,
+            suppress_push=quiet,
+            # Runs while the creator waits for the expense to save.
+            push_timeout=PUSH_TIMEOUT_INLINE_SECONDS,
+        )
+
+        for outcome in outcomes:
+            session.add(
+                Notification(
+                    user_id=split.user_id,
+                    group_id=group_id,
+                    counterparty_user_id=payer_id,
+                    event_type=EVENT_EXPENSE_SPLIT_ASSIGNED,
+                    # Level 0: not a rung on the urgency ladder (mirrors the
+                    # cleared notice), so Escalation Efficacy stays honest.
+                    level=0,
+                    channel=outcome.channel,
+                    status=outcome.status,
+                    amount=split.amount_owed,
+                    currency=currency,
+                    title=title,
+                    body=body,
+                    detail=outcome.detail
+                    or ("quiet hours — email only" if quiet else None),
+                    sent_at=now,
+                )
+            )
+        if any(o.status == NotificationStatus.SENT for o in outcomes):
+            reached += 1
+
+    session.flush()
+    return reached
 
 
 # === Kill-switch telemetry (WS13 — analytics-spec §4 "Mute rate") ===

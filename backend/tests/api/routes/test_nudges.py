@@ -25,6 +25,7 @@ from app.features.auth.models import UserCreate
 from app.features.expenses.models import Expense
 from app.features.notifications import service as nudge_service
 from app.features.notifications.models import (
+    EVENT_EXPENSE_SPLIT_ASSIGNED,
     EVENT_NUDGE_LEVEL_1,
     Notification,
     NotificationChannel,
@@ -147,10 +148,20 @@ def _age_expenses(
 
 
 def _notifications_for(db: Session, user_id: uuid.UUID) -> list[Notification]:
+    """Nudge-ENGINE notifications for a user.
+
+    Deliberately excludes EVENT_EXPENSE_SPLIT_ASSIGNED: splitting an expense
+    now notifies each participant at split time (audit finding F8), which is
+    orthogonal to the nudge ladder these tests exercise. Counting it here
+    would make every "no nudge yet" assertion flaky.
+    """
     db.expire_all()
     return list(
         db.exec(
-            select(Notification).where(Notification.user_id == user_id)
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.event_type != EVENT_EXPENSE_SPLIT_ASSIGNED,
+            )
         ).all()
     )
 

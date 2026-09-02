@@ -153,6 +153,20 @@ SplitRequest = Annotated[
 ]
 
 
+class ExpenseCreateWithSplit(ExpenseCreate):
+    """ExpenseCreate + an optional split applied in the SAME transaction.
+
+    Audit finding F9: creating an expense and splitting it used to be two
+    separate calls the client had to chain, so a failed split left an orphaned
+    split-less DRAFT the user believed had failed. The create endpoint now
+    accepts an optional `split` (the same discriminated union the
+    PUT /{id}/split endpoint takes) and does both atomically. Omit it and the
+    expense is created as a bare DRAFT exactly as before (backward compatible).
+    """
+
+    split: SplitRequest | None = None
+
+
 class ExpenseSplitPublic(SQLModel):
     """Response schema for expense split."""
 

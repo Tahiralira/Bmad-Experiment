@@ -495,6 +495,16 @@ def apply_split(
                 excluded_user_ids=req.excluded_user_ids,
             )
 
+    # A member must not appear twice: an unequal/percentage body could repeat
+    # a user_id, and two rows for one (expense, user) would trip
+    # uq_expense_user_split as a raw 500 at flush. Reject it as a clean domain
+    # error (router → 400) before we insert anything (audit finding F10).
+    seen_user_ids: set[uuid.UUID] = set()
+    for split in splits_data:
+        if split["user_id"] in seen_user_ids:
+            raise ValueError("Each member can appear only once in a split")
+        seen_user_ids.add(split["user_id"])
+
     # Replace any existing splits with the new configuration
     session.exec(delete(ExpenseSplit).where(ExpenseSplit.expense_id == expense.id))
     for split in splits_data:
@@ -519,6 +529,22 @@ def apply_split(
         after_data={"type": req.type, "members": len(splits_data)},
     )
     session.flush()
+
+    # Tell each non-payer participant they have a share to confirm (audit
+    # finding F8 — before this, participants only found out by opening
+    # /pending). Imported inside the function: notifications.service imports
+    # this module's models, so a module-level import would close the cycle.
+    # SAVEPOINT-guarded and never raises — a push failure can't fail a split.
+    from app.features.groups.service import get_group_currency
+    from app.features.notifications.service import notify_split_assigned
+
+    notify_split_assigned(
+        session,
+        expense_id=expense.id,
+        group_id=expense.group_id,
+        payer_id=expense.payer_id,
+        currency=get_group_currency(session, expense.group_id),
+    )
 
     return splits_data
 

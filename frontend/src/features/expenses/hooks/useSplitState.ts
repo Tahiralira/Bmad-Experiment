@@ -16,13 +16,16 @@ interface UseSplitStateProps {
   currency?: string
 }
 
-interface UseSplitStateReturn {
+export interface UseSplitStateReturn {
   /** Current split type */
   splitType: SplitType
   /** Set split type */
   setSplitType: (type: SplitType) => void
-  /** Set of excluded member IDs */
+  /** Set of excluded member IDs (the state's single source of truth) */
   excludedMembers: Set<string>
+  /** Set of INCLUDED member IDs (derived: all members − excluded). This is
+   *  what the chips/amounts UI should render — see the audit F2 note below. */
+  includedMembers: Set<string>
   /** Toggle member exclusion */
   toggleMemberExclusion: (memberId: string) => void
   /** Custom amounts for unequal split (user_id -> amount) */
@@ -108,6 +111,24 @@ export function useSplitState({
       return newType
     })
   }, [])
+
+  // Members actually IN the split (inclusion view). State is stored as
+  // EXCLUSIONS (empty = everyone in), but the chips and amounts UI render an
+  // inclusion model. Deriving it here keeps the exclusion set as the single
+  // source of truth while giving components the set they actually mean.
+  //
+  // Audit F2: EditableExpensePreview used to hand the raw `excludedMembers`
+  // set to MemberChips/SplitAmountsDisplay as if it were the included set, so
+  // the picker showed everyone de-selected on open and "selecting" a person
+  // actually excluded them. Passing THIS derived set fixes that at the root.
+  const includedMembers = useMemo(() => {
+    const included = new Set<string>()
+    for (const m of members) {
+      const id = m.user_id || m.id
+      if (!excludedMembers.has(id)) included.add(id)
+    }
+    return included
+  }, [members, excludedMembers])
 
   // Calculate split amounts based on type and exclusions
   const splitAmounts = useMemo(() => {
@@ -337,6 +358,7 @@ export function useSplitState({
     splitType,
     setSplitType: handleSetSplitType,
     excludedMembers,
+    includedMembers,
     toggleMemberExclusion,
     customAmounts,
     setCustomAmount,
