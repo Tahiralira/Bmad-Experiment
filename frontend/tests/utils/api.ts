@@ -3,10 +3,9 @@ import type { Page } from "@playwright/test"
 const API_URL = process.env.VITE_API_URL ?? "http://localhost:8000"
 
 /**
- * Borrow the signed-in user's token so a test can talk to the API directly.
- *
- * Used only for steps the UI genuinely cannot perform — see `applyEqualSplit`.
- * Anything a user can do, the journeys do through the interface.
+ * Borrow the signed-in user's token so a test can READ API state for an
+ * assertion (see `latestExpense`). Anything a user can DO, the journeys do
+ * through the interface.
  */
 async function authHeader(page: Page): Promise<Record<string, string>> {
   const token = await page.evaluate(() =>
@@ -48,37 +47,4 @@ export async function latestExpense(
   }
 
   return first
-}
-
-/**
- * Split an expense equally across the group.
- *
- * ⚠️ This is a **workaround for a gap in the product**, not a testing
- * shortcut. `ExpenseForm` (the manual "Add Expense" path) posts only
- * `{group_id, amount, description}`, which leaves the expense in `draft`.
- * Nothing in the UI can then assign splits to it: `SplitPicker` is rendered
- * only by `EditableExpensePreview`, which sits behind the AI parse flow, and
- * an expense row on the ledger merely expands. So a manually-created expense
- * can never reach `pending_confirmation`, never be confirmed, and never move
- * a balance.
- *
- * Driving the AI path instead would make CI depend on a hosted LLM key, so
- * these journeys apply the split over the API and continue through the UI
- * from there. When the manual form grows a split step, delete this and let the
- * journey click it.
- */
-export async function applyEqualSplit(
-  page: Page,
-  expenseId: string,
-): Promise<void> {
-  const res = await page.request.put(
-    `${API_URL}/api/v1/expenses/${expenseId}/split`,
-    { headers: await authHeader(page), data: { type: "equal" } },
-  )
-
-  if (!res.ok()) {
-    throw new Error(
-      `Applying the equal split failed: ${res.status()} ${await res.text()}`,
-    )
-  }
 }
