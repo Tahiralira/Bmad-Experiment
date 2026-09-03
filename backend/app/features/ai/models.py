@@ -118,6 +118,25 @@ class ExpenseParseRequest(BaseModel):
     )
 
 
+class ExpenseParseSplit(BaseModel):
+    """
+    A split SUGGESTION resolved from the natural-language input (audit F7).
+
+    The AI extracts who to leave in/out ("split with everyone except Tom");
+    the server resolves those names against the group roster into
+    `excluded_user_ids`. It is only ever a PRE-FILL for the split editor,
+    which the user always confirms — so a wrong guess is harmless.
+
+    Only equal-split-with-exclusions is inferred for now; explicit amounts and
+    percentages from prose are left to the editor.
+    """
+
+    type: str = PydanticField(default="equal", description="Suggested split type")
+    excluded_user_ids: list[uuid.UUID] = PydanticField(
+        default_factory=list, description="Members to leave out of the split"
+    )
+
+
 class ExpenseParseResponse(BaseModel):
     """
     Response from AI expense parsing.
@@ -139,6 +158,11 @@ class ExpenseParseResponse(BaseModel):
     )
     commentary: str = PydanticField(
         ..., description="Personality-flavored AI commentary"
+    )
+    # Split suggestion resolved from the input, or null when the text didn't
+    # say who to split with (the editor then defaults to everyone). Audit F7.
+    split: ExpenseParseSplit | None = PydanticField(
+        default=None, description="Resolved split suggestion (pre-fills the editor)"
     )
 
 

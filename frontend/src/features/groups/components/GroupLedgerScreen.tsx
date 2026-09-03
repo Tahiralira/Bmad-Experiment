@@ -135,6 +135,36 @@ export function GroupLedgerScreen({ groupId }: Props) {
 
   const netBalance = Number(group.net_balance)
 
+  // Light pending-vs-confirmed affordance (audit F11): balances only count
+  // CONFIRMED expenses, so a freshly-added split shows no balance movement.
+  // Surface what's still awaiting confirmation — derivable from the ledger
+  // alone: for an expense I paid, others will owe me (amount − my share); for
+  // one I didn't, I'll owe my share once I confirm.
+  const pending = items.reduce(
+    (acc, { expense, my_split }) => {
+      if (expense.status !== "pending_confirmation") return acc
+      const myShare = my_split ? Number(my_split.amount_owed) : 0
+      if (expense.payer_id === user?.id) {
+        acc.net += Number(expense.amount) - myShare
+        acc.count += 1
+      } else if (my_split && my_split.status === "pending") {
+        acc.net -= myShare
+        acc.count += 1
+      }
+      return acc
+    },
+    { net: 0, count: 0 },
+  )
+  const pendingNoun = pending.count === 1 ? "expense" : "expenses"
+  const pendingLabel =
+    pending.count === 0
+      ? null
+      : Math.abs(pending.net) < 0.005
+        ? `${pending.count} pending ${pendingNoun} awaiting confirmation`
+        : pending.net > 0
+          ? `+${formatCurrency(pending.net, group.currency)} once ${pending.count} pending ${pendingNoun} confirm`
+          : `−${formatCurrency(Math.abs(pending.net), group.currency)} once ${pending.count} pending ${pendingNoun} confirm`
+
   return (
     <CurrencyProvider currency={group.currency}>
     <div className="space-y-8">
@@ -172,6 +202,11 @@ export function GroupLedgerScreen({ groupId }: Props) {
               contextLabel={netBalance < 0 ? "You owe" : "You're owed"}
               contextDescription={`in ${group.name}`}
             />
+            {pendingLabel && (
+              <p className="mt-1.5 text-caption text-text-muted tabular-nums">
+                {pendingLabel}
+              </p>
+            )}
           </div>
           <Button ref={addExpenseRef} onClick={() => setIsAddExpenseOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />

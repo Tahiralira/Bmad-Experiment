@@ -32,22 +32,20 @@ describe("SplitPicker", () => {
     expect(onSelectType).toHaveBeenCalledWith("equal")
   })
 
-  it("disabled cards show coming soon message", () => {
+  it("has no gated cards — every split type is live (audit F13)", () => {
     render(<SplitPicker selectedType={"equal" as SplitType} onSelectType={() => {}} />)
 
-    // Unequal (3.6) and Percentage (3.7) shipped; only Shares (3.8) remains gated
-    expect(screen.queryByText("Coming in Story 3.6")).not.toBeInTheDocument()
-    expect(screen.queryByText("Coming in Story 3.7")).not.toBeInTheDocument()
-    expect(screen.getByText("Coming in Story 3.8")).toBeInTheDocument()
+    // Shares shipped, so no card carries a "Coming in Story ..." message.
+    expect(screen.queryByText(/Coming in Story/i)).not.toBeInTheDocument()
   })
 
-  it("disabled cards are not clickable", () => {
+  it("selects the Shares split when its card is clicked", () => {
     const onSelectType = vi.fn()
     render(<SplitPicker selectedType={"equal" as SplitType} onSelectType={onSelectType} />)
 
     const sharesCard = screen.getByText("Shares").closest("button")
-    expect(sharesCard).toBeDisabled()
+    expect(sharesCard).not.toBeDisabled()
     fireEvent.click(sharesCard!)
-    expect(onSelectType).not.toHaveBeenCalled()
+    expect(onSelectType).toHaveBeenCalledWith("shares")
   })
 })

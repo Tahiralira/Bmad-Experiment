@@ -166,6 +166,25 @@ def _notifications_for(db: Session, user_id: uuid.UUID) -> list[Notification]:
     )
 
 
+def _disable_quiet_hours(db: Session, user_id: uuid.UUID) -> None:
+    """Pin a debtor's quiet-hours window OFF so a sweep's decision doesn't
+    depend on the wall-clock time the suite runs at.
+
+    Default quiet hours are 22:00–08:00 UTC, and a sweep run inside that
+    window suppresses every nudge — so a test that asserts "a nudge is sent"
+    but leaves quiet hours at the default fails for ~10 hours a day. Tests that
+    are ABOUT quiet hours inject their own `now` and set their own window and
+    must not use this.
+    """
+    from app.features.notifications.service import get_or_create_preferences
+
+    prefs = get_or_create_preferences(db, user_id)
+    prefs.quiet_hours_start = None
+    prefs.quiet_hours_end = None
+    db.add(prefs)
+    db.commit()
+
+
 # ---------------------------------------------------------------------------
 # The core contract: per-relationship, per-group — never per-expense
 # ---------------------------------------------------------------------------
@@ -191,6 +210,7 @@ def test_twelve_expenses_produce_one_nudge(client: TestClient, db: Session) -> N
             description=f"Dinner {i} {uuid.uuid4().hex[:6]}",
         )
     _age_expenses(db, group["id"], hours=48)
+    _disable_quiet_hours(db, member_id)
 
     result = nudge_service.run_nudge_sweep(db, group_id=uuid.UUID(group["id"]))
     db.commit()
@@ -325,6 +345,7 @@ def test_cooldown_makes_repeat_sweeps_idempotent(
         client, owner_headers, [owner_headers, member_headers], group["id"], amount="60.00"
     )
     _age_expenses(db, group["id"], hours=48)
+    _disable_quiet_hours(db, member_id)
 
     nudge_service.run_nudge_sweep(db, group_id=uuid.UUID(group["id"]))
     db.commit()
@@ -372,6 +393,7 @@ def test_snooze_defers_then_expires(client: TestClient, db: Session) -> None:
         client, owner_headers, [owner_headers, member_headers], group["id"], amount="60.00"
     )
     _age_expenses(db, group["id"], hours=48)
+    _disable_quiet_hours(db, member_id)
 
     r = client.put(
         f"{settings.API_V1_STR}/notifications/relationships/{group['id']}/{owner_id}",
@@ -794,6 +816,7 @@ def test_sweep_endpoint_runs_with_the_right_secret(
         client, owner_headers, [owner_headers, member_headers], group["id"], amount="75.00"
     )
     _age_expenses(db, group["id"], hours=48)
+    _disable_quiet_hours(db, member_id)
 
     original = settings.NUDGE_CRON_SECRET
     settings.NUDGE_CRON_SECRET = "the-real-secret"
@@ -818,6 +841,7 @@ def test_dry_run_changes_nothing(client: TestClient, db: Session) -> None:
         client, owner_headers, [owner_headers, member_headers], group["id"], amount="75.00"
     )
     _age_expenses(db, group["id"], hours=48)
+    _disable_quiet_hours(db, member_id)
 
     result = nudge_service.run_nudge_sweep(
         db, group_id=uuid.UUID(group["id"]), dry_run=True
@@ -850,6 +874,7 @@ def test_undeliverable_nudge_is_recorded_not_dropped(
         client, owner_headers, [owner_headers, member_headers], group["id"], amount="90.00"
     )
     _age_expenses(db, group["id"], hours=48)
+    _disable_quiet_hours(db, member_id)
 
     nudge_service.run_nudge_sweep(db, group_id=uuid.UUID(group["id"]))
     db.commit()
@@ -872,6 +897,7 @@ def test_push_disabled_in_preferences_falls_through_to_email(
         client, owner_headers, [owner_headers, member_headers], group["id"], amount="90.00"
     )
     _age_expenses(db, group["id"], hours=48)
+    _disable_quiet_hours(db, member_id)
 
     client.put(
         f"{settings.API_V1_STR}/notifications/preferences",

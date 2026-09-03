@@ -156,6 +156,45 @@ def test_create_with_duplicate_participant_unequal_is_400(
     assert r.status_code == 400
 
 
+def test_create_with_shares_split_apportions_proportionally(
+    client: TestClient, db: Session
+) -> None:
+    """A weighted shares split (2:1) apportions the amount proportionally
+    (audit F13 — the fourth split type)."""
+    group_id, owner_headers, owner_id, _member_headers, member_id = (
+        _two_member_group(client, db)
+    )
+
+    r = client.post(
+        f"{settings.API_V1_STR}/expenses/",
+        headers=owner_headers,
+        json={
+            "group_id": group_id,
+            "amount": "90.00",
+            "description": "Rent",
+            "split": {
+                "type": "shares",
+                "splits": [
+                    {"user_id": str(owner_id), "shares": 2},
+                    {"user_id": str(member_id), "shares": 1},
+                ],
+            },
+        },
+    )
+    assert r.status_code == 200
+    expense = r.json()
+
+    r = client.get(
+        f"{settings.API_V1_STR}/expenses/{expense['id']}/splits",
+        headers=owner_headers,
+    )
+    assert r.status_code == 200
+    splits = {s["user_id"]: Decimal(s["amount_owed"]) for s in r.json()["data"]}
+    assert splits[str(owner_id)] == Decimal("60.00")
+    assert splits[str(member_id)] == Decimal("30.00")
+    assert sum(splits.values()) == Decimal("90.00")
+
+
 def test_split_assignment_notifies_non_payer_only(
     client: TestClient, db: Session
 ) -> None:
